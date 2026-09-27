@@ -478,7 +478,8 @@ function render(){
 }
 
 function renderMonths(ms){
-  const opts = [...ms].reverse().map(m => [m, monthLabel(m)]);
+  const all = [...new Set([...ms, state.period].filter(p => p && p !== 'all'))].sort();
+  const opts = all.reverse().map(m => [m, monthLabel(m)]);
   opts.push(['all','All time']);
   $('#months').innerHTML = opts.map(([v,l]) => `<button class="chip" type="button" data-p="${v}" aria-pressed="${state.period===v}">${l}</button>`).join('');
 }
@@ -798,18 +799,48 @@ function parseCSV(text){
 }
 const dupKey = r => [r.date, (+r.amount).toFixed(2), (r.store||'').toLowerCase()].join('|');
 
+// Column names accepted on import (compared lowercase, letters only).
+const HEADER_ALIASES = {
+  date:['date','day'], amount:['amount','amounteur','price','cost','value'], store:['store','merchant','shop','payee','description'],
+  category:['category'], subcategory:['subcategory','sub'], account:['account','accountcard','card','paymentmethod'],
+  spender:['spender','paidby','who','person'], country:['country'], comment:['comment','comments','note','notes']
+};
+const normHead = h => h.toLowerCase().replace(/[^a-z]/g, '');
+
+// Accepts 2026-09-01, 1/9/2026, 01.09.2026, 1-9-2026 (day first, as in Europe).
+function parseDate(v){
+  v = v.trim();
+  let y, m, d, mt;
+  if ((mt = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) [, y, m, d] = mt;
+  else if ((mt = v.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/))) [, d, m, y] = mt;
+  else return null;
+  y = +y; m = +m; d = +d;
+  if (m < 1 || m > 12 || d < 1 || d > new Date(y, m, 0).getDate()) return null;
+  return y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+}
+// Accepts 9.99, €9.99, "€1,200.00", 1.200,00 €, 12,50
+function parseAmount(v){
+  let s = String(v).replace(/[^\d.,\-]/g, '');
+  const lc = s.lastIndexOf(','), ld = s.lastIndexOf('.');
+  if (lc > -1 && ld > -1) s = lc > ld ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  else if (lc > -1) s = /,\d{1,2}$/.test(s) ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  const n = parseFloat(s);
+  return isFinite(n) ? Math.round(n * 100) / 100 : NaN;
+}
+
 $('#importFile').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
-  const rows = parseCSV(await file.text());
-  const head = (rows.shift() || []).map(h => h.trim().toLowerCase());
-  const idx = Object.fromEntries(CSV_COLS.map(c => [c, head.indexOf(c)]));
-  if (idx.date < 0 || idx.amount < 0 || idx.store < 0){ toast('That CSV needs date, amount and store columns.'); return; }
+  const rows = parseCSV((await file.text()).replace(/^\uFEFF/, ''));
+  const head = (rows.shift() || []).map(normHead);
+  const idx = Object.fromEntries(CSV_COLS.map(c => [c, head.findIndex(h => HEADER_ALIASES[c].includes(h))]));
+  if (idx.date < 0 || idx.amount < 0 || idx.store < 0){ toast('That CSV needs Date, Amount and Store columns.'); return; }
   const recs = [], bad = [];
   rows.forEach((r, n) => {
     const o = {}; CSV_COLS.forEach(c => o[c] = idx[c] >= 0 ? (r[idx[c]] || '').trim() : '');
-    o.amount = Math.round(parseFloat(o.amount.replace(/[€\s,]/g, '')) * 100) / 100;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(o.date) || !(o.amount > 0) || !o.store) { bad.push(n + 2); return; }
+    o.amount = parseAmount(o.amount);
+    o.date = parseDate(o.date);
+    if (!o.date || !(o.amount > 0) || !o.store) { bad.push(n + 2); return; }
     o.category ||= 'Uncategorized'; o.account ||= 'Unknown'; o.spender ||= 'Anubhav';
     recs.push(o);
   });
