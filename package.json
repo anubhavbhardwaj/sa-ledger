@@ -1,0 +1,9 @@
+{
+  "name": "sa-ledger",
+  "private": true,
+  "type": "module",
+  "description": "S&A Ledger: static app in public/, capture function in netlify/functions/",
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

@@ -135,6 +135,17 @@ a{color:var(--accent)}
 .unlink{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;border-radius:6px;width:28px;height:28px}
 .unlink:hover{background:var(--danger-soft);color:var(--danger)}
 .muted{color:var(--muted)}
+/* inbox */
+.inboxbtn{position:relative;gap:6px}
+.inboxbtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:var(--surface);font-size:11px;line-height:18px;text-align:center;font-weight:700}
+.ibx{display:grid;gap:10px;max-height:60vh;overflow:auto}
+.ibi{display:grid;gap:6px;border:1px solid var(--line);border-radius:10px;padding:12px}
+.ibi .row1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.ibi .mer{font-weight:600}
+.ibi .amt{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.ibi .raw{font-size:12px;color:var(--muted);white-space:pre-wrap;word-break:break-word}
+.ibi .dup{font-size:12px;color:var(--warn);background:var(--warn-soft);border-radius:6px;padding:4px 8px}
+.ibi .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 /* currencies */
 .amtrow{display:flex;gap:6px}
 .amtrow input{flex:1 1 auto;min-width:0}
@@ -373,6 +384,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <a class="tab" href="#visualizations" data-page="visualizations">Visualizations</a>
     </nav>
     <button class="btn primary" id="addBtn" type="button">+ <span class="long">Add expense</span></button>
+    <button class="btn small inboxbtn" id="inboxBtn" type="button" hidden>To review <span class="badge" id="inboxCount">0</span></button>
     <span class="who"><span class="name">Signed in as <strong id="whoName"></strong></span><button class="btn small" id="logoutBtn" type="button">Sign out</button></span>
   </div>
 </header>
@@ -384,6 +396,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   <section class="page" id="page-overview" data-page="overview">
     <div style="display:grid;gap:18px">
       <div class="install" id="installBar" hidden></div>
+      <div class="banner" id="inboxBar" hidden></div>
       <div class="pagehead"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
       <section class="kpis" id="kpis" aria-label="Summary"></section>
       <section class="panel" id="budgetPanel" hidden></section>
@@ -543,6 +556,15 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   </form>
 </dialog>
 
+<dialog id="inboxDlg">
+  <form method="dialog" style="display:grid;gap:14px;padding:20px">
+    <h3>Captured payments to review</h3>
+    <p class="muted" style="margin:0;font-size:13px">These came from your phone’s payment notifications. <strong>Add</strong> opens the entry pre-filled, so you can check it and pick a trip. Nothing reaches the ledger until you save.</p>
+    <div class="ibx" id="inboxList"></div>
+    <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="inboxClose">Close</button></div></div>
+  </form>
+</dialog>
+
 <div id="tip" hidden></div>
 <div class="toast" id="toast" hidden></div>
 
@@ -606,6 +628,7 @@ catch { fs = initializeFirestore(fbApp, {}); }
 const expensesCol = collection(fs, "expenses");
 const incomeCol = collection(fs, "income");
 const tripsCol = collection(fs, "trips");
+const inboxCol = collection(fs, "inbox");
 const TRIP_TYPE = { visit:'Visit', holiday:'Holiday', other:'Other', office:'Office' };
 const TRIP_KIND = { visit:'Visits', holiday:'Holidays', other:'Other trips', office:'Office trips' };
 const TRIP_DOT = { visit:'var(--s1)', holiday:'var(--s2)', other:'var(--s3)', office:'var(--s7)' };
@@ -632,7 +655,7 @@ const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' +
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { inbox:[], fromInbox:null, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -663,6 +686,10 @@ onAuthStateChanged(auth, user => {
     state.income = snap.docs.map(d => ({ ...d.data(), id: d.id, kind:'income' })).sort(byDate);
     render();
   }, onErr('income')));
+  unsubs.push(onSnapshot(inboxCol, snap => {
+    state.inbox = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => String(b.receivedAt).localeCompare(String(a.receivedAt)));
+    renderInbox(); render();
+  }, () => {}));
   unsubs.push(onSnapshot(settingsCol, snap => {
     const d = snap.docs.find(x => x.id === 'budgets');
     state.budgets = d ? { items:[], ...d.data() } : { items:[] };
@@ -1289,7 +1316,7 @@ function setCur(cur, rate){
 
 function openAdd(kind, tripId){
   if (typeof kind !== 'string') kind = (state.page === 'transactions' && state.txKind === 'income') ? 'income' : 'expense';
-  state.editing = null;
+  state.editing = null; state.fromInbox = null;
   const mine = arr => arr.find(i => i.createdBy === usernameOf(state.user)) || arr[0] || {};
   const lastE = mine(state.items), lastI = mine(state.income);
   FIELDS.forEach(k => F(k).value = '');
@@ -1361,7 +1388,7 @@ $('#form').addEventListener('submit', async e => {
         if (state.period !== 'all') state.period = date.slice(0,7);
         toast('Added income ' + eur.format(amount) + ' from ' + rec.source);
       }
-      dlg.close();
+      doneInbox(); dlg.close();
     } catch (x) { err.textContent = writeError(x); err.hidden = false; }
     finally { $('#saveBtn').disabled = false; }
     return;
@@ -1378,7 +1405,7 @@ $('#form').addEventListener('submit', async e => {
       if (state.period !== 'all') state.period = date.slice(0,7);
       toast('Added ' + eur.format(amount) + ' at ' + rec.store);
     }
-    dlg.close();
+    doneInbox(); dlg.close();
   } catch (x) { err.textContent = writeError(x); err.hidden = false; }
   finally { $('#saveBtn').disabled = false; }
 });
@@ -1864,6 +1891,66 @@ document.addEventListener('click', e => {
   const eb = e.target.closest('[data-editbudgets]'); if (eb){ openBudgets(eb.dataset.editbudgets === 'suggest'); return; }
   const bc = e.target.closest('[data-budgetcat]');
   if (bc){ for (const x of DIMS) state.filters[x] = null; state.q = ''; state.filters.category = bc.dataset.budgetcat; state.filters.tripKind = 'Daily life'; state.txKind = 'expense'; location.hash = 'transactions'; }
+});
+
+// ---------- captured payments inbox ----------
+const localDate = iso => { const d = new Date(iso); return isNaN(d) ? today() : d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m/60) + ' h ago' : Math.round(m/1440) + ' d ago'; };
+const norm = v => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+function historyFor(merchant){
+  const n = norm(merchant); if (n.length < 3) return null;
+  return state.items.find(i => { const s = norm(i.store); return s && (s === n || s.startsWith(n) || n.startsWith(s)); }) || null;
+}
+function possibleDuplicate(it){
+  if (it.direction === 'in') return null;
+  const d = localDate(it.receivedAt), day = 864e5;
+  return state.items.find(i => Math.abs(new Date(i.date) - new Date(d)) <= 3 * day
+    && (it.currency && it.currency !== 'EUR' ? i.currency === it.currency && Math.abs(+i.origAmount - it.amount) < 0.01 : Math.abs(+i.amount - it.amount) < 0.01)) || null;
+}
+function renderInbox(){
+  const n = state.inbox.length;
+  $('#inboxBtn').hidden = !n; $('#inboxCount').textContent = n;
+  const bar = $('#inboxBar');
+  if (bar){ bar.hidden = !n;
+    if (n) bar.innerHTML = `<div class="left"><strong>${n} captured payment${n===1?'':'s'} to review</strong><span class="note" style="font-size:12.5px;color:var(--muted)">Latest: ${esc(state.inbox[0].merchant || state.inbox[0].app || 'Payment')} ${money(state.inbox[0].amount, state.inbox[0].currency || 'EUR')}, ${ago(state.inbox[0].receivedAt)}</span></div><button class="btn primary" type="button" data-openinbox>Review</button>`; }
+  if (!$('#inboxDlg').open) return;
+  $('#inboxList').innerHTML = n ? state.inbox.map(it => {
+    const dup = possibleDuplicate(it);
+    return `<div class="ibi">
+      <div class="row1"><span><span class="mer">${esc(it.merchant || 'Unknown merchant')}</span> <span class="muted" style="font-size:12px">· ${esc(it.app || 'phone')} · ${ago(it.receivedAt)}${it.capturedBy ? ' · ' + esc(cap(it.capturedBy)) : ''}</span></span>
+        <span class="amt ${it.direction === 'in' ? 'inc-amt' : ''}">${it.direction === 'in' ? '+' : ''}${money(it.amount, it.currency || 'EUR')}</span></div>
+      <div class="raw">${esc([it.title, it.text].filter(Boolean).join(' · '))}</div>
+      ${dup ? `<div class="dup">Possibly already added: ${esc(dup.store)} ${eur.format(dup.amount)} on ${shortDate(dup.date)}</div>` : ''}
+      <div class="acts"><button class="btn small" type="button" data-ibdismiss="${esc(it.id)}">Dismiss</button><button class="btn primary small" type="button" data-ibadd="${esc(it.id)}">${it.direction === 'in' ? 'Add as income' : 'Add'}</button></div>
+    </div>`; }).join('') : '<p class="empty" style="margin:0">All caught up. New payment notifications will appear here.</p>';
+}
+function addFromInbox(id){
+  const it = state.inbox.find(x => x.id === id); if (!it) return;
+  $('#inboxDlg').close();
+  const kind = it.direction === 'in' ? 'income' : 'expense';
+  openAdd(kind);
+  state.fromInbox = id;
+  $('#dlgTitle').textContent = kind === 'income' ? 'Add captured income' : 'Add captured payment';
+  F('amount').value = it.amount;
+  F('date').value = localDate(it.receivedAt);
+  F('store').value = it.merchant || '';
+  const h = kind === 'expense' ? historyFor(it.merchant) : null;
+  if (h){ F('category').value = h.category || ''; F('account').value = h.account || ''; F('country').value = h.country || F('country').value; if (h.subcategory) F('subcategory').value = h.subcategory; }
+  if (it.account && (!h || !h.account)) F('account').value = it.account;
+  if (kind === 'income' && !F('category').value) F('category').value = 'Salary';
+  setCur(it.currency || 'EUR');
+  (F('category').value ? $('#saveBtn') : F('category')).focus();
+}
+async function doneInbox(){
+  const id = state.fromInbox; state.fromInbox = null;
+  if (id) try { await deleteDoc(doc(fs, 'inbox', id)); } catch {}
+}
+$('#inboxClose').addEventListener('click', () => $('#inboxDlg').close());
+document.addEventListener('click', async e => {
+  if (e.target.closest('#inboxBtn') || e.target.closest('[data-openinbox]')){ $('#inboxDlg').showModal(); renderInbox(); return; }
+  const a = e.target.closest('[data-ibadd]'); if (a){ addFromInbox(a.dataset.ibadd); return; }
+  const d = e.target.closest('[data-ibdismiss]');
+  if (d){ d.disabled = true; try { await deleteDoc(doc(fs, 'inbox', d.dataset.ibdismiss)); toast('Dismissed'); } catch (x){ toast(writeError(x)); d.disabled = false; } }
 });
 
 // ---------- install as an app ----------

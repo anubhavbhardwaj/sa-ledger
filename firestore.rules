@@ -92,6 +92,13 @@ service cloud.firestore {
       allow write: if isMember() && id == 'budgets' && validBudgets();
     }
 
+    // Captured payment notifications. Only the capture function (server, admin access) creates them;
+    // the app reads them and deletes each one once it's added or dismissed.
+    match /inbox/{id} {
+      allow read, delete: if isMember();
+      allow create, update: if false;
+    }
+
     // Everything else stays locked.
     match /{document=**} {
       allow read, write: if false;
