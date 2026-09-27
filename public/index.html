@@ -27,6 +27,7 @@ img{max-width:100%}
   --accent:#1F6F5C; --accent-ink:#FFFFFF; --accent-soft:#D5E8E0; --bar:#2C8A72; --bar-dim:#BCD6CC;
   --danger:#B0412B; --danger-soft:#F6E1DB; --up:#B0412B; --down:#1F6F5C;
   --c-exp:#0E8A67; --c-inc:#4B6BC8; --inc-ink:#3552A8;
+  --good:#1F7A4D; --good-soft:#DDF0E5; --warn:#9A5B00; --warn-soft:#F8EACB;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#9AA39F;
   --shadow:0 1px 2px rgba(21,32,28,.06),0 8px 24px rgba(21,32,28,.06);
   --f-display:"Schibsted Grotesk",ui-sans-serif,system-ui,sans-serif;
@@ -41,6 +42,7 @@ img{max-width:100%}
     --accent:#55B99A; --accent-ink:#0B1411; --accent-soft:#1B3A30; --bar:#4FAF91; --bar-dim:#2A4A3F;
     --danger:#E27A62; --danger-soft:#3A221C; --up:#E27A62; --down:#55B99A;
     --c-exp:#2DA884; --c-inc:#6F8BE0; --inc-ink:#9DB1F0;
+    --good:#5CC48F; --good-soft:#173527; --warn:#E6AE4A; --warn-soft:#3A2D14;
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#5E6863;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
   }
@@ -52,6 +54,7 @@ img{max-width:100%}
   --accent:#55B99A; --accent-ink:#0B1411; --accent-soft:#1B3A30; --bar:#4FAF91; --bar-dim:#2A4A3F;
   --danger:#E27A62; --danger-soft:#3A221C; --up:#E27A62; --down:#55B99A;
     --c-exp:#2DA884; --c-inc:#6F8BE0; --inc-ink:#9DB1F0;
+    --good:#5CC48F; --good-soft:#173527; --warn:#E6AE4A; --warn-soft:#3A2D14;
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#5E6863;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
 }
@@ -132,6 +135,52 @@ a{color:var(--accent)}
 .unlink{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;border-radius:6px;width:28px;height:28px}
 .unlink:hover{background:var(--danger-soft);color:var(--danger)}
 .muted{color:var(--muted)}
+/* currencies */
+.amtrow{display:flex;gap:6px}
+.amtrow input{flex:1 1 auto;min-width:0}
+.amtrow select{flex:0 0 auto;width:auto!important}
+.fxline{grid-column:1/-1;font-size:12.5px;color:var(--ink-2);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;background:var(--sunk);border-radius:8px;padding:8px 10px}
+.fxline label{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.fxline input{width:120px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);font-family:var(--f-mono)}
+.fxline .err{margin:0}
+.orig{display:block;font-size:11px;color:var(--muted);font-weight:400;font-family:var(--f-mono)}
+/* budgets */
+.brows{display:grid;gap:4px}
+.brow{display:grid;grid-template-columns:minmax(110px,170px) minmax(0,1fr) 170px 104px;gap:12px;align-items:center;padding:6px 4px;border-radius:8px;background:none;border:0;text-align:left;cursor:pointer;width:100%;color:var(--ink)}
+.brow:hover{background:var(--sunk)}
+.brow.total{cursor:default;border-bottom:1px solid var(--line);border-radius:0;padding-bottom:10px;margin-bottom:4px}
+.brow.total:hover{background:none}
+.brow .bn{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brow.total .bn{font-weight:600}
+.brow .bn small{color:var(--muted);font-size:11px;margin-left:6px}
+.bbar{position:relative;height:10px;background:var(--sunk);border-radius:5px}
+.bbar > span{display:block;height:100%;border-radius:5px;background:var(--good)}
+.bbar > span.risk{background:var(--warn)}
+.bbar > span.over{background:var(--danger)}
+.bbar > span.neutral{background:var(--bar)}
+.bbar > i{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink-2);border-radius:1px}
+.bamt{font-family:var(--f-mono);font-size:12.5px;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.bamt small{color:var(--muted)}
+.pill{justify-self:end;display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.ontrack,.pill.under{background:var(--good-soft);color:var(--good)}
+.pill.risk{background:var(--warn-soft);color:var(--warn)}
+.pill.over{background:var(--danger-soft);color:var(--danger)}
+.pill.paid,.pill.planned{background:var(--sunk);color:var(--ink-2)}
+.bfoot{font-size:12.5px;color:var(--muted)}
+.bedit{display:grid;gap:2px;max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:4px}
+.berow{display:grid;grid-template-columns:minmax(0,1fr) 90px 110px 58px;gap:10px;align-items:center;padding:5px 8px;border-radius:6px}
+.berow:nth-child(even){background:var(--sunk)}
+.berow.head{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;background:none!important}
+.berow .ref{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-align:right}
+.berow input[type=number]{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:5px 8px;font-family:var(--f-mono);text-align:right}
+.berow label{display:flex;justify-content:center}
+.berow input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent)}
+@media (max-width:640px){
+  .brow{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n p" "b b" "a a";gap:6px 10px;padding:8px 2px}
+  .brow .bn{grid-area:n}.brow .pill{grid-area:p}.brow .bbar{grid-area:b}.brow .bamt{grid-area:a;text-align:left}
+  .berow{grid-template-columns:minmax(0,1fr) 96px 44px}
+  .berow .ref{display:none}
+}
 table.mini{min-width:0;width:100%}
 table.mini td,table.mini th{padding:7px 8px}
 tr.mrow{cursor:pointer}
@@ -337,6 +386,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <div class="install" id="installBar" hidden></div>
       <div class="pagehead"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
       <section class="kpis" id="kpis" aria-label="Summary"></section>
+      <section class="panel" id="budgetPanel" hidden></section>
       <div class="grid">
         <section class="panel span-7">
           <header><h2>Income vs spending</h2><span class="legend"><span><i style="background:var(--c-inc)"></i>Income</span><span><i style="background:var(--c-exp)"></i>Spending</span></span></header>
@@ -467,6 +517,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <label class="f">To<input id="t-end" type="date"></label>
       <label class="f">Who travels<select id="t-traveller"><option>Anubhav</option><option>Sulekha</option><option>Both</option></select></label>
       <label class="f">Budget (€, optional)<input id="t-budget" type="number" step="1" min="0" inputmode="decimal"></label>
+      <label class="f">Local currency<select id="t-currency"></select></label>
       <label class="f full">Notes<input id="t-notes" autocomplete="off"></label>
     </div>
     <p class="hint muted" id="tripHint" style="margin:0;font-size:12.5px"></p>
@@ -474,6 +525,20 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <div class="dlg-actions">
       <button class="btn danger" id="tripDel" type="button" hidden>Delete trip</button>
       <div class="right"><button class="btn" id="tripCancel" type="button">Cancel</button><button class="btn primary" id="tripSave" type="submit">Save trip</button></div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="budDlg">
+  <form id="budForm" novalidate>
+    <h3>Monthly budgets</h3>
+    <p class="muted" style="margin:0;font-size:13px">Budgets cover daily life only; trips have their own budgets. Tick <strong>Fixed</strong> for bills paid once a month (rent, insurance), so they aren’t judged on pace.</p>
+    <div class="bedit" id="budList"></div>
+    <label class="f">Overall daily-life limit per month (optional)<input id="b-total" type="number" step="10" min="0" inputmode="decimal" placeholder="Leave empty to use the sum"></label>
+    <p class="err" id="budErr" hidden></p>
+    <div class="dlg-actions">
+      <button class="btn" id="budSuggest" type="button">Suggest</button>
+      <div class="right"><button class="btn" id="budCancel" type="button">Cancel</button><button class="btn primary" id="budSave" type="submit">Save budgets</button></div>
     </div>
   </form>
 </dialog>
@@ -486,8 +551,9 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <h3 id="dlgTitle">Add expense</h3>
     <div class="seg" role="radiogroup" aria-label="Entry type" id="kindSeg"><button type="button" role="radio" data-kind="expense" aria-checked="true">Expense</button><button type="button" role="radio" data-kind="income" aria-checked="false">Income</button></div>
     <div class="fields">
-      <label class="f">Amount (€)<input class="amount-in" id="f-amount" type="number" step="0.01" min="0" inputmode="decimal" required></label>
+      <label class="f">Amount<span class="amtrow"><input class="amount-in" id="f-amount" type="number" step="0.01" min="0" inputmode="decimal" required><select id="f-cur" aria-label="Currency"></select></span></label>
       <label class="f">Date<input id="f-date" type="date" required></label>
+      <div class="fxline" id="fxLine" hidden><span id="fxText"></span><label>Rate: 1 <span id="fxCur"></span> = €<input id="f-rate" type="number" step="any" min="0" inputmode="decimal" aria-label="Exchange rate in euros"></label></div>
       <label class="f full"><span id="lb-store">Store</span><input id="f-store" list="dl-store" autocomplete="off" required></label>
       <label class="f"><span>Category</span><input id="f-category" list="dl-category" autocomplete="off" required></label>
       <label class="f exp-only">Sub category<input id="f-subcategory" list="dl-subcategory" autocomplete="off" placeholder="e.g. Flight, Taxi"></label>
@@ -543,7 +609,12 @@ const tripsCol = collection(fs, "trips");
 const TRIP_TYPE = { visit:'Visit', holiday:'Holiday', other:'Other', office:'Office' };
 const TRIP_KIND = { visit:'Visits', holiday:'Holidays', other:'Other trips', office:'Office trips' };
 const TRIP_DOT = { visit:'var(--s1)', holiday:'var(--s2)', other:'var(--s3)', office:'var(--s7)' };
-const EXP_KEYS = ['amount','date','store','category','subcategory','account','spender','country','comment','createdAt','createdBy','updatedBy','tripId'];
+const EXP_KEYS = ['amount','date','store','category','subcategory','account','spender','country','comment','createdAt','createdBy','updatedBy','tripId','currency','origAmount','fxRate'];
+const CURRENCIES = ['EUR','INR','CHF','USD','GBP','CZK','PLN','HUF','DKK','SEK','NOK','TRY','JPY','CAD','AUD','SGD','THB'];
+const FIXED_GUESS = /^(rent|insurance|phone\/internet|subscriptions|fitness)$/i;
+const money = (v, c = 'EUR') => { try { return new Intl.NumberFormat('en-IE', {style:'currency', currency:c}).format(v); } catch { return c + ' ' + (+v).toFixed(2); } };
+const origHtml = r => r.currency && r.currency !== 'EUR' && r.origAmount ? `<span class="orig">${money(r.origAmount, r.currency)}</span>` : '';
+const settingsCol = collection(fs, "settings");
 const INCOME_CATS = ['Salary','Bonus','Refund','Interest','Gift','Other'];
 
 const $ = s => document.querySelector(s);
@@ -561,7 +632,7 @@ const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' +
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -592,6 +663,11 @@ onAuthStateChanged(auth, user => {
     state.income = snap.docs.map(d => ({ ...d.data(), id: d.id, kind:'income' })).sort(byDate);
     render();
   }, onErr('income')));
+  unsubs.push(onSnapshot(settingsCol, snap => {
+    const d = snap.docs.find(x => x.id === 'budgets');
+    state.budgets = d ? { items:[], ...d.data() } : { items:[] };
+    render();
+  }, onErr('budgets')));
   unsubs.push(onSnapshot(tripsCol, snap => {
     state.trips = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     state.tripsReady = true; derive(); render();
@@ -754,6 +830,7 @@ function renderOverview(ms){
     <div class="kpi"><span class="lbl">Top category</span><span class="val">${top?esc(top.key):'—'}</span><span class="sub">${top?eur.format(top.total)+' · '+(top.total/total*100).toFixed(0)+'% of spend':''}</span></div>
     <div class="kpi"><span class="lbl">Largest expense</span><span class="val">${big?eur.format(big.amount):'—'}</span><span class="sub">${big?esc(big.store)+(big.comment?' · '+esc(big.comment):''):''}</span></div>
     <div class="kpi"><span class="lbl">Who paid</span><span class="val">${rows.length} <span style="font-size:14px;font-weight:500;color:var(--muted)">txns</span></span><span class="sub">${who.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ')} · ${eur.format(total/days)}/day</span></div>`;
+  renderBudgets();
   renderIncomeVsSpend($('#ovTrend'));
   renderBars('category', $('#ovCats'), {max:6, filtered:false, goto:'transactions'});
   const recent = [...rows.map(r => ({...r, kind:'expense'})), ...inc]
@@ -762,12 +839,12 @@ function renderOverview(ms){
     <div class="r" data-edit="${esc(r.id)}" data-kind="income" tabindex="0" role="button">
       <span class="d">${r.date.slice(8,10)} ${MON[+r.date.slice(5,7)-1]}</span>
       <span><span class="store">${esc(r.source)}</span><br><span class="meta">Income · ${esc(r.category)} · ${esc(r.account)} · ${esc(r.earner)}</span></span>
-      <span class="a inc-amt">+${eur.format(r.amount)}</span>
+      <span class="a inc-amt">+${eur.format(r.amount)}${origHtml(r)}</span>
     </div>` : `
     <div class="r" data-edit="${esc(r.id)}" data-kind="expense" tabindex="0" role="button">
       <span class="d">${r.date.slice(8,10)} ${MON[+r.date.slice(5,7)-1]}</span>
       <span><span class="store">${esc(r.store)}</span><br><span class="meta">${esc(r.category)} · ${esc(r.account)} · ${esc(r.spender)}${r.tripId && state.tripMap[r.tripId] ? ' · ' + esc(state.tripMap[r.tripId].name) : ''}</span></span>
-      <span class="a">${eur.format(r.amount)}</span>
+      <span class="a">${eur.format(r.amount)}${origHtml(r)}</span>
     </div>`).join('') : `<div class="empty">${state.ready ? 'Nothing in this period yet. Add an expense or income with the + button.' : 'Loading…'}</div>`;
 }
 
@@ -834,7 +911,7 @@ function renderTransactions(){
       <td class="acct dcol">${esc(r.account)}</td>
       <td class="dcol">${esc(r.spender)}</td>
       <td class="cc dcol" title="${esc(r.country)}">${esc(CC[r.country] || r.country || '')}</td>
-      <td class="amt">${eur.format(r.amount)}</td>
+      <td class="amt">${eur.format(r.amount)}${origHtml(r)}</td>
     </tr>`).join('');
   $('#foot').innerHTML = rows.length ? `<tr><td colspan="6">Total</td><td class="amt">${eur.format(sum(rows))}</td></tr>` : '';
   $('#status').textContent = !state.ready ? 'Loading…' : rows.length ? 'Click a row to edit or delete it.' : state.items.length ? 'No transactions match. Clear a filter or pick another month.' : 'No expenses yet. Add one, or use Import CSV.';
@@ -854,7 +931,7 @@ function renderIncomeTable(){
       <td class="acct dcol">${esc(r.account)}</td>
       <td class="dcol">${esc(r.earner)}</td>
       <td class="dcol"></td>
-      <td class="amt inc-amt">+${eur.format(r.amount)}</td>
+      <td class="amt inc-amt">+${eur.format(r.amount)}${origHtml(r)}</td>
     </tr>`).join('');
   $('#foot').innerHTML = rows.length ? `<tr><td colspan="6">Total</td><td class="amt inc-amt">+${eur.format(sum(rows))}</td></tr>` : '';
   $('#status').textContent = !state.ready ? 'Loading…' : rows.length ? 'Click a row to edit or delete it.' : 'No income in this period. Add it with the + button and choose Income.';
@@ -1153,6 +1230,63 @@ function fillTripSelect(cur){
   F('trip').innerHTML = `<option value="">No trip (daily life)</option>` + og('Ongoing', groups.ongoing) + og('Upcoming', groups.upcoming) + og('No dates yet', groups.nodate) + og('Past', groups.past.slice(0, 30));
   F('trip').value = cur || '';
 }
+// ---------- currencies ----------
+const fxCache = {};
+try { Object.assign(fxCache, JSON.parse(localStorage.getItem('fxRates') || '{}')); } catch {}
+async function getRate(cur, date){
+  if (cur === 'EUR') return 1;
+  const d = !date || date >= today() ? 'latest' : date;
+  const key = cur + '|' + d;
+  if (fxCache[key]) return fxCache[key];
+  const r = await fetch(`https://api.frankfurter.dev/v1/${d}?base=${cur}&symbols=EUR`);
+  if (!r.ok) throw new Error('fx ' + r.status);
+  const j = await r.json(), rate = j?.rates?.EUR;
+  if (!(rate > 0)) throw new Error('fx empty');
+  if (d !== 'latest'){ fxCache[key] = rate; try { localStorage.setItem('fxRates', JSON.stringify(fxCache)); } catch {} }
+  return { rate, day: j.date };
+}
+F('cur').innerHTML = CURRENCIES.map(c => `<option>${c}</option>`).join('');
+$('#t-currency').innerHTML = CURRENCIES.map(c => `<option>${c}</option>`).join('');
+let fxSeq = 0;
+function fxShow(){
+  const cur = F('cur').value, rate = parseFloat(F('rate').value), amt = parseFloat(F('amount').value);
+  $('#fxLine').hidden = cur === 'EUR';
+  $('#fxCur').textContent = cur;
+  if (cur === 'EUR') return;
+  $('#fxText').innerHTML = rate > 0 && amt > 0 ? `= <strong>${eur.format(Math.round(amt * rate * 100) / 100)}</strong>${state.fxNote ? ' · ' + state.fxNote : ''}`
+    : rate > 0 ? (state.fxNote || '') : (state.fxNote || 'Getting the exchange rate…');
+}
+async function fxRefresh(){
+  const cur = F('cur').value, date = F('date').value;
+  if (cur === 'EUR'){ F('rate').value = ''; state.fxNote = ''; fxShow(); return; }
+  if (!state.fxAuto){ fxShow(); return; }
+  const my = ++fxSeq; state.fxNote = 'Getting the exchange rate…'; F('rate').value = ''; fxShow();
+  try {
+    const res = await getRate(cur, date);
+    if (my !== fxSeq) return;
+    const rate = typeof res === 'number' ? res : res.rate, day = typeof res === 'number' ? date : res.day;
+    F('rate').value = rate; state.fxNote = `ECB rate${day ? ' for ' + shortDate(day, true) : ''}`;
+  } catch {
+    if (my !== fxSeq) return;
+    state.fxNote = 'Couldn’t fetch the rate. Type it in.';
+  }
+  fxShow();
+}
+F('cur').addEventListener('change', () => { state.fxAuto = true; fxRefresh(); });
+F('date').addEventListener('change', () => { if (F('cur').value !== 'EUR' && state.fxAuto !== false) { state.fxAuto = true; fxRefresh(); } });
+F('rate').addEventListener('input', () => { state.fxAuto = false; state.fxNote = 'Your rate'; fxShow(); });
+F('amount').addEventListener('input', fxShow);
+F('trip').addEventListener('change', () => {
+  const t = state.tripMap[F('trip').value];
+  if (t && t.currency && t.currency !== F('cur').value && !state.editing){ F('cur').value = t.currency; state.fxAuto = true; fxRefresh(); }
+});
+function setCur(cur, rate){
+  F('cur').value = cur || 'EUR';
+  F('rate').value = rate || '';
+  state.fxAuto = !rate; state.fxNote = rate ? 'Saved rate' : '';
+  if (F('cur').value !== 'EUR' && !rate) fxRefresh(); else fxShow();
+}
+
 function openAdd(kind, tripId){
   if (typeof kind !== 'string') kind = (state.page === 'transactions' && state.txKind === 'income') ? 'income' : 'expense';
   state.editing = null;
@@ -1167,6 +1301,8 @@ function openAdd(kind, tripId){
   F('account').value = state.lastAccount[kind];
   if (kind === 'income') F('category').value = 'Salary';
   fillTripSelect(tripId || '');
+  const tr = tripId && state.tripMap[tripId];
+  setCur(tr && tr.currency ? tr.currency : 'EUR');
   setKind(kind, false);
   $('#delBtn').hidden = true; resetDel(); $('#formErr').hidden = true;
   dlg.showModal(); F('amount').focus();
@@ -1178,6 +1314,8 @@ function openEdit(id, kind = 'expense'){
   FIELDS.forEach(k => F(k).value = it[k] ?? '');
   if (kind === 'income'){ F('store').value = it.source || ''; F('spender').value = it.earner || 'Anubhav'; }
   else fillTripSelect(it.tripId || '');
+  if (it.currency && it.currency !== 'EUR' && it.origAmount){ F('amount').value = it.origAmount; setCur(it.currency, it.fxRate); }
+  else setCur('EUR');
   setKind(kind, true);
   $('#delBtn').hidden = false; resetDel(); $('#formErr').hidden = true;
   dlg.showModal();
@@ -1199,16 +1337,20 @@ $('#cancelBtn').addEventListener('click', () => dlg.close());
 $('#form').addEventListener('submit', async e => {
   e.preventDefault();
   const err = $('#formErr');
-  const amount = Math.round(parseFloat(F('amount').value) * 100) / 100;
+  const entered = Math.round(parseFloat(F('amount').value) * 100) / 100;
+  const cur = F('cur').value, rate = parseFloat(F('rate').value);
   const date = F('date').value;
+  if (cur !== 'EUR' && !(rate > 0)){ err.textContent = 'Enter the exchange rate, or wait for it to load.'; err.hidden = false; return; }
+  const amount = cur === 'EUR' ? entered : Math.round(entered * rate * 100) / 100;
+  const fx = cur === 'EUR' ? {} : { currency:cur, origAmount:entered, fxRate:rate };
   const need = {store:F('store').value.trim(), category:F('category').value.trim(), account:F('account').value.trim()};
-  if (!(amount > 0)) { err.textContent = 'Enter an amount above zero.'; err.hidden = false; return; }
+  if (!(entered > 0) || !(amount > 0)) { err.textContent = 'Enter an amount above zero.'; err.hidden = false; return; }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { err.textContent = 'Pick a date.'; err.hidden = false; return; }
   const miss = Object.entries(need).filter(([,v]) => !v).map(([k]) => k);
   if (miss.length){ const nm = state.kind === 'income' ? {store:'source', account:'received in'} : {}; err.textContent = 'Fill in ' + miss.map(m => nm[m] || m).join(', ') + '.'; err.hidden = false; return; }
   $('#saveBtn').disabled = true;
   if (state.kind === 'income'){
-    const rec = { amount, date, source:need.store, category:need.category, account:need.account, earner:F('spender').value, comment:F('comment').value.trim() };
+    const rec = { amount, date, source:need.store, category:need.category, account:need.account, earner:F('spender').value, comment:F('comment').value.trim(), ...fx };
     try {
       if (state.editing){
         const old = state.income.find(i => i.id === state.editing) || {};
@@ -1224,7 +1366,7 @@ $('#form').addEventListener('submit', async e => {
     finally { $('#saveBtn').disabled = false; }
     return;
   }
-  const rec = { amount, date, ...need, subcategory:F('subcategory').value.trim(), spender:F('spender').value, country:F('country').value.trim(), comment:F('comment').value.trim() };
+  const rec = { amount, date, ...need, subcategory:F('subcategory').value.trim(), spender:F('spender').value, country:F('country').value.trim(), comment:F('comment').value.trim(), ...fx };
   if (F('trip').value) rec.tripId = F('trip').value;
   try {
     if (state.editing){
@@ -1255,9 +1397,10 @@ const CSV_COLS = ['date','amount','store','category','subcategory','account','sp
 $('#exportBtn').addEventListener('click', () => {
   const isInc = state.txKind === 'income';
   const rows = isInc ? incomeRows() : filtered();
-  const cols = isInc ? ['date','amount','source','category','account','earner','comment'] : CSV_COLS;
+  const cols = [...(isInc ? ['date','amount','source','category','account','earner','comment'] : CSV_COLS), 'currency', 'original_amount'];
+  const out = rows.map(r => ({ ...r, currency: r.currency || 'EUR', original_amount: r.origAmount || r.amount }));
   const q = v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
-  const csv = [cols.join(','), ...rows.slice().reverse().map(r => cols.map(c => q(c==='amount' ? (+r.amount).toFixed(2) : r[c])).join(','))].join('\n');
+  const csv = [cols.join(','), ...out.slice().reverse().map(r => cols.map(c => q(c==='amount' ? (+r.amount).toFixed(2) : r[c])).join(','))].join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
   a.download = (isInc ? 'income-' : 'expenses-') + state.period + '.csv';
@@ -1470,7 +1613,7 @@ function renderTripDetail(t){
   $('#tripDetail').innerHTML = `
     <div><button class="btn ghost" type="button" data-backtrips>← All trips</button></div>
     <div class="tdhead">
-      <div><span class="ttype"><i style="background:${TRIP_DOT[t.type]}"></i>${TRIP_TYPE[t.type]}</span><h1>${esc(t.name)}</h1><p>${fmtRange(t.start, t.end)} · ${esc(t.traveller)}${t.notes ? ' · ' + esc(t.notes) : ''}</p></div>
+      <div><span class="ttype"><i style="background:${TRIP_DOT[t.type]}"></i>${TRIP_TYPE[t.type]}</span><h1>${esc(t.name)}</h1><p>${fmtRange(t.start, t.end)} · ${esc(t.traveller)}${t.currency ? ' · local currency ' + t.currency : ''}${t.notes ? ' · ' + esc(t.notes) : ''}</p></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" type="button" data-edittrip="${esc(t.id)}">Edit trip</button>
         <button class="btn" type="button" data-attach>${state.attachOpen ? 'Close attach' : 'Attach transactions'}</button>
@@ -1478,7 +1621,7 @@ function renderTripDetail(t){
       </div>
     </div>
     <section class="kpis">
-      <div class="kpi"><span class="lbl">Total</span><span class="val">${eur.format(total)}</span><span class="sub">${ex.length} entr${ex.length===1?'y':'ies'}</span></div>
+      <div class="kpi"><span class="lbl">Total</span><span class="val">${eur.format(total)}</span><span class="sub">${ex.length} entr${ex.length===1?'y':'ies'}${t.currency && ex.some(e => e.currency === t.currency) ? ' · incl. ' + money(ex.filter(e => e.currency === t.currency).reduce((a,e) => a + (+e.origAmount||0), 0), t.currency) + ' paid in ' + t.currency : ''}</span></div>
       <div class="kpi"><span class="lbl">Paid by</span><span class="val" style="font-size:18px">${who.length ? who.map(w => esc(w.key)).join(' & ') : '—'}</span><span class="sub">${who.map(w => esc(w.key) + ' ' + eur0.format(w.total)).join(' · ')}</span></div>
       ${budget}
     </section>
@@ -1488,7 +1631,7 @@ function renderTripDetail(t){
         <input class="search" id="attachQ" type="search" placeholder="Search store, category or comment" value="${esc(state.attachQ)}" style="flex:1 1 220px;border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:7px 10px">
         ${t.start ? `<button class="btn small" type="button" data-attachall>${state.attachAll ? 'Only around trip dates' : 'Show all dates'}</button>` : ''}
       </div>
-      ${cand.length ? `<div class="cands" id="cands">${cand.map(i => `<label class="cand"><input type="checkbox" value="${esc(i.id)}"><span class="d">${shortDate(i.date)}</span><span><span class="store">${esc(i.store)}</span><br><span class="m">${esc(i.category)} · ${esc(i.account)} · ${esc(i.spender)}</span></span><span class="a">${eur.format(i.amount)}</span></label>`).join('')}</div>
+      ${cand.length ? `<div class="cands" id="cands">${cand.map(i => `<label class="cand"><input type="checkbox" value="${esc(i.id)}"><span class="d">${shortDate(i.date)}</span><span><span class="store">${esc(i.store)}</span><br><span class="m">${esc(i.category)} · ${esc(i.account)} · ${esc(i.spender)}</span></span><span class="a">${eur.format(i.amount)}${origHtml(i)}</span></label>`).join('')}</div>
       <div style="display:flex;justify-content:flex-end"><button class="btn primary" type="button" id="attachGo" disabled>Attach selected</button></div>`
       : `<p class="empty" style="margin:0">No unlinked expenses ${t.start && !state.attachAll ? 'around these dates. Try “Show all dates”.' : 'match.'}</p>`}
     </section>` : ''}
@@ -1500,7 +1643,7 @@ function renderTripDetail(t){
         <div class="recent">${ex.length ? ex.map(r => `<div class="r withx" data-edit="${esc(r.id)}" data-kind="expense" tabindex="0" role="button">
           <span class="d">${shortDate(r.date)}</span>
           <span><span class="store">${esc(r.store)}</span><br><span class="meta">${esc(r.category)} · ${esc(r.account)} · ${esc(r.spender)}</span></span>
-          <span class="a">${eur.format(r.amount)}</span>
+          <span class="a">${eur.format(r.amount)}${origHtml(r)}</span>
           <button class="unlink" type="button" data-unlink="${esc(r.id)}" aria-label="Unlink ${esc(r.store)} from this trip">×</button></div>`).join('')
           : '<div class="empty">No expenses linked yet. Use “Attach transactions” for past payments, or “Add expense” for new ones.</div>'}</div>
       </section>
@@ -1522,6 +1665,7 @@ function openTripDlg(t, preset){
   T('name').value = src.name || ''; T('start').value = src.start || ''; T('end').value = src.end || '';
   T('traveller').value = src.traveller || (cap(usernameOf(state.user)) === 'Sulekha' ? 'Sulekha' : 'Anubhav');
   T('budget').value = src.budget || ''; T('notes').value = src.notes || '';
+  T('currency').value = src.currency || 'EUR';
   setTripType(src.type || 'visit');
   $('#tripDel').hidden = !t; $('#tripDel').classList.remove('armed'); $('#tripDel').textContent = 'Delete trip';
   $('#tripErr').hidden = true;
@@ -1532,7 +1676,7 @@ $('#tripCancel').addEventListener('click', () => tdlg.close());
 $('#newTrip').addEventListener('click', () => openTripDlg(null));
 $('#repeatVisit').addEventListener('click', () => {
   const last = state.trips.filter(t => t.type === 'visit').sort((a,b) => (b.start||'').localeCompare(a.start||''))[0];
-  openTripDlg(null, last ? { name:last.name, type:'visit', traveller:last.traveller, budget:last.budget } : { type:'visit', name:'Rome visit' });
+  openTripDlg(null, last ? { name:last.name, type:'visit', traveller:last.traveller, budget:last.budget, currency:last.currency } : { type:'visit', name:'Rome visit' });
 });
 $('#tripForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -1546,6 +1690,7 @@ $('#tripForm').addEventListener('submit', async e => {
   if (start) rec.start = start; if (end) rec.end = end;
   const budget = parseFloat(T('budget').value); if (budget > 0) rec.budget = Math.round(budget * 100) / 100;
   const notes = T('notes').value.trim(); if (notes) rec.notes = notes;
+  if (T('currency').value !== 'EUR') rec.currency = T('currency').value;
   $('#tripSave').disabled = true;
   try {
     if (state.editingTrip){
@@ -1607,6 +1752,118 @@ document.addEventListener('change', e => {
 });
 let aqT; document.addEventListener('input', e => {
   if (e.target.id === 'attachQ'){ clearTimeout(aqT); const v = e.target.value; aqT = setTimeout(() => { state.attachQ = v; render(); const el = $('#attachQ'); if (el){ el.focus(); el.setSelectionRange(v.length, v.length); } }, 200); }
+});
+
+// ---------- budgets ----------
+const BUD_LABEL = { ontrack:'On track', risk:'At risk', over:'Over budget', under:'Under budget', paid:'Paid', planned:'Planned' };
+function budgetMap(){ const m = {}; (state.budgets.items || []).forEach(b => { if (b.a > 0) m[b.c] = b; }); return m; }
+function budgetStatus(month){
+  const bm = budgetMap();
+  const [y, m] = month.split('-').map(Number), D = new Date(y, m, 0).getDate();
+  const td = today(), isCur = td.startsWith(month), isPast = month < td.slice(0,7);
+  const d = isCur ? +td.slice(8,10) : isPast ? D : 0;
+  const daily = state.items.filter(i => i.date.startsWith(month) && !i.tripId);
+  const spentBy = {}, maxBy = {};
+  daily.forEach(i => { const a = +i.amount || 0; spentBy[i.category] = (spentBy[i.category] || 0) + a; maxBy[i.category] = Math.max(maxBy[i.category] || 0, a); });
+  // Month-end forecast: the regular trickle is extrapolated, the single largest purchase is not (a one-off shouldn't be projected).
+  const project = (spent, maxTx, fixed) => fixed || !isCur || d < 3 ? spent : spent + Math.max(0, spent - maxTx) / d * (D - d);
+  const judge = (spent, budget, fixed, projected) => {
+    if (spent > budget + 0.005) return 'over';
+    if (isPast) return 'under';
+    if (!isCur) return 'planned';
+    if (fixed) return spent >= budget * 0.98 ? 'paid' : 'ontrack';
+    return projected > budget * 1.05 ? 'risk' : 'ontrack';
+  };
+  const rows = Object.values(bm).map(b => { const spent = spentBy[b.c] || 0, projected = project(spent, maxBy[b.c] || 0, !!b.f);
+    return { cat:b.c, budget:b.a, spent, projected, fixed:!!b.f, status:judge(spent, b.a, !!b.f, projected), expected: isCur && !b.f ? b.a * d / D : null }; });
+  const order = { over:0, risk:1, ontrack:2, paid:3, under:4, planned:5 };
+  rows.sort((a,b) => order[a.status] - order[b.status] || b.spent/b.budget - a.spent/a.budget);
+  const unbudgeted = Object.entries(spentBy).filter(([c]) => !bm[c]).map(([cat, spent]) => ({ cat, spent })).sort((a,b) => b.spent - a.spent);
+  const allDaily = sum(daily);
+  const totalBudget = +state.budgets.total > 0 ? +state.budgets.total : rows.reduce((a,r) => a + r.budget, 0);
+  const fixedShare = rows.filter(r => r.fixed).reduce((a,r) => a + r.budget, 0);
+  // Overall pace: fixed budgets count in full, flexible ones pro rata.
+  const unbSpend = Object.entries(spentBy).filter(([c]) => !bm[c]);
+  const totalProjected = rows.reduce((a,r) => a + Math.max(r.projected, r.fixed ? r.budget : 0), 0)
+    + unbSpend.reduce((a,[c,v]) => a + project(v, maxBy[c] || 0, false), 0);
+  const total = { cat:'All daily life', budget:totalBudget, spent:allDaily, fixed:false,
+    expected: isCur ? fixedShare + (totalBudget - fixedShare) * d / D : null };
+  total.status = judge(allDaily, totalBudget, false, totalProjected);
+  return { rows, unbudgeted, total, d, D, isCur, isPast };
+}
+function bRow(r, isTotal){
+  const pct = r.budget > 0 ? Math.min(100, r.spent / r.budget * 100) : 0;
+  const cls = r.status === 'over' ? 'over' : r.status === 'risk' ? 'risk' : r.status === 'paid' || r.status === 'planned' ? 'neutral' : '';
+  const mark = r.expected != null && r.expected < r.budget ? `<i style="left:calc(${(r.expected / r.budget * 100).toFixed(1)}% - 1px)" title="Expected by today: ${eur0.format(r.expected)}"></i>` : '';
+  const tag = isTotal ? 'div' : 'button type="button"';
+  return `<${tag} class="brow ${isTotal ? 'total' : ''}" ${isTotal ? '' : `data-budgetcat="${esc(r.cat)}" title="Show these transactions"`}>
+    <span class="bn">${esc(r.cat)}${r.fixed ? '<small>fixed</small>' : ''}</span>
+    <span class="bbar"><span class="${cls}" style="width:${pct.toFixed(1)}%"></span>${mark}</span>
+    <span class="bamt">${eur0.format(r.spent)} <small>of ${eur0.format(r.budget)}</small>${r.status === 'over' ? ` <small>(+${eur0.format(r.spent - r.budget)})</small>` : r.budget > r.spent ? ` <small>· ${eur0.format(r.budget - r.spent)} left</small>` : ''}</span>
+    <span class="pill ${r.status}">${BUD_LABEL[r.status]}</span></${isTotal ? 'div' : 'button'}>`;
+}
+function renderBudgets(){
+  const el = $('#budgetPanel');
+  if (state.period === 'all'){ el.hidden = true; return; }
+  el.hidden = false;
+  const has = (state.budgets.items || []).some(b => b.a > 0);
+  if (!has){
+    el.innerHTML = `<header><h2>Budgets</h2></header>
+      <p class="muted" style="margin:0">Set a monthly budget per category to see what’s on track, at risk or over. Daily life only; trips have their own budgets.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-editbudgets="suggest">Suggest budgets from my spending</button><button class="btn" type="button" data-editbudgets>Set budgets myself</button></div>`;
+    return;
+  }
+  const b = budgetStatus(state.period);
+  const counts = ['over','risk'].map(k => b.rows.filter(r => r.status === k).length);
+  el.innerHTML = `<header><h2>Budgets · ${monthLabel(state.period)}</h2><span class="right"><span class="hint">${b.isCur ? `Day ${b.d} of ${b.D} · ` : ''}daily life only${counts[0] || counts[1] ? ` · ${[counts[0] ? counts[0] + ' over' : '', counts[1] ? counts[1] + ' at risk' : ''].filter(Boolean).join(', ')}` : ''}</span><button class="btn small" type="button" data-editbudgets>Edit budgets</button></span></header>
+    <div class="brows">${bRow(b.total, true)}${b.rows.map(r => bRow(r)).join('')}</div>
+    ${b.unbudgeted.length ? `<p class="bfoot" style="margin:0">No budget yet: ${b.unbudgeted.map(u => `${esc(u.cat)} ${eur0.format(u.spent)}`).join(' · ')}</p>` : ''}
+    ${b.isCur ? '<p class="bfoot" style="margin:0">The vertical mark shows where spending would be if it were spread evenly over the month.</p>' : ''}`;
+}
+
+// budgets dialog
+const bdlg = $('#budDlg');
+function refMonth(){
+  const td = today().slice(0,7), ms = monthsPresent().filter(m => m < td);
+  return ms.length ? ms[ms.length - 1] : td;
+}
+function openBudgets(suggest){
+  const bm = budgetMap(), ref = refMonth();
+  const refSpend = {}; state.items.filter(i => i.date.startsWith(ref) && !i.tripId).forEach(i => refSpend[i.category] = (refSpend[i.category] || 0) + (+i.amount || 0));
+  const cats = [...new Set([...Object.keys(bm), ...state.items.map(i => i.category).filter(Boolean)])]
+    .sort((a,b) => (refSpend[b] || 0) - (refSpend[a] || 0) || a.localeCompare(b));
+  state.budRef = { ref, refSpend };
+  $('#budSuggest').textContent = 'Suggest from ' + monthLabel(ref);
+  $('#budList').innerHTML = `<div class="berow head"><span>Category</span><span class="ref">${MON[+ref.slice(5,7)-1]} spend</span><span style="text-align:right">€ / month</span><span style="text-align:center">Fixed</span></div>` +
+    cats.map((c, i) => `<div class="berow"><span>${esc(c)}</span><span class="ref">${refSpend[c] ? eur0.format(refSpend[c]) : '—'}</span>
+      <input type="number" step="10" min="0" inputmode="decimal" data-bcat="${esc(c)}" value="${bm[c] ? bm[c].a : ''}" aria-label="Budget for ${esc(c)}">
+      <label><input type="checkbox" data-bfix="${esc(c)}" ${bm[c] ? (bm[c].f ? 'checked' : '') : (FIXED_GUESS.test(c) ? 'checked' : '')} aria-label="${esc(c)} is fixed"></label></div>`).join('');
+  $('#b-total').value = +state.budgets.total > 0 ? state.budgets.total : '';
+  $('#budErr').hidden = true;
+  if (suggest) suggestBudgets();
+  bdlg.showModal();
+}
+function suggestBudgets(){
+  const { refSpend } = state.budRef;
+  $$('#budList [data-bcat]').forEach(inp => { if (!inp.value && refSpend[inp.dataset.bcat] > 0) inp.value = Math.ceil(refSpend[inp.dataset.bcat] / 10) * 10; });
+}
+$('#budSuggest').addEventListener('click', suggestBudgets);
+$('#budCancel').addEventListener('click', () => bdlg.close());
+$('#budForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const items = $$('#budList [data-bcat]').map(inp => ({ c: inp.dataset.bcat, a: Math.round(parseFloat(inp.value) * 100) / 100,
+    f: $$('#budList [data-bfix]').find(x => x.dataset.bfix === inp.dataset.bcat)?.checked || false })).filter(b => b.a > 0);
+  const rec = { items, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) };
+  const tot = parseFloat($('#b-total').value); if (tot > 0) rec.total = Math.round(tot);
+  $('#budSave').disabled = true;
+  try { await setDoc(doc(fs, 'settings', 'budgets'), rec); bdlg.close(); toast(items.length ? `Saved ${items.length} budget${items.length===1?'':'s'}` : 'Budgets cleared'); }
+  catch (x){ $('#budErr').textContent = writeError(x); $('#budErr').hidden = false; }
+  finally { $('#budSave').disabled = false; }
+});
+document.addEventListener('click', e => {
+  const eb = e.target.closest('[data-editbudgets]'); if (eb){ openBudgets(eb.dataset.editbudgets === 'suggest'); return; }
+  const bc = e.target.closest('[data-budgetcat]');
+  if (bc){ for (const x of DIMS) state.filters[x] = null; state.q = ''; state.filters.category = bc.dataset.budgetcat; state.filters.tripKind = 'Daily life'; state.txKind = 'expense'; location.hash = 'transactions'; }
 });
 
 // ---------- install as an app ----------
