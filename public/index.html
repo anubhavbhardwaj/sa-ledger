@@ -100,6 +100,38 @@ a{color:var(--accent)}
 .leg .am{font-family:var(--f-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
 .leg .pc{color:var(--muted);font-size:11px;margin-left:6px;display:inline-block;min-width:28px;text-align:right}
 .mwrap{overflow-x:auto}
+/* trips */
+.tgroup{display:grid;gap:10px}
+.tgroup > h2{font:700 13px/1.2 var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:6px 0 0}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.tcard{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:6px;cursor:pointer;color:var(--ink);align-content:start}
+.tcard:hover{border-color:var(--muted)}
+.tcard .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tname{font:700 16px/1.25 var(--f-display)}
+.tmeta{font-size:12.5px;color:var(--muted)}
+.ttotal{font:700 20px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.ttype{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--ink-2);background:var(--sunk);border-radius:999px;padding:2px 9px 2px 7px;white-space:nowrap}
+.ttype i{width:8px;height:8px;border-radius:50%}
+.tmix{display:flex;height:6px;border-radius:3px;overflow:hidden;gap:2px;background:var(--sunk)}
+.tmix span{display:block;height:100%}
+.prog{height:6px;background:var(--sunk);border-radius:3px;overflow:hidden}
+.prog span{display:block;height:100%;background:var(--bar);border-radius:3px}
+.prog.over span{background:var(--danger)}
+.tdhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+.tdhead h1{font:800 clamp(22px,3.4vw,30px)/1.1 var(--f-display);letter-spacing:-.02em;margin:4px 0 0}
+.tdhead p{margin:4px 0 0;color:var(--muted)}
+.cands{display:grid;max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.cand{display:grid;grid-template-columns:22px 58px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer}
+.cand:last-child{border-bottom:0}
+.cand:hover{background:var(--sunk)}
+.cand input{width:16px;height:16px;accent-color:var(--accent)}
+.cand .d{font-family:var(--f-mono);font-size:12px;color:var(--ink-2)}
+.cand .m{font-size:12px;color:var(--muted)}
+.cand .a{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.recent .r.withx{grid-template-columns:52px 1fr auto 28px}
+.unlink{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;border-radius:6px;width:28px;height:28px}
+.unlink:hover{background:var(--danger-soft);color:var(--danger)}
+.muted{color:var(--muted)}
 table.mini{min-width:0;width:100%}
 table.mini td,table.mini th{padding:7px 8px}
 tr.mrow{cursor:pointer}
@@ -117,7 +149,7 @@ table.mini th.num{font-family:var(--f-body)}
   .appbar-in{min-height:52px}
   .appbar .tabs,.appbar #addBtn{display:none}
   .appbar .logo{margin-right:auto}
-  .bottomnav{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .bottomnav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
   .btab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px 7px;text-decoration:none;color:var(--muted);font-size:11px;font-weight:500;position:relative}
   .btab svg{width:22px;height:22px}
   .btab[aria-current="page"]{color:var(--accent);font-weight:600}
@@ -183,8 +215,8 @@ table.mini th.num{font-family:var(--f-body)}
 .panel h2{font:700 15px/1.2 var(--f-display);margin:0}
 .panel .hint{font-size:12px;color:var(--muted);margin:0}
 .panel header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
-.span-7{grid-column:span 7}.span-5{grid-column:span 5}.span-6{grid-column:span 6}.span-12{grid-column:span 12}
-@media (max-width:860px){.span-7,.span-5,.span-6{grid-column:span 12}}
+.span-4{grid-column:span 4}.span-7{grid-column:span 7}.span-5{grid-column:span 5}.span-6{grid-column:span 6}.span-12{grid-column:span 12}
+@media (max-width:860px){.span-7,.span-5,.span-6,.span-4{grid-column:span 12}}
 
 svg text{fill:var(--muted);font-family:var(--f-mono);font-size:11px}
 .gridline{stroke:var(--line);stroke-width:1}
@@ -288,6 +320,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <nav class="tabs" aria-label="Pages">
       <a class="tab" href="#overview" data-page="overview">Overview</a>
       <a class="tab" href="#transactions" data-page="transactions">Transactions<span class="badge" id="fbadge" hidden></span></a>
+      <a class="tab" href="#trips" data-page="trips">Trips</a>
       <a class="tab" href="#visualizations" data-page="visualizations">Visualizations</a>
     </nav>
     <button class="btn primary" id="addBtn" type="button">+ <span class="long">Add expense</span></button>
@@ -341,6 +374,8 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <label><span class="lbl">Spender</span><select id="fl-spender"></select></label>
         <label><span class="lbl">Account</span><select id="fl-account"></select></label>
         <label><span class="lbl">Country</span><select id="fl-country"></select></label>
+        <label><span class="lbl">Trip type</span><select id="fl-tripKind"></select></label>
+        <label><span class="lbl">Trip</span><select id="fl-tripName"></select></label>
       </div>
       <div class="filterline" id="txFilters"></div>
       <section class="panel">
@@ -353,6 +388,22 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         </div>
         <p class="status" id="status">Loading…</p>
       </section>
+    </div>
+  </section>
+
+  <!-- TRIPS -->
+  <section class="page" id="page-trips" data-page="trips" hidden>
+    <div style="display:grid;gap:16px">
+      <div id="tripListView" style="display:grid;gap:16px">
+        <div class="pagehead">
+          <div><h1>Trips</h1><p>Visits, holidays and office travel. Link any expense to a trip, whenever it was paid.</p></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="repeatVisit" type="button">Repeat last visit</button><button class="btn primary" id="newTrip" type="button">+ New trip</button></div>
+        </div>
+        <div class="banner" id="tripSetup" hidden></div>
+        <section class="kpis" id="tripKpis" aria-label="Trip summary"></section>
+        <div id="tripList" style="display:grid;gap:18px"></div>
+      </div>
+      <div id="tripDetail" hidden style="display:grid;gap:16px"></div>
     </div>
   </section>
 
@@ -371,18 +422,22 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
           <div id="cum"></div>
         </section>
         <section class="panel span-6">
+          <header><h2>Daily life vs trips</h2><span class="right" data-vzslot="tripKind"></span></header>
+          <div class="hbars" id="byTripKind"></div>
+        </section>
+        <section class="panel span-6">
           <header><h2>By category</h2><span class="right" data-vzslot="category"></span></header>
           <div class="hbars" id="byCategory"></div>
         </section>
-        <section class="panel span-6">
+        <section class="panel span-4">
           <header><h2>By spender</h2><span class="right" data-vzslot="spender"></span></header>
           <div class="hbars" id="bySpender"></div>
         </section>
-        <section class="panel span-6">
+        <section class="panel span-4">
           <header><h2>By account</h2><span class="right" data-vzslot="account"></span></header>
           <div class="hbars" id="byAccount"></div>
         </section>
-        <section class="panel span-6">
+        <section class="panel span-4">
           <header><h2>By country</h2><span class="right" data-vzslot="country"></span></header>
           <div class="hbars" id="byCountry"></div>
         </section>
@@ -394,10 +449,34 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 <nav class="bottomnav" aria-label="Pages">
   <a class="btab" href="#overview" data-page="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
   <a class="btab" href="#transactions" data-page="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Transactions</span><span class="bdot" id="fbadge2" hidden></span></a>
+  <a class="btab" href="#trips" data-page="trips"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 19h19"/><path d="M4.5 13.5l3.5 1.2 9-5.2c1.2-.7 2.8-.4 3.3.6.4.8-.1 1.7-1 2.2L8.6 18.2 3.4 15.9z"/><path d="M8 9.5l2.4-1.4 4.1 1.6"/></svg><span>Trips</span></a>
   <a class="btab" href="#visualizations" data-page="visualizations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg><span>Visualizations</span></a>
 </nav>
 <button class="fab" id="fab" type="button" aria-label="Add expense">+</button>
 </div>
+
+<dialog id="tripDlg">
+  <form id="tripForm" novalidate>
+    <h3 id="tripDlgTitle">New trip</h3>
+    <div class="seg" role="radiogroup" aria-label="Trip type" id="tripTypeSeg">
+      <button type="button" role="radio" data-ttype="visit">Visit</button><button type="button" role="radio" data-ttype="holiday">Holiday</button><button type="button" role="radio" data-ttype="other">Other</button><button type="button" role="radio" data-ttype="office">Office</button>
+    </div>
+    <div class="fields">
+      <label class="f full">Name<input id="t-name" autocomplete="off" placeholder="e.g. Rome visit"></label>
+      <label class="f">From<input id="t-start" type="date"></label>
+      <label class="f">To<input id="t-end" type="date"></label>
+      <label class="f">Who travels<select id="t-traveller"><option>Anubhav</option><option>Sulekha</option><option>Both</option></select></label>
+      <label class="f">Budget (€, optional)<input id="t-budget" type="number" step="1" min="0" inputmode="decimal"></label>
+      <label class="f full">Notes<input id="t-notes" autocomplete="off"></label>
+    </div>
+    <p class="hint muted" id="tripHint" style="margin:0;font-size:12.5px"></p>
+    <p class="err" id="tripErr" hidden></p>
+    <div class="dlg-actions">
+      <button class="btn danger" id="tripDel" type="button" hidden>Delete trip</button>
+      <div class="right"><button class="btn" id="tripCancel" type="button">Cancel</button><button class="btn primary" id="tripSave" type="submit">Save trip</button></div>
+    </div>
+  </form>
+</dialog>
 
 <div id="tip" hidden></div>
 <div class="toast" id="toast" hidden></div>
@@ -411,10 +490,11 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <label class="f">Date<input id="f-date" type="date" required></label>
       <label class="f full"><span id="lb-store">Store</span><input id="f-store" list="dl-store" autocomplete="off" required></label>
       <label class="f"><span>Category</span><input id="f-category" list="dl-category" autocomplete="off" required></label>
-      <label class="f exp-only">Sub category<input id="f-subcategory" list="dl-subcategory" autocomplete="off" placeholder="e.g. Trip"></label>
+      <label class="f exp-only">Sub category<input id="f-subcategory" list="dl-subcategory" autocomplete="off" placeholder="e.g. Flight, Taxi"></label>
       <label class="f"><span id="lb-account">Account / card</span><input id="f-account" list="dl-account" autocomplete="off" required></label>
       <label class="f"><span id="lb-spender">Spender</span><select id="f-spender"><option>Anubhav</option><option>Sulekha</option></select></label>
       <label class="f exp-only">Country<input id="f-country" list="dl-country" autocomplete="off"></label>
+      <label class="f full exp-only">Trip<select id="f-trip"></select></label>
       <label class="f full">Comment<input id="f-comment" autocomplete="off"></label>
     </div>
     <p class="err" id="formErr" hidden></p>
@@ -459,6 +539,11 @@ try { fs = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabMa
 catch { fs = initializeFirestore(fbApp, {}); }
 const expensesCol = collection(fs, "expenses");
 const incomeCol = collection(fs, "income");
+const tripsCol = collection(fs, "trips");
+const TRIP_TYPE = { visit:'Visit', holiday:'Holiday', other:'Other', office:'Office' };
+const TRIP_KIND = { visit:'Visits', holiday:'Holidays', other:'Other trips', office:'Office trips' };
+const TRIP_DOT = { visit:'var(--s1)', holiday:'var(--s2)', other:'var(--s3)', office:'var(--s7)' };
+const EXP_KEYS = ['amount','date','store','category','subcategory','account','spender','country','comment','createdAt','createdBy','updatedBy','tripId'];
 const INCOME_CATS = ['Salary','Bonus','Refund','Interest','Gift','Other'];
 
 const $ = s => document.querySelector(s);
@@ -467,16 +552,16 @@ const eur = new Intl.NumberFormat('en-IE', {style:'currency', currency:'EUR'});
 const eur0 = new Intl.NumberFormat('en-IE', {style:'currency', currency:'EUR', maximumFractionDigits:0});
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CC = {Germany:'DE', Italy:'IT', India:'IN', France:'FR', Spain:'ES', Switzerland:'CH', Austria:'AT'};
-const DIMS = ['category','spender','account','country'];
-const LABEL = {category:'Category', spender:'Spender', account:'Account', country:'Country'};
-const PAGES = ['overview','transactions','visualizations'];
+const DIMS = ['category','spender','account','country','tripKind','tripName'];
+const LABEL = {category:'Category', spender:'Spender', account:'Account', country:'Country', tripKind:'Trip type', tripName:'Trip'};
+const PAGES = ['overview','transactions','trips','visualizations'];
 const FIELDS = ['amount','date','store','category','subcategory','account','spender','country','comment'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' + y; };
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -486,7 +571,7 @@ onAuthStateChanged(auth, user => {
   state.user = user;
   unsubs.forEach(f => f()); unsubs = [];
   if (!user){
-    state.items = []; state.income = []; state.ready = false;
+    state.items = []; state.income = []; state.trips = []; state.ready = false; state.tripsReady = false;
     $('#app').hidden = true; $('#login').hidden = false; $('#l-user').focus();
     return;
   }
@@ -501,12 +586,16 @@ onAuthStateChanged(auth, user => {
   };
   unsubs.push(onSnapshot(expensesCol, snap => {
     state.items = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort(byDate);
-    state.ready = true; render();
+    state.ready = true; derive(); render();
   }, onErr('the ledger')));
   unsubs.push(onSnapshot(incomeCol, snap => {
     state.income = snap.docs.map(d => ({ ...d.data(), id: d.id, kind:'income' })).sort(byDate);
     render();
   }, onErr('income')));
+  unsubs.push(onSnapshot(tripsCol, snap => {
+    state.trips = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    state.tripsReady = true; derive(); render();
+  }, onErr('trips')));
   route();
 });
 
@@ -531,6 +620,40 @@ $('#loginForm').addEventListener('submit', async e => {
   } finally { $('#loginBtn').disabled = false; $('#loginBtn').textContent = 'Sign in'; }
 });
 $('#logoutBtn').addEventListener('click', () => signOut(auth));
+
+// ---------- trips helpers ----------
+const shortDate = (d, withYear) => { if (!d) return ''; const [y,m,dd] = d.split('-'); return (+dd) + ' ' + MON[+m-1] + (withYear ? ' ' + y : ''); };
+function fmtRange(a, b){
+  if (!a) return 'Dates not set';
+  if (!b || a === b) return shortDate(a, true);
+  const [ya, ma] = a.split('-'), [yb, mb] = b.split('-');
+  if (ya === yb && ma === mb) return (+a.slice(8,10)) + '–' + shortDate(b, true);
+  if (ya === yb) return shortDate(a) + ' – ' + shortDate(b, true);
+  return shortDate(a, true) + ' – ' + shortDate(b, true);
+}
+const tripLabel = t => t.name + (t.start ? ' · ' + fmtRange(t.start, t.end).replace(/ \d{4}$/, '') : '');
+function tripStatus(t){
+  if (!t.start) return 'nodate';
+  const td = today(), end = t.end || t.start;
+  if (td < t.start) return 'upcoming';
+  if (td > end) return 'past';
+  return 'ongoing';
+}
+function derive(){
+  state.tripMap = Object.fromEntries(state.trips.map(t => [t.id, t]));
+  for (const i of state.items){
+    const t = i.tripId && state.tripMap[i.tripId];
+    i.tripKind = t ? TRIP_KIND[t.type] : 'Daily life';
+    i.tripName = t ? tripLabel(t) : 'No trip';
+  }
+}
+function expenseDoc(it, over = {}){
+  const o = {};
+  for (const k of EXP_KEYS){ const v = k in over ? over[k] : it[k]; if (v !== undefined && v !== null && v !== '') o[k] = v; }
+  o.updatedBy = usernameOf(state.user);
+  return o;
+}
+const tripExpenses = id => state.items.filter(i => i.tripId === id);
 
 // ---------- data helpers ----------
 const monthsPresent = () => [...new Set([...state.items, ...state.income].map(i => i.date.slice(0,7)))].sort();
@@ -558,6 +681,8 @@ function route(){
   const h = location.hash.replace('#','');
   if (h === 'add'){ history.replaceState(null, '', '#overview'); if (state.user) setTimeout(openAdd, 0); }
   state.page = PAGES.includes(h) ? h : 'overview';
+  if (state.page !== 'trips') state.openTrip = null;
+  $('#months').hidden = state.page === 'trips';
   $$('section.page').forEach(s => s.hidden = s.dataset.page !== state.page);
   $$('.tab, .btab').forEach(t => t.setAttribute('aria-current', t.dataset.page === state.page ? 'page' : 'false'));
   render();
@@ -580,6 +705,7 @@ function render(){
   if (state.page === 'overview') renderOverview(ms);
   if (state.page === 'transactions') renderTransactions();
   if (state.page === 'visualizations') renderVisualizations();
+  if (state.page === 'trips') renderTrips();
   fillDatalists();
 }
 
@@ -621,6 +747,8 @@ function renderOverview(ms){
   const earners = group(inc, 'earner');
   $('#kpis').innerHTML = `
     <div class="kpi"><span class="lbl">Spent</span><span class="val">${eur.format(total)}</span>${deltaHtml}</div>
+    ${(() => { const onTrips = rows.filter(r => r.tripId); const tt = sum(onTrips); const parts = group(onTrips, 'tripKind');
+      return `<div class="kpi"><span class="lbl">Daily life</span><span class="val">${eur.format(total - tt)}</span><span class="sub">${tt > 0 ? '+ ' + parts.map(p => esc(p.key) + ' ' + eur0.format(p.total)).join(' · ') + ' on trips' : 'No trip spending this period'}</span></div>`; })()}
     <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
     <div class="kpi"><span class="lbl">Net saved</span><span class="val ${net<0?'neg':''}">${net<0?'−':''}${eur.format(Math.abs(net))}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income saved' : 'Spent more than earned') : 'Add income to see savings'}</span></div>
     <div class="kpi"><span class="lbl">Top category</span><span class="val">${top?esc(top.key):'—'}</span><span class="sub">${top?eur.format(top.total)+' · '+(top.total/total*100).toFixed(0)+'% of spend':''}</span></div>
@@ -638,7 +766,7 @@ function renderOverview(ms){
     </div>` : `
     <div class="r" data-edit="${esc(r.id)}" data-kind="expense" tabindex="0" role="button">
       <span class="d">${r.date.slice(8,10)} ${MON[+r.date.slice(5,7)-1]}</span>
-      <span><span class="store">${esc(r.store)}</span><br><span class="meta">${esc(r.category)} · ${esc(r.account)} · ${esc(r.spender)}</span></span>
+      <span><span class="store">${esc(r.store)}</span><br><span class="meta">${esc(r.category)} · ${esc(r.account)} · ${esc(r.spender)}${r.tripId && state.tripMap[r.tripId] ? ' · ' + esc(state.tripMap[r.tripId].name) : ''}</span></span>
       <span class="a">${eur.format(r.amount)}</span>
     </div>`).join('') : `<div class="empty">${state.ready ? 'Nothing in this period yet. Add an expense or income with the + button.' : 'Loading…'}</div>`;
 }
@@ -701,8 +829,8 @@ function renderTransactions(){
   $('#rows').innerHTML = rows.map(r => `
     <tr class="row" data-edit="${esc(r.id)}" tabindex="0">
       <td class="date"><span class="dd">${r.date.slice(8,10)}</span> <span class="mm">${MON[+r.date.slice(5,7)-1]}${state.period==='all'?' '+r.date.slice(2,4):''}</span></td>
-      <td><div class="store">${esc(r.store)}</div><div class="mmeta">${esc(r.category)}${r.subcategory?' · '+esc(r.subcategory):''} · ${esc(r.account)} · ${esc(r.spender)}</div>${r.comment?`<div class="cmt">${esc(r.comment)}</div>`:''}</td>
-      <td class="dcol">${esc(r.category)}${r.subcategory?`<span class="tag">${esc(r.subcategory)}</span>`:''}</td>
+      <td><div class="store">${esc(r.store)}</div><div class="mmeta">${esc(r.category)}${r.subcategory?' · '+esc(r.subcategory):''} · ${esc(r.account)} · ${esc(r.spender)}${r.tripId && state.tripMap[r.tripId] ? ' · ' + esc(state.tripMap[r.tripId].name) : ''}</div>${r.comment?`<div class="cmt">${esc(r.comment)}</div>`:''}</td>
+      <td class="dcol">${esc(r.category)}${r.subcategory?`<span class="tag">${esc(r.subcategory)}</span>`:''}${r.tripId && state.tripMap[r.tripId] ? `<span class="tag" title="${esc(tripLabel(state.tripMap[r.tripId]))}">${esc(state.tripMap[r.tripId].name)}</span>` : ''}</td>
       <td class="acct dcol">${esc(r.account)}</td>
       <td class="dcol">${esc(r.spender)}</td>
       <td class="cc dcol" title="${esc(r.country)}">${esc(CC[r.country] || r.country || '')}</td>
@@ -741,9 +869,9 @@ function renderChips(el, withLink){
 }
 
 // ---------- chart type choices (remembered per device) ----------
-const VZ_TYPES = { trend:['bar','line','table'], cum:['line','bar','table'], category:['bar','pie','table'], spender:['bar','pie','table'], account:['bar','pie','table'], country:['bar','pie','table'] };
+const VZ_TYPES = { tripKind:['bar','pie','table'], trend:['bar','line','table'], cum:['line','bar','table'], category:['bar','pie','table'], spender:['bar','pie','table'], account:['bar','pie','table'], country:['bar','pie','table'] };
 const VZ_LABEL = { bar:'Bar', line:'Line', pie:'Pie', table:'Table' };
-state.vz = { trend:'bar', cum:'line', category:'bar', spender:'bar', account:'bar', country:'bar' };
+state.vz = { tripKind:'pie', trend:'bar', cum:'line', category:'bar', spender:'bar', account:'bar', country:'bar' };
 try { Object.assign(state.vz, JSON.parse(localStorage.getItem('vzTypes') || '{}')); } catch {}
 for (const k in state.vz) if (!VZ_TYPES[k]?.includes(state.vz[k])) state.vz[k] = VZ_TYPES[k][0];
 function vzSwitch(id){
@@ -761,6 +889,7 @@ function renderVisualizations(){
   $$('[data-vzslot]').forEach(el => el.innerHTML = vzSwitch(el.dataset.vzslot));
   renderTrend($('#vzTrend'), true, state.vz.trend);
   renderCum();
+  renderBreakdown('tripKind', $('#byTripKind'));
   renderBreakdown('category', $('#byCategory'), 12);
   renderBreakdown('spender', $('#bySpender'));
   renderBreakdown('account', $('#byAccount'));
@@ -1014,7 +1143,17 @@ function setKind(kind, locked){
   F('category').setAttribute('list', inc ? 'dl-icategory' : 'dl-category');
   $$('#dlg .exp-only').forEach(el => el.hidden = inc);
 }
-function openAdd(kind){
+function fillTripSelect(cur){
+  const groups = { ongoing:[], upcoming:[], past:[], nodate:[] };
+  state.trips.forEach(t => groups[tripStatus(t)].push(t));
+  groups.upcoming.sort((a,b) => a.start.localeCompare(b.start));
+  groups.past.sort((a,b) => (b.end||b.start).localeCompare(a.end||a.start));
+  const opt = t => `<option value="${esc(t.id)}" ${t.id===cur?'selected':''}>${esc(tripLabel(t))}</option>`;
+  const og = (label, arr) => arr.length ? `<optgroup label="${label}">${arr.map(opt).join('')}</optgroup>` : '';
+  F('trip').innerHTML = `<option value="">No trip (daily life)</option>` + og('Ongoing', groups.ongoing) + og('Upcoming', groups.upcoming) + og('No dates yet', groups.nodate) + og('Past', groups.past.slice(0, 30));
+  F('trip').value = cur || '';
+}
+function openAdd(kind, tripId){
   if (typeof kind !== 'string') kind = (state.page === 'transactions' && state.txKind === 'income') ? 'income' : 'expense';
   state.editing = null;
   const mine = arr => arr.find(i => i.createdBy === usernameOf(state.user)) || arr[0] || {};
@@ -1027,6 +1166,7 @@ function openAdd(kind){
   state.lastAccount = { expense: lastE.account || '', income: lastI.account || '' };
   F('account').value = state.lastAccount[kind];
   if (kind === 'income') F('category').value = 'Salary';
+  fillTripSelect(tripId || '');
   setKind(kind, false);
   $('#delBtn').hidden = true; resetDel(); $('#formErr').hidden = true;
   dlg.showModal(); F('amount').focus();
@@ -1037,6 +1177,7 @@ function openEdit(id, kind = 'expense'){
   state.editing = id;
   FIELDS.forEach(k => F(k).value = it[k] ?? '');
   if (kind === 'income'){ F('store').value = it.source || ''; F('spender').value = it.earner || 'Anubhav'; }
+  else fillTripSelect(it.tripId || '');
   setKind(kind, true);
   $('#delBtn').hidden = false; resetDel(); $('#formErr').hidden = true;
   dlg.showModal();
@@ -1084,6 +1225,7 @@ $('#form').addEventListener('submit', async e => {
     return;
   }
   const rec = { amount, date, ...need, subcategory:F('subcategory').value.trim(), spender:F('spender').value, country:F('country').value.trim(), comment:F('comment').value.trim() };
+  if (F('trip').value) rec.tripId = F('trip').value;
   try {
     if (state.editing){
       const old = state.items.find(i => i.id === state.editing) || {};
@@ -1208,6 +1350,263 @@ document.addEventListener('click', async e => {
       toast('Imported ' + recs.length + ' expenses'); render();
     } catch (x){ toast(writeError(x)); e.target.disabled = false; e.target.textContent = 'Retry import'; }
   }
+});
+
+// ---------- trips page ----------
+const SETUP_TRIPS = [
+  { name:'Rome visit', type:'visit', traveller:'Anubhav', start:'2026-09-05', end:'2026-09-14',
+    match:[['2026-09-02',63,'DB'],['2026-09-05',9,'Terravision'],['2026-09-14',3.6,'Buffet Bolzano']] },
+  { name:'Naples', type:'holiday', traveller:'Both', start:'2026-09-11', end:'2026-09-13',
+    match:[['2026-09-11',3,'Atac'],['2026-09-11',7,'Geco'],['2026-09-11',18,'Lantica Pizzeria'],['2026-09-11',22,'Ghee Rice'],['2026-09-11',1.5,'Naz Minimarket'],
+           ['2026-09-11',51.39,'Booking.com'],['2026-09-12',17.47,'Mister Risparmio'],['2026-09-12',6.51,'Volta'],['2026-09-12',14.5,'100 Gradi Srl'],
+           ['2026-09-12',3,'Unico Campania'],['2026-09-12',1.25,"McDonald's"],['2026-09-12',4.18,'Conad'],['2026-09-12',26.03,'Flixbus'],
+           ['2026-09-13',1.5,'Atac'],['2026-09-13',3,'Unico Campania'],['2026-09-14',4.3,'Unico Campania']] },
+  { name:'Rome visit', type:'visit', traveller:'Anubhav', start:'2026-10-29', end:'2026-11-02', match:[['2026-09-07',73.51,'Easyjet']] },
+  { name:'Wedding in India', type:'other', traveller:'Both', start:'2026-11-13', end:'2026-12-06', match:[['2026-09-04',694.97,'Air India']] },
+  { name:'Honeymoon', type:'holiday', traveller:'Both', start:'2026-12-25', end:'2027-01-01',
+    match:[['2026-09-26',294.98,'Vueling'],['2026-09-26',301.48,'Expedia'],['2026-09-26',98,'Ouigo'],['2026-09-26',283.9,'Airbnb'],['2026-09-26',49.52,'IRYO'],['2026-09-26',227.21,'Booking.com']] }
+];
+const STAY_STORES = /booking\.com|expedia|airbnb|hotel|hostel/i;
+function setupPlan(){
+  const used = new Set(), links = [];
+  for (const [ti, t] of SETUP_TRIPS.entries())
+    for (const [d, a, st] of t.match)
+      state.items.filter(i => !i.tripId && !used.has(i.id) && i.date === d && Math.abs(+i.amount - a) < 0.005 && i.store.toLowerCase() === st.toLowerCase())
+        .forEach(i => { used.add(i.id); links.push([ti, i]); });
+  const fixes = state.items.filter(i => i.category === 'Travel' || i.subcategory === 'Trip');
+  return { links, fixes };
+}
+function setupDismissed(){ try { return localStorage.getItem('tripSetupDone') === '1'; } catch { return false; } }
+function renderSetup(){
+  const bar = $('#tripSetup');
+  if (!state.tripsReady || !state.ready || state.trips.length || setupDismissed()){ bar.hidden = true; return; }
+  const { links, fixes } = setupPlan();
+  if (!links.length && !fixes.length){ bar.hidden = true; return; }
+  const per = SETUP_TRIPS.map((t, ti) => links.filter(l => l[0] === ti).length);
+  bar.hidden = false;
+  bar.innerHTML = `<div class="left" style="display:grid;gap:4px"><strong>Set up trips from your existing entries</strong>
+    <span class="note" style="font-size:12.5px;color:var(--muted)">${SETUP_TRIPS.map((t,ti) => `${esc(t.name)} (${fmtRange(t.start,t.end)}): ${per[ti]} entr${per[ti]===1?'y':'ies'}`).join(' · ')}.
+    ${(() => { const nT = fixes.filter(i=>i.category==='Travel').length, nS = fixes.filter(i=>i.subcategory==='Trip').length;
+      return [nT ? `Moves ${nT} “Travel” entr${nT===1?'y':'ies'} to Transportation or Accommodation.` : '', nS ? `Clears the old “Trip” sub category on ${nS} entr${nS===1?'y':'ies'}.` : ''].join(' '); })()}</span></div>
+    <div style="display:flex;gap:8px"><button class="btn" type="button" id="setupSkip">Skip</button><button class="btn primary" type="button" id="setupGo">Set up ${SETUP_TRIPS.length} trips</button></div>`;
+}
+async function runSetup(btn){
+  const { links, fixes } = setupPlan();
+  btn.disabled = true; btn.textContent = 'Setting up…';
+  try {
+    const b = writeBatch(fs), now = new Date().toISOString(), me = usernameOf(state.user);
+    const refs = SETUP_TRIPS.map(t => { const r = doc(tripsCol); const { match, ...rec } = t; b.set(r, { ...rec, createdAt: now, createdBy: me }); return r; });
+    const touched = new Map();
+    for (const i of fixes) touched.set(i.id, { it:i, over:{} });
+    for (const [ti, i] of links){ const e = touched.get(i.id) || { it:i, over:{} }; e.over.tripId = refs[ti].id; touched.set(i.id, e); }
+    for (const { it, over } of touched.values()){
+      if (it.category === 'Travel') over.category = STAY_STORES.test(it.store) ? 'Accommodation' : 'Transportation';
+      if (it.subcategory === 'Trip') over.subcategory = '';
+      b.set(doc(fs, 'expenses', it.id), expenseDoc(it, over));
+    }
+    await b.commit();
+    try { localStorage.setItem('tripSetupDone', '1'); } catch {}
+    toast(`Created ${SETUP_TRIPS.length} trips and updated ${touched.size} entries`);
+  } catch (x){ toast(writeError(x)); btn.disabled = false; btn.textContent = 'Try again'; }
+}
+
+function tripCard(t){
+  const ex = tripExpenses(t.id), total = sum(ex);
+  const cats = group(ex, 'category'), cmap = colorMap('category');
+  const mix = total > 0 ? `<span class="tmix" aria-hidden="true">${cats.map(c => `<span style="width:${(c.total/total*100).toFixed(2)}%;background:${cmap[c.key] || 'var(--s8)'}" title="${esc(c.key)} ${eur.format(c.total)}"></span>`).join('')}</span>` : '';
+  const budget = +t.budget > 0 ? `<span class="prog ${total > t.budget ? 'over' : ''}" title="${eur.format(total)} of ${eur.format(t.budget)} budget"><span style="width:${Math.min(100, total/t.budget*100).toFixed(1)}%"></span></span><span class="tmeta">${eur0.format(total)} of ${eur0.format(t.budget)} budget</span>` : '';
+  return `<button type="button" class="tcard" data-trip="${esc(t.id)}">
+    <span class="top"><span class="ttype"><i style="background:${TRIP_DOT[t.type]}"></i>${TRIP_TYPE[t.type]}</span><span class="tmeta">${fmtRange(t.start, t.end)}</span></span>
+    <span class="tname">${esc(t.name)}</span>
+    <span class="tmeta">${esc(t.traveller)} · ${ex.length} entr${ex.length===1?'y':'ies'}${cats[0] ? ' · mostly ' + esc(cats[0].key) : ''}</span>
+    <span class="ttotal">${eur.format(total)}</span>${mix}${budget}
+  </button>`;
+}
+
+function renderTrips(){
+  renderSetup();
+  const detail = state.openTrip && state.tripMap[state.openTrip];
+  $('#tripListView').hidden = !!detail; $('#tripDetail').hidden = !detail;
+  if (detail) return renderTripDetail(detail);
+  const g = { ongoing:[], upcoming:[], nodate:[], past:[] };
+  state.trips.forEach(t => g[tripStatus(t)].push(t));
+  g.upcoming.sort((a,b) => a.start.localeCompare(b.start));
+  g.past.sort((a,b) => (b.end||b.start).localeCompare(a.end||a.start));
+  // summary
+  const tot = t => sum(tripExpenses(t.id));
+  const visits = state.trips.filter(t => t.type === 'visit');
+  const vPast = visits.filter(t => tripStatus(t) !== 'upcoming' && tot(t) > 0);
+  const byKind = k => state.trips.filter(t => t.type === k).reduce((a,t) => a + tot(t), 0);
+  const next = g.ongoing[0] || g.upcoming[0];
+  const days = next && next.start > today() ? Math.round((new Date(next.start) - new Date(today())) / 864e5) : 0;
+  $('#tripKpis').innerHTML = state.trips.length ? `
+    <div class="kpi"><span class="lbl">All trips</span><span class="val">${eur.format(state.trips.reduce((a,t)=>a+tot(t),0))}</span><span class="sub">${state.trips.length} trip${state.trips.length===1?'':'s'}</span></div>
+    <div class="kpi"><span class="lbl">Visits</span><span class="val">${eur.format(byKind('visit'))}</span><span class="sub">${visits.length} visit${visits.length===1?'':'s'}${vPast.length ? ' · avg ' + eur0.format(vPast.reduce((a,t)=>a+tot(t),0)/vPast.length) + ' each' : ''}</span></div>
+    <div class="kpi"><span class="lbl">Holidays</span><span class="val">${eur.format(byKind('holiday'))}</span><span class="sub">Other ${eur0.format(byKind('other'))} · Office ${eur0.format(byKind('office'))}</span></div>
+    <div class="kpi"><span class="lbl">${g.ongoing[0] ? 'On a trip now' : 'Next trip'}</span><span class="val" style="font-size:18px">${next ? esc(next.name) : '—'}</span><span class="sub">${next ? (g.ongoing[0] ? 'until ' + shortDate(next.end || next.start) : 'in ' + days + ' day' + (days===1?'':'s') + ' · ' + fmtRange(next.start, next.end)) : 'Nothing planned'}</span></div>` : '';
+  $('#tripKpis').hidden = !state.trips.length;
+  const sec = (title, arr) => arr.length ? `<section class="tgroup"><h2>${title}</h2><div class="tgrid">${arr.map(tripCard).join('')}</div></section>` : '';
+  $('#tripList').innerHTML = state.trips.length
+    ? sec('Ongoing', g.ongoing) + sec('Upcoming', g.upcoming) + sec('Dates not set', g.nodate) + sec('Past', g.past)
+    : `<div class="panel"><p class="empty" style="margin:0">${state.tripsReady ? 'No trips yet. Create one with “New trip”, then link its flights, hotels and other costs.' : 'Loading…'}</p></div>`;
+}
+
+function renderTripDetail(t){
+  const ex = tripExpenses(t.id).sort((a,b) => b.date.localeCompare(a.date));
+  const total = sum(ex);
+  const cats = group(ex, 'category'), who = group(ex, 'spender');
+  const maxC = Math.max(1, ...cats.map(c => c.total));
+  const budget = +t.budget > 0 ? `<div class="kpi"><span class="lbl">Budget</span><span class="val ${total > t.budget ? 'neg' : ''}">${eur0.format(t.budget)}</span><span class="sub">${total > t.budget ? eur.format(total - t.budget) + ' over' : eur.format(t.budget - total) + ' left'}</span></div>` : '';
+  // candidates for attaching
+  let cand = [];
+  if (state.attachOpen){
+    const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x.toISOString().slice(0,10); };
+    const from = t.start && !state.attachAll ? addDays(t.start, -60) : '0000';
+    const to = t.start && !state.attachAll ? addDays(t.end || t.start, 7) : '9999';
+    const q = state.attachQ.toLowerCase();
+    cand = state.items.filter(i => !i.tripId && i.date >= from && i.date <= to && (!q || (i.store + ' ' + i.category + ' ' + (i.comment||'')).toLowerCase().includes(q)))
+      .sort((a,b) => b.date.localeCompare(a.date)).slice(0, 200);
+  }
+  $('#tripDetail').innerHTML = `
+    <div><button class="btn ghost" type="button" data-backtrips>← All trips</button></div>
+    <div class="tdhead">
+      <div><span class="ttype"><i style="background:${TRIP_DOT[t.type]}"></i>${TRIP_TYPE[t.type]}</span><h1>${esc(t.name)}</h1><p>${fmtRange(t.start, t.end)} · ${esc(t.traveller)}${t.notes ? ' · ' + esc(t.notes) : ''}</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" type="button" data-edittrip="${esc(t.id)}">Edit trip</button>
+        <button class="btn" type="button" data-attach>${state.attachOpen ? 'Close attach' : 'Attach transactions'}</button>
+        <button class="btn primary" type="button" data-addtotrip="${esc(t.id)}">+ Add expense</button>
+      </div>
+    </div>
+    <section class="kpis">
+      <div class="kpi"><span class="lbl">Total</span><span class="val">${eur.format(total)}</span><span class="sub">${ex.length} entr${ex.length===1?'y':'ies'}</span></div>
+      <div class="kpi"><span class="lbl">Paid by</span><span class="val" style="font-size:18px">${who.length ? who.map(w => esc(w.key)).join(' & ') : '—'}</span><span class="sub">${who.map(w => esc(w.key) + ' ' + eur0.format(w.total)).join(' · ')}</span></div>
+      ${budget}
+    </section>
+    ${state.attachOpen ? `<section class="panel">
+      <header><h2>Attach transactions</h2><span class="hint">${t.start && !state.attachAll ? 'Unlinked expenses from 60 days before the trip to 7 days after' : 'All unlinked expenses'}</span></header>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input class="search" id="attachQ" type="search" placeholder="Search store, category or comment" value="${esc(state.attachQ)}" style="flex:1 1 220px;border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:7px 10px">
+        ${t.start ? `<button class="btn small" type="button" data-attachall>${state.attachAll ? 'Only around trip dates' : 'Show all dates'}</button>` : ''}
+      </div>
+      ${cand.length ? `<div class="cands" id="cands">${cand.map(i => `<label class="cand"><input type="checkbox" value="${esc(i.id)}"><span class="d">${shortDate(i.date)}</span><span><span class="store">${esc(i.store)}</span><br><span class="m">${esc(i.category)} · ${esc(i.account)} · ${esc(i.spender)}</span></span><span class="a">${eur.format(i.amount)}</span></label>`).join('')}</div>
+      <div style="display:flex;justify-content:flex-end"><button class="btn primary" type="button" id="attachGo" disabled>Attach selected</button></div>`
+      : `<p class="empty" style="margin:0">No unlinked expenses ${t.start && !state.attachAll ? 'around these dates. Try “Show all dates”.' : 'match.'}</p>`}
+    </section>` : ''}
+    <div class="grid">
+      <section class="panel span-5"><header><h2>By category</h2></header>
+        <div class="hbars">${cats.length ? cats.map(c => `<div class="hbar" style="cursor:default"><span class="name">${esc(c.key)}</span><span class="track"><span class="fill" style="width:${(c.total/maxC*100).toFixed(1)}%"></span></span><span class="amt">${eur.format(c.total)}<span class="pct">${(c.total/total*100).toFixed(0)}%</span></span></div>`).join('') : '<div class="empty">Nothing linked yet.</div>'}</div>
+      </section>
+      <section class="panel span-7"><header><h2>Linked expenses</h2><span class="hint">Tap to edit · × to unlink</span></header>
+        <div class="recent">${ex.length ? ex.map(r => `<div class="r withx" data-edit="${esc(r.id)}" data-kind="expense" tabindex="0" role="button">
+          <span class="d">${shortDate(r.date)}</span>
+          <span><span class="store">${esc(r.store)}</span><br><span class="meta">${esc(r.category)} · ${esc(r.account)} · ${esc(r.spender)}</span></span>
+          <span class="a">${eur.format(r.amount)}</span>
+          <button class="unlink" type="button" data-unlink="${esc(r.id)}" aria-label="Unlink ${esc(r.store)} from this trip">×</button></div>`).join('')
+          : '<div class="empty">No expenses linked yet. Use “Attach transactions” for past payments, or “Add expense” for new ones.</div>'}</div>
+      </section>
+    </div>`;
+}
+
+// trip dialog
+const tdlg = $('#tripDlg');
+const T = k => $('#t-' + k);
+function setTripType(k){
+  state.tripType = k;
+  $$('#tripTypeSeg [data-ttype]').forEach(b => b.setAttribute('aria-checked', b.dataset.ttype === k));
+  $('#tripHint').textContent = k === 'office' ? 'Tip: when your employer reimburses you, log the refund as Income (category Refund) so your net saved stays right.' : '';
+}
+function openTripDlg(t, preset){
+  state.editingTrip = t ? t.id : null;
+  $('#tripDlgTitle').textContent = t ? 'Edit trip' : 'New trip';
+  const src = t || preset || {};
+  T('name').value = src.name || ''; T('start').value = src.start || ''; T('end').value = src.end || '';
+  T('traveller').value = src.traveller || (cap(usernameOf(state.user)) === 'Sulekha' ? 'Sulekha' : 'Anubhav');
+  T('budget').value = src.budget || ''; T('notes').value = src.notes || '';
+  setTripType(src.type || 'visit');
+  $('#tripDel').hidden = !t; $('#tripDel').classList.remove('armed'); $('#tripDel').textContent = 'Delete trip';
+  $('#tripErr').hidden = true;
+  tdlg.showModal(); (preset ? T('start') : T('name')).focus();
+}
+$('#tripTypeSeg').addEventListener('click', e => { const b = e.target.closest('[data-ttype]'); if (b) setTripType(b.dataset.ttype); });
+$('#tripCancel').addEventListener('click', () => tdlg.close());
+$('#newTrip').addEventListener('click', () => openTripDlg(null));
+$('#repeatVisit').addEventListener('click', () => {
+  const last = state.trips.filter(t => t.type === 'visit').sort((a,b) => (b.start||'').localeCompare(a.start||''))[0];
+  openTripDlg(null, last ? { name:last.name, type:'visit', traveller:last.traveller, budget:last.budget } : { type:'visit', name:'Rome visit' });
+});
+$('#tripForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = $('#tripErr'); err.hidden = true;
+  const type = state.tripType, traveller = T('traveller').value;
+  const name = T('name').value.trim() || (type === 'visit' ? (traveller === 'Sulekha' ? 'Munich visit' : 'Rome visit') : type === 'holiday' ? 'Holiday' : type === 'office' ? 'Office trip' : 'Trip');
+  const start = T('start').value, end = T('end').value;
+  if (end && !start){ err.textContent = 'Add a start date, or clear the end date.'; err.hidden = false; return; }
+  if (start && end && end < start){ err.textContent = 'The end date is before the start date.'; err.hidden = false; return; }
+  const rec = { name, type, traveller };
+  if (start) rec.start = start; if (end) rec.end = end;
+  const budget = parseFloat(T('budget').value); if (budget > 0) rec.budget = Math.round(budget * 100) / 100;
+  const notes = T('notes').value.trim(); if (notes) rec.notes = notes;
+  $('#tripSave').disabled = true;
+  try {
+    if (state.editingTrip){
+      const old = state.tripMap[state.editingTrip] || {};
+      await setDoc(doc(fs, 'trips', state.editingTrip), { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
+      toast('Trip saved');
+    } else {
+      const r = await addDoc(tripsCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
+      if (r && r.id){ state.openTrip = r.id; state.attachOpen = true; state.attachAll = false; state.attachQ = ''; }
+      toast('Trip created. Attach its expenses below.');
+    }
+    tdlg.close(); render();
+  } catch (x){ err.textContent = writeError(x); err.hidden = false; }
+  finally { $('#tripSave').disabled = false; }
+});
+$('#tripDel').addEventListener('click', async () => {
+  const b = $('#tripDel');
+  const n = tripExpenses(state.editingTrip).length;
+  if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = n ? `Delete and unlink ${n}` : 'Confirm delete'; return; }
+  b.disabled = true;
+  try {
+    const batch = writeBatch(fs);
+    tripExpenses(state.editingTrip).forEach(i => batch.set(doc(fs, 'expenses', i.id), expenseDoc(i, { tripId:null })));
+    batch.delete(doc(fs, 'trips', state.editingTrip));
+    await batch.commit();
+    state.openTrip = null; tdlg.close(); toast('Trip deleted. Its expenses are back in daily life.'); render();
+  } catch (x){ $('#tripErr').textContent = writeError(x); $('#tripErr').hidden = false; }
+  finally { b.disabled = false; }
+});
+
+// trip page clicks
+document.addEventListener('click', async e => {
+  const t = e.target;
+  if (t.id === 'setupGo') return runSetup(t);
+  if (t.id === 'setupSkip'){ try { localStorage.setItem('tripSetupDone', '1'); } catch {} $('#tripSetup').hidden = true; return; }
+  const card = t.closest('[data-trip]');
+  if (card){ state.openTrip = card.dataset.trip; state.attachOpen = false; state.attachAll = false; state.attachQ = ''; render(); window.scrollTo(0,0); return; }
+  if (t.closest('[data-backtrips]')){ state.openTrip = null; render(); return; }
+  const et = t.closest('[data-edittrip]'); if (et){ openTripDlg(state.tripMap[et.dataset.edittrip]); return; }
+  const at = t.closest('[data-addtotrip]'); if (at){ openAdd('expense', at.dataset.addtotrip); return; }
+  if (t.closest('[data-attach]')){ state.attachOpen = !state.attachOpen; render(); return; }
+  if (t.closest('[data-attachall]')){ state.attachAll = !state.attachAll; render(); return; }
+  const ul = t.closest('[data-unlink]');
+  if (ul){ e.stopPropagation(); const it = state.items.find(i => i.id === ul.dataset.unlink); if (!it) return;
+    try { await setDoc(doc(fs, 'expenses', it.id), expenseDoc(it, { tripId:null })); toast('Unlinked ' + it.store); } catch (x){ toast(writeError(x)); } return; }
+  if (t.id === 'attachGo'){
+    const ids = $$('#cands input:checked').map(c => c.value);
+    if (!ids.length) return;
+    t.disabled = true; t.textContent = 'Attaching…';
+    try {
+      const b = writeBatch(fs);
+      ids.forEach(id => { const it = state.items.find(i => i.id === id); if (it) b.set(doc(fs, 'expenses', id), expenseDoc(it, { tripId: state.openTrip })); });
+      await b.commit(); state.attachOpen = false; render(); window.scrollTo(0,0); toast(`Attached ${ids.length} expense${ids.length===1?'':'s'}`);
+    } catch (x){ toast(writeError(x)); t.disabled = false; t.textContent = 'Attach selected'; }
+  }
+}, true);
+document.addEventListener('change', e => {
+  if (e.target.closest && e.target.closest('#cands')){ const n = $$('#cands input:checked').length; const b = $('#attachGo'); b.disabled = !n; b.textContent = n ? `Attach ${n} selected` : 'Attach selected'; }
+});
+let aqT; document.addEventListener('input', e => {
+  if (e.target.id === 'attachQ'){ clearTimeout(aqT); const v = e.target.value; aqT = setTimeout(() => { state.attachQ = v; render(); const el = $('#attachQ'); if (el){ el.focus(); el.setSelectionRange(v.length, v.length); } }, 200); }
 });
 
 // ---------- install as an app ----------
