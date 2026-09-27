@@ -1,0 +1,11 @@
+# Netlify serves the app straight from /public. No build step.
+[build]
+  publish = "public"
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "same-origin"
+    Cache-Control = "no-cache"
