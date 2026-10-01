@@ -23,3 +23,11 @@ banking-app notification there; the function reads amount, currency and merchant
 Netlify environment variables (scope: Functions):
 - `FIREBASE_SERVICE_ACCOUNT`: contents of the Firebase service account JSON key
 - `CAPTURE_TOKENS`: `anubhav:<secret>,sulekha:<secret>` (secrets at least 16 characters)
+
+## Daily backup to Google Drive
+
+`netlify/functions/backup.mjs` runs every night (02:15 UTC) and saves the whole ledger as one JSON file
+in a Drive folder called "S&A Ledger backups", keeping the newest 30. It needs these environment
+variables in Netlify, besides `FIREBASE_SERVICE_ACCOUNT`: `GDRIVE_CLIENT_ID`, `GDRIVE_CLIENT_SECRET`,
+`GDRIVE_REFRESH_TOKEN` (OAuth refresh token with the `drive.file` scope). Any backup file can be restored
+from the app's menu with "Restore from backup".

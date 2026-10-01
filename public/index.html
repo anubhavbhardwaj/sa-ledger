@@ -274,6 +274,19 @@ table.mini th.num{font-family:var(--f-body)}
 .ilist .v small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
 .ilist .tot{cursor:default;font-weight:600}.ilist .tot:hover{background:none}
 .pos{color:var(--good)}
+/* to do card */
+.todo{display:grid}
+.todo .t{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line)}
+.todo .t:last-child{border-bottom:0}
+.todo .ic{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--muted);display:grid;place-items:center;font-size:12px;line-height:1}
+.todo .t.done .ic{background:var(--good);border-color:var(--good);color:var(--surface)}
+.todo .t.done .tx{color:var(--muted)}
+.todo .tx b{font-weight:600}
+.todo .sub{display:block;font-size:12px;color:var(--muted)}
+.todo .acts{display:flex;gap:6px;align-items:center}
+.todo .sec{font:700 11px/1 var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:12px 2px 2px}
+.todo .sec:first-child{padding-top:0}
+.btn.small{padding:5px 10px;font-size:13px}
 .modelled{font-size:11px;padding:0 7px;border-radius:4px;background:var(--warn-soft);color:var(--warn);margin-left:6px;vertical-align:1px;font-weight:500}
 .wrapleg{flex-wrap:wrap;gap:6px 14px}
 .sublbl{font-size:12.5px;color:var(--muted)}
@@ -307,6 +320,7 @@ table.snaps tr.row:hover td{background:var(--sunk)}
   #wSeg{width:100%}#wSeg button{flex:1;padding:6px 8px}
   .sirow{grid-template-columns:minmax(0,1fr) 96px 28px}
   .kpis.w .val{font-size:18px;white-space:nowrap}
+  .kpis .kpi:last-child:nth-child(odd){grid-column:1/-1;border-top:1px solid var(--line)}
   table.snaps{font-size:13px}
   table.snaps th:nth-child(4),table.snaps td:nth-child(4){display:none}
   table.snaps td,table.snaps th{padding:7px 4px}
@@ -371,6 +385,8 @@ table.snaps tr.row:hover td{background:var(--sunk)}
 .kpi:last-child{border-right:0}
 .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
 .kpi .val{white-space:nowrap}
+a.kpilink{color:inherit;text-decoration:none}
+a.kpilink:hover{background:var(--sunk)}
 .kpi .val{font:700 26px/1.1 var(--f-display);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
 .kpi .sub{font-size:12.5px;color:var(--muted)}
 .delta{display:inline-flex;align-items:center;gap:4px;font-weight:600;font-size:12.5px;padding:1px 8px;border-radius:999px}
@@ -508,6 +524,8 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <hr>
         <button class="pm-item" role="menuitem" type="button" data-pm="import"><span>Import CSV</span><small>into expenses</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="export"><span>Export CSV</span><small>current transactions view</small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="backup"><span>Download backup</span><small id="pmBackup">everything, one file</small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="restore"><span>Restore from backup</span><small>adds back what’s missing</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="install" id="pmInstall" hidden><span>Install app</span><small>on this device</small></button>
         <hr>
         <button class="pm-item" role="menuitem" type="button" id="logoutBtn"><span>Sign out</span></button>
@@ -524,6 +542,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <div style="display:grid;gap:18px">
       <div class="install" id="installBar" hidden></div>
       <div class="banner" id="inboxBar" hidden></div>
+      <section class="panel" id="todoCard" hidden></section>
       <div class="pagehead"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
       <section class="kpis" id="kpis" aria-label="Summary"></section>
       <section class="panel" id="budgetPanel" hidden></section>
@@ -604,6 +623,9 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
           <div class="seg" role="radiogroup" aria-label="Show" id="wSeg"><button type="button" role="radio" data-wv="inv">Investments</button><button type="button" role="radio" data-wv="cash">Cash &amp; cards</button><button type="button" role="radio" data-wv="fire">FIRE</button></div>
         </div>
 
+        <section class="panel" id="nwAllP" hidden><header><h2>Net worth</h2><span class="hint" id="nwAllHint"></span></header><div id="nwAll"></div>
+          <div class="legend"><span><i style="background:var(--bar)"></i>Investments</span><span><i style="background:var(--c-inc)"></i>Cash &amp; cards</span></div></section>
+
         <div id="wv-inv" class="wview">
           <div class="banner" id="invEmpty" hidden></div>
           <section class="kpis w" id="invKpis" aria-label="Investments"></section>
@@ -621,7 +643,6 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
             <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="newAcc" type="button">+ Account</button><button class="btn" type="button" data-sendindia>Send to India</button><button class="btn primary" id="checkinAll" type="button">Check in balances</button></div></div>
           <div class="banner" id="accSetup" hidden></div>
           <section class="kpis" id="accKpis" aria-label="Cash and cards"></section>
-          <section class="panel" id="nwPanel" hidden><header><h2>Cash &amp; cards over time</h2><span class="hint">Month-end estimates from your check-ins</span></header><div id="nwChart"></div></section>
           <div id="accList" style="display:grid;gap:18px"></div>
         </div>
 
@@ -830,6 +851,15 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   </form>
 </dialog>
 <input id="itFile" type="file" accept=".json,application/json" hidden>
+<input id="rsFile" type="file" accept=".json,application/json" hidden>
+<dialog id="rsDlg">
+  <form id="rsForm" novalidate style="display:grid;gap:14px;padding:20px">
+    <h3>Restore from backup</h3>
+    <div id="rsBody"></div>
+    <p class="err" id="rsErr" hidden></p>
+    <div class="dlg-actions"><div class="right"><button class="btn" id="rsCancel" type="button">Cancel</button><button class="btn primary" id="rsSave" type="submit">Restore</button></div></div>
+  </form>
+</dialog>
 
 <div id="tip" hidden></div>
 <div class="toast" id="toast" hidden></div>
@@ -993,8 +1023,12 @@ onAuthStateChanged(auth, user => {
   unsubs.push(onSnapshot(settingsCol, snap => {
     const d = snap.docs.find(x => x.id === 'budgets');
     state.budgets = d ? { items:[], ...d.data() } : { items:[] };
-    const fx = snap.docs.find(x => x.id === 'fx'), fire = snap.docs.find(x => x.id === 'fire');
-    state.fxMonths = { ...(fx ? fx.data().months || {} : {}), ...state.fxMonthsLocal };
+    const fx = snap.docs.find(x => x.id === 'fx'), fire = snap.docs.find(x => x.id === 'fire'), bk = snap.docs.find(x => x.id === 'backup');
+    state.backup = bk ? bk.data() : null;
+    // Merge per month and per currency, so a rate fetched here never drops one stored for another currency.
+    const stored = fx ? fx.data().months || {} : {}, merged = {};
+    for (const src of [stored, state.fxMonthsLocal]) for (const [m, r] of Object.entries(src || {})) merged[m] = { ...(merged[m] || {}), ...r };
+    state.fxMonths = merged;
     state.fire = fire ? fire.data() : {};
     pfCache = null; render();
   }, onErr('budgets')));
@@ -1128,6 +1162,7 @@ function renderMonths(ms){
 // Overview ignores bar filters: it is the unfiltered picture of the chosen period.
 function renderOverview(ms){
   $('#ovTitle').textContent = 'Overview · ' + periodName();
+  loadRates(); renderTodo(); fillMonthRates();
   const rows = state.items.filter(inPeriod);
   const total = sum(rows);
   let deltaHtml = '<span class="sub">No earlier month to compare</span>';
@@ -1164,7 +1199,8 @@ function renderOverview(ms){
     <div class="kpi"><span class="lbl">Spent</span><span class="val">${eur.format(total)}</span>${deltaHtml}</div>
     <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
     <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' : ''}</span></div>
-    <div class="kpi"><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`;
+    <div class="kpi"><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
+    + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${eur0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : `<span class="${nw.delta >= 0 ? 'pos' : 'neg'}">${signed(nw.delta)}</span> since end of ${MON[+nw.prevM.slice(5,7)-1]}`} · Wealth →</span></a>` : ''; })();
   renderBudgets();
   renderIncomeVsSpend($('#ovTrend'));
   renderBars('category', $('#ovCats'), {max:6, filtered:false, goto:'transactions'});
@@ -2436,37 +2472,6 @@ function netWorthAt(date){
   for (const a of state.accounts){ if (a.type === 'investment') continue; const e = estimate(a, date); if (e){ total += toEur(a, e.balance); any = true; } }
   return any ? total : null;
 }
-function renderNetWorthChart(){
-  const cashIds = new Set(state.accounts.filter(a => a.type !== 'investment').map(a => a.id));
-  const first = state.checkins.filter(c => cashIds.has(c.accountId)).map(c => c.date).sort()[0];
-  const panel = $('#nwPanel');
-  if (!first){ panel.hidden = true; return; }
-  const pts = [];
-  let [y, m] = first.split('-').map(Number);
-  const td = today();
-  while (true){
-    const end = new Date(y, m, 0); const iso = end.getFullYear() + '-' + String(end.getMonth()+1).padStart(2,'0') + '-' + String(end.getDate()).padStart(2,'0');
-    const d = iso > td ? td : iso;
-    const v = netWorthAt(d); if (v !== null) pts.push([d, v]);
-    if (iso >= td) break;
-    m++; if (m > 12){ m = 1; y++; }
-  }
-  if (pts.length < 2){ panel.hidden = true; return; }
-  panel.hidden = false;
-  const W = 640, H = 200, L = innerWidth <= 640 ? 92 : 70, R = 16, T = 14, B = 26;
-  const vals = pts.map(p => p[1]), lo = Math.min(0, ...vals), hi = niceMax(Math.max(...vals) - lo) + lo;
-  const x = i => L + (W-L-R) * (pts.length === 1 ? 0.5 : i/(pts.length-1));
-  const yy = v => T + (H-T-B) * (1 - (v - lo)/(hi - lo || 1));
-  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Net worth by month">`;
-  for (let k=0; k<=4; k++){ const v = lo + (hi-lo)*k/4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${yy(v)}" y2="${yy(v)}"/><text x="${L-8}" y="${yy(v)+4}" text-anchor="end">${eur0.format(v)}</text>`; }
-  const line = pts.map((p,i) => (i?'L':'M') + x(i).toFixed(1) + ',' + yy(p[1]).toFixed(1)).join(' ');
-  s += `<path d="${line}" fill="none" stroke="var(--bar)" stroke-width="2" stroke-linejoin="round"/>`;
-  pts.forEach((p,i) => { s += `<circle cx="${x(i)}" cy="${yy(p[1])}" r="4" fill="var(--surface)" stroke="var(--bar)" stroke-width="2"/><rect x="${x(i)-14}" y="${T}" width="28" height="${H-T-B}" fill="transparent" data-tip="${shortDate(p[0], true)}: ${eur.format(p[1])}"/>`;
-    s += `<text x="${x(i)}" y="${H-6}" text-anchor="middle">${MON[+p[0].slice(5,7)-1]}${p[0].slice(5,7)==='01'||i===0?" '"+p[0].slice(2,4):''}</text>`; });
-  s += `</svg>`;
-  $('#nwChart').innerHTML = s;
-}
-
 function renderCash(){
   renderAccSetup();
   const cashAccs = state.accounts.filter(a => a.type !== 'investment');
@@ -2480,7 +2485,6 @@ function renderCash(){
     <div class="kpi"><span class="lbl">Bank & cash</span><span class="val">${eur.format(sumT(['bank','cash']))}</span><span class="sub">${missing.length ? missing.length + ' account' + (missing.length===1?'':'s') + ' not checked in yet' : 'Estimated from your check-ins'}${need.length ? (miss.length ? ' · waiting for ' + miss.join(', ') + ' rate' : ' · ' + need.join(', ') + ' at today’s rate') : ''}</span></div>
     <div class="kpi"><span class="lbl">Cards owed</span><span class="val">${eur.format(Math.max(0, -sumT(['card'])))}</span><span class="sub">${cashAccs.filter(a => a.type==='card').length} card${cashAccs.filter(a => a.type==='card').length===1?'':'s'}</span></div>
     <div class="kpi"><span class="lbl">Net cash</span><span class="val ${net<0?'neg':''}">${net<0?'−':''}${eur.format(Math.abs(net))}</span><span class="sub">Bank and cash minus cards</span></div>`;
-  renderNetWorthChart();
   const grp = (title, types) => { const arr = cashAccs.filter(a => types.includes(a.type)); return arr.length ? `<section class="tgroup"><h2>${title}</h2><div class="tgrid">${arr.map(accCard).join('')}</div></section>` : ''; };
   $('#accList').innerHTML = cashAccs.length ? grp('Bank & cash', ['bank','cash']) + grp('Credit cards', ['card'])
     : `<div class="panel"><p class="empty" style="margin:0">${state.accountsReady ? 'No accounts yet. Use the setup above, or “+ Account”.' : 'Loading…'}</p></div>`;
@@ -2812,6 +2816,62 @@ function ledgerInv(a, m){
   return Math.round((tin - tout) * 100) / 100;
 }
 
+
+// ---------- net worth over time ----------
+// Month-end values: investments at each month's closing rate (today's for the running month), cash and cards
+// from check-ins and entries. The last bar is the same figure as the Wealth header.
+function lastDayOf(m){ const d = new Date(Date.UTC(+m.slice(0,4), +m.slice(5,7), 0)); return d.toISOString().slice(0,10); }
+function netWorthSeries(){
+  const pf = portfolio(), cm = thisMonth();
+  const cashAccs = state.accounts.filter(a => a.type !== 'investment');
+  const starts = [...pf.withData.map(x => x.rows[0].month), ...state.checkins.map(c => c.date.slice(0,7)), ...cashAccs.map(a => String(a.createdAt || '').slice(0,7)).filter(m => /^\d{4}-\d{2}$/.test(m))];
+  if (!starts.length) return [];
+  let first = starts.sort()[0]; if (first > cm) return [];
+  const months = monthsBetween(first, cm).slice(-24);
+  return months.map(m => {
+    const cur = m === cm, d = cur ? today() : lastDayOf(m);
+    let inv = 0;
+    for (const x of pf.withData){
+      const r = x.rows.filter(r => r.month <= m).pop(); if (!r) continue;
+      inv += r.value * (cur ? latestRate(x.cur) : monthRate(x.cur, addMonth(m, 1)));
+    }
+    let cash = 0;
+    for (const a of cashAccs){ const e = estimate(a, d); if (e) cash += toEur(a, e.balance); }
+    return { m, inv, cash, total: inv + cash };
+  }).filter((p, i, arr) => p.inv || p.cash || arr.slice(0, i).some(q => q.inv || q.cash));
+}
+function renderNetWorthAll(){
+  const pts = netWorthSeries(), P = $('#nwAllP');
+  P.hidden = pts.length < 2; if (P.hidden) return;
+  const n = pts.length, narrow = innerWidth <= 640;
+  const W = wideW(), H = narrow ? 180 : 150, L = narrow ? 78 : 58, R = 8, T = 10, B = 24;
+  const hi = Math.max(...pts.map(p => Math.max(p.total, p.inv + Math.max(0, p.cash))));
+  let lo = Math.min(0, ...pts.map(p => Math.min(p.cash, p.total)));
+  if (lo > -0.03 * hi) lo = 0; else lo = -niceMax(-lo);
+  const top = niceMax(hi - lo) + lo, y = v => T + (H-T-B) * (top - v) / (top - lo || 1);
+  const bw = (W-L-R) / n, w = Math.min(26, bw * 0.62), every = Math.max(1, Math.ceil(n / (narrow ? 4 : 12)));
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Net worth by month">`;
+  for (let k = 0; k <= 4; k++){ const v = lo + (top - lo) * k / 4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${eurK.format(v)}</text>`; }
+  pts.forEach((p, i) => {
+    const cx = L + i*bw + bw/2, x0 = cx - w/2;
+    const invTop = y(p.inv), zero = y(0);
+    s += `<rect x="${x0}" y="${Math.min(invTop, zero)}" width="${w}" height="${Math.max(0, zero - invTop)}" fill="var(--bar)"/>`;
+    if (p.cash >= 0) s += `<rect x="${x0}" y="${y(p.inv + p.cash)}" width="${w}" height="${Math.max(0, invTop - y(p.inv + p.cash))}" fill="var(--c-inc)"/>`;
+    else s += `<rect x="${x0}" y="${zero}" width="${w}" height="${Math.max(0, Math.min(H - B, y(p.cash)) - zero)}" fill="var(--c-inc)" fill-opacity=".6"/>`;
+    s += `<rect x="${L + i*bw}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(p.m)}${p.m === thisMonth() ? ' (today)' : ''} · net worth ${eur0.format(p.total)} · investments ${eur0.format(p.inv)} · cash &amp; cards ${eur0.format(p.cash)}"/>`;
+    if (tick(i, n, every)) s += `<text x="${i === n-1 ? W-R : cx}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : 'middle'}">${mShort(p.m)}</text>`;
+  });
+  s += `<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/></svg>`;
+  $('#nwAll').innerHTML = s;
+  const a = pts[n-1], b = pts[n-2], dlt = a.total - b.total;
+  $('#nwAllHint').innerHTML = `${eur0.format(a.total)} today · <span class="${dlt >= 0 ? 'pos' : 'neg'}">${signed(dlt)}</span> since end of ${MON[+b.m.slice(5,7)-1]}`;
+}
+function netWorthNow(){
+  const pts = netWorthSeries(); if (!pts.length) return null;
+  const a = pts[pts.length-1], b = pts.length > 1 ? pts[pts.length-2] : null;
+  return { total: a.total, delta: b ? a.total - b.total : null, prevM: b?.m };
+}
+
 // ---------- wealth page ----------
 function renderWealth(){
   loadRates();
@@ -2826,6 +2886,7 @@ function renderWealth(){
   $('#wSub').innerHTML = pf.withData.length || state.checkins.length
     ? `Net worth ≈ <strong>${eur0.format(nw)}</strong> · investments ${eur0.format(pf.value)} · ${state.checkins.length ? 'cash &amp; cards ' + (cash < 0 ? '−' : '') + eur0.format(Math.abs(cash)) : 'cash &amp; cards not checked in yet'}`
     : 'Investments, cash and your FIRE plan';
+  renderNetWorthAll();
   if (state.wv === 'inv') renderInvestments(pf);
   if (state.wv === 'cash') renderCash();
   if (state.wv === 'fire') renderFire(pf);
@@ -3238,15 +3299,15 @@ function umRows(){
       <input type="number" step="0.01" inputmode="decimal" data-um="val" value="${ex && ex.value !== undefined && ex.value !== null ? ex.value : ''}" placeholder="${auto ? 'modelled' : ''}" aria-label="${esc(a.name)}: value"></div>`;
   }).join('');
 }
-function openUpdateMonth(){
+function openUpdateMonth(month){
   if (!state.accounts.some(a => a.type === 'investment')){ toast('Add an investment account first.'); return; }
   const last = state.snaps.map(s => s.month).sort().pop();
-  $('#um-month').value = !last ? thisMonth() : last >= thisMonth() ? thisMonth() : addMonth(last, 1);
+  $('#um-month').value = typeof month === 'string' ? month : !last ? thisMonth() : last >= thisMonth() ? thisMonth() : addMonth(last, 1);
   $('#umErr').hidden = true; umRows(); umdlg.showModal();
 }
 $('#um-month').addEventListener('change', umRows);
 $('#umCancel').addEventListener('click', () => umdlg.close());
-$('#updMonth').addEventListener('click', openUpdateMonth);
+$('#updMonth').addEventListener('click', () => openUpdateMonth());
 $('#newInv').addEventListener('click', () => openAccDlg(null, 'investment'));
 $('#umForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -3529,6 +3590,157 @@ document.addEventListener('click', async e => {
   if (d){ d.disabled = true; try { await deleteDoc(doc(fs, 'inbox', d.dataset.ibdismiss)); toast('Dismissed'); } catch (x){ toast(writeError(x)); d.disabled = false; } }
 });
 
+
+
+// ---------- to do: recurring entries and the monthly close ----------
+const addDays = (d, k) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + k); return x.toISOString().slice(0,10); };
+const sameDayNextMonth = d => { const [y, m, dd] = d.split('-').map(Number); const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate(); return new Date(Date.UTC(y, m, Math.min(dd, last))).toISOString().slice(0,10); };
+const lsGet = (k, def) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? def; } catch { return def; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const nk = v => String(v || '').trim().toLowerCase();
+// Entries that come back about once a month (same store and account, similar amount), whose next date has arrived.
+function dueRecurring(){
+  const groups = new Map(), td = today(), skipped = lsGet('recSkip', {});
+  const put = (kind, key, r) => { if (!groups.has(key)) groups.set(key, { kind, rows: [] }); groups.get(key).rows.push(r); };
+  state.items.forEach(i => put('expense', 'e|' + nk(i.store) + '|' + nk(i.account), i));
+  state.income.forEach(i => put('income', 'i|' + nk(i.source) + '|' + nk(i.account), i));
+  state.transfers.filter(t => t.comment !== 'Send to India').forEach(t => put('transfer', 't|' + nk(t.from) + '|' + nk(t.to), t));
+  const out = [];
+  for (const [key, g] of groups){
+    const rows = g.rows.slice().sort((a,b) => a.date.localeCompare(b.date));
+    const months = new Set(rows.map(r => r.date.slice(0,7)));
+    if (months.size < 2 || rows.length > months.size + 1) continue;
+    const last = rows[rows.length-1], prev = rows[rows.length-2];
+    const gap = (Date.parse(last.date) - Date.parse(prev.date)) / 864e5;
+    if (gap < 24 || gap > 38) continue;
+    const amts = rows.slice(-3).map(r => +r.amount).sort((a,b) => a-b), med = amts[Math.floor(amts.length / 2)];
+    if (Math.abs(+last.amount - med) > med * 0.2) continue;
+    const due = sameDayNextMonth(last.date);
+    if (due > td || due < addDays(td, -25) || skipped[key + '|' + due]) continue;
+    out.push({ key, kind: g.kind, last, due });
+  }
+  return out.sort((a,b) => a.due.localeCompare(b.due));
+}
+function recTitle(r){ const x = r.last; return r.kind === 'transfer' ? `${esc(x.from)} → ${esc(x.to)}` : esc(r.kind === 'income' ? x.source : x.store); }
+function recAmount(r){ const x = r.last; return x.currency && x.currency !== 'EUR' && x.origAmount ? money(x.origAmount, x.currency) : eur.format(x.amount); }
+async function addRecurring(r){
+  const x = r.last, me = usernameOf(state.user), now = new Date().toISOString();
+  const over = { date: r.due, createdAt: now, createdBy: me, updatedBy: undefined, tripId: undefined };
+  const [col, d] = r.kind === 'income' ? [incomeCol, pickDoc(INC_KEYS, x, over)] : r.kind === 'transfer' ? [transfersCol, pickDoc(TR_KEYS, x, over)] : [expensesCol, pickDoc(EXP_KEYS, x, over)];
+  try { await addDoc(col, d); toast(`Added ${r.kind === 'transfer' ? 'transfer' : r.kind} ${recAmount(r)} on ${shortDate(r.due)}`); }
+  catch (e){ toast(writeError(e)); }
+}
+function editRecurring(r){
+  const x = r.last;
+  openAdd(r.kind);
+  F('date').value = r.due;
+  if (r.kind === 'transfer'){ F('account').value = x.from; F('to').value = x.to; }
+  else { F('store').value = r.kind === 'income' ? x.source : x.store; F('category').value = x.category || ''; F('account').value = x.account || '';
+    if (r.kind === 'income') F('spender').value = x.earner || F('spender').value; else { F('spender').value = x.spender || F('spender').value; F('subcategory').value = x.subcategory || ''; F('country').value = x.country || F('country').value; } }
+  F('comment').value = x.comment || '';
+  if (x.currency && x.currency !== 'EUR' && x.origAmount){ F('amount').value = x.origAmount; setCur(x.currency); } else { F('amount').value = x.amount; setCur('EUR'); }
+  if (typeof trHint === 'function') trHint();
+}
+// The month-end routine for the month that just ended: investment values, balance check-ins, money home.
+function closeItems(){
+  const cm = thisMonth(), M = addMonth(cm, -1), first = cm + '-01', items = [];
+  const inv = state.accounts.filter(a => a.type === 'investment' && state.snaps.some(x => x.accountId === a.id && x.month < M + '~'));
+  if (inv.length){
+    const done = inv.filter(a => state.snaps.some(x => x.accountId === a.id && x.month >= M)).length;
+    items.push({ id:'inv', done: done === inv.length, text: `<b>Investment values for ${MON[+M.slice(5,7)-1]}</b>`, sub: `${done} of ${inv.length} accounts updated`, act: `<button class="btn small" type="button" data-todo="inv" data-m="${M}">Update</button>` });
+  }
+  const cash = state.accounts.filter(a => a.type !== 'investment');
+  if (cash.length){
+    const stale = cash.filter(a => !checkinsOf(a).some(c => c.date >= addDays(first, -3)));
+    items.push({ id:'ck', done: !stale.length, text: '<b>Check in balances</b>', sub: stale.length ? `${stale.length} account${stale.length===1?'':'s'}: ${stale.slice(0,3).map(a => esc(a.name)).join(', ')}${stale.length > 3 ? '…' : ''}` : 'All checked in this month', act: `<button class="btn small" type="button" data-todo="ck">Check in</button>` });
+  }
+  if (state.transfers.some(t => t.comment === 'Send to India')){
+    const sent = state.transfers.some(t => t.comment === 'Send to India' && t.date.startsWith(cm));
+    items.push({ id:'india', done: sent, text: `<b>Send to India for ${MON[+cm.slice(5,7)-1]}</b>`, sub: sent ? 'Logged' : 'Not logged yet this month', act: `<button class="btn small" type="button" data-sendindia>Send</button>` });
+  }
+  return { M, items };
+}
+function renderTodo(){
+  const card = $('#todoCard'); if (!state.ready || !state.accountsReady){ card.hidden = true; return; }
+  const due = dueRecurring(), cl = closeItems(), cm = thisMonth();
+  const hidden = lsGet('closeHidden', '') === cm, open = cl.items.filter(i => !i.done).length;
+  const showClose = cl.items.length && !hidden && (open > 0 && +today().slice(8,10) <= 15 || cl.items.some(i => i.done && open > 0));
+  if (!due.length && !(showClose && open)){ card.hidden = true; return; }
+  card.hidden = false;
+  let h = `<header><h2>To do</h2><span class="hint">${due.length ? due.length + ' repeat' + (due.length===1?'':'s') + ' due' : ''}${due.length && showClose && open ? ' · ' : ''}${showClose && open ? `${MON[+cl.M.slice(5,7)-1]} close: ${cl.items.length - open} of ${cl.items.length} done` : ''}</span></header><div class="todo">`;
+  if (due.length){
+    h += `<div class="sec">Repeats</div>` + due.map(r => `<div class="t"><span class="ic">↻</span><span class="tx"><b>${recTitle(r)}</b> · ${recAmount(r)}<span class="sub">${r.kind === 'transfer' ? transferType(r.last) : r.kind === 'income' ? 'Income · ' + esc(r.last.category) : esc(r.last.category) + ' · ' + esc(r.last.account)} · due ${shortDate(r.due)}${r.due < today() ? ' (' + Math.round((Date.parse(today()) - Date.parse(r.due)) / 864e5) + ' days ago)' : ''}</span></span>
+      <span class="acts"><button class="btn small primary" type="button" data-recadd="${esc(r.key)}">Add</button><button class="btn small" type="button" data-recedit="${esc(r.key)}">Edit</button><button class="unlink" type="button" data-recskip="${esc(r.key)}|${r.due}" aria-label="Skip this time" title="Skip this time">×</button></span></div>`).join('');
+  }
+  if (showClose && open){
+    h += `<div class="sec">Month close</div>` + cl.items.map(i => `<div class="t ${i.done ? 'done' : ''}"><span class="ic">${i.done ? '✓' : ''}</span><span class="tx">${i.text}<span class="sub">${i.sub}</span></span><span class="acts">${i.done ? '' : i.act}</span></div>`).join('')
+      + `<div style="padding-top:8px"><button class="linkbtn" type="button" data-closehide style="font-size:12.5px;color:var(--muted)">Hide until next month</button></div>`;
+  }
+  card.innerHTML = h + '</div>';
+  state.dueRec = due;
+}
+document.addEventListener('click', e => {
+  const t = e.target;
+  const ra = t.closest('[data-recadd]'); if (ra){ const r = (state.dueRec || []).find(x => x.key === ra.dataset.recadd); if (r){ ra.disabled = true; addRecurring(r); } return; }
+  const re = t.closest('[data-recedit]'); if (re){ const r = (state.dueRec || []).find(x => x.key === re.dataset.recedit); if (r) editRecurring(r); return; }
+  const rs = t.closest('[data-recskip]'); if (rs){ const sk = lsGet('recSkip', {}); sk[rs.dataset.recskip] = 1; lsSet('recSkip', sk); render(); toast('Skipped this time'); return; }
+  const td = t.closest('[data-todo]'); if (td){ if (td.dataset.todo === 'inv') openUpdateMonth(td.dataset.m); else openCheckin(null); return; }
+  if (t.closest('[data-closehide]')){ lsSet('closeHidden', thisMonth()); render(); }
+});
+
+// ---------- backup & restore ----------
+const BK_COLS = { expenses:() => state.items, income:() => state.income, transfers:() => state.transfers, accounts:() => state.accounts,
+  checkins:() => state.checkins, invSnapshots:() => state.snaps, trips:() => state.trips };
+const DERIVED = ['tripKind','tripName','kind'];
+function backupData(){
+  const collections = {};
+  for (const [c, get] of Object.entries(BK_COLS)) collections[c] = get().map(d => { const o = { ...d }; DERIVED.forEach(k => delete o[k]); return o; });
+  const settings = [];
+  if ((state.budgets.items || []).length || state.budgets.total) settings.push({ id:'budgets', ...state.budgets });
+  if (state.fire && Object.keys(state.fire).length) settings.push({ id:'fire', ...state.fire });
+  if (Object.keys(state.fxMonths).length) settings.push({ id:'fx', months: state.fxMonths });
+  collections.settings = settings;
+  return { app:'S&A Ledger', version:1, exportedAt: new Date().toISOString(), collections };
+}
+function downloadBackup(){
+  const data = backupData(), blob = new Blob([JSON.stringify(data)], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `sa-ledger-backup-${today()}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  const n = Object.values(data.collections).reduce((s, v) => s + v.length, 0);
+  toast(`Backup downloaded: ${n} records`);
+}
+const RS_LABEL = { expenses:'expenses', income:'income', transfers:'transfers', accounts:'accounts', checkins:'check-ins', invSnapshots:'monthly investment values', trips:'trips', settings:'settings' };
+$('#rsFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let data;
+  try { data = JSON.parse(await f.text()); if (data.app !== 'S&A Ledger' || !data.collections) throw 0; }
+  catch { toast('That file isn’t an S&A Ledger backup.'); return; }
+  const have = { expenses:state.items, income:state.income, transfers:state.transfers, accounts:state.accounts, checkins:state.checkins, invSnapshots:state.snaps, trips:state.trips };
+  const rows = Object.entries(data.collections).filter(([c, v]) => RS_LABEL[c] && Array.isArray(v) && v.length).map(([c, v]) => {
+    const ids = new Set((have[c] || []).map(x => x.id)), missing = c === 'settings' ? null : v.filter(x => !ids.has(x.id)).length;
+    return `<li><span class="ok">•</span><span>${v.length} ${RS_LABEL[c]}</span><span class="n">${missing === null ? 'replaces current' : missing ? missing + ' not here now' : 'all already here'}</span></li>`; });
+  $('#rsBody').innerHTML = `<div style="display:grid;gap:10px"><p style="margin:0">Backup from <strong>${esc(new Date(data.exportedAt).toLocaleString('en-IE', { dateStyle:'medium', timeStyle:'short' }))}</strong>:</p>
+    <ul class="checks">${rows.join('')}</ul>
+    <p class="muted" style="margin:0;font-size:12.5px">Entries come back exactly as they were in the backup. Anything added since stays; nothing is deleted. An entry you changed since the backup goes back to the backup’s version.</p></div>`;
+  state.rsData = data; $('#rsErr').hidden = true; $('#rsDlg').showModal();
+});
+$('#rsCancel').addEventListener('click', () => { $('#rsDlg').close(); state.rsData = null; });
+$('#rsForm').addEventListener('submit', async e => {
+  e.preventDefault(); const data = state.rsData; if (!data) return;
+  const writes = [];
+  for (const [c, v] of Object.entries(data.collections)){
+    if (!RS_LABEL[c] || !Array.isArray(v)) continue;
+    for (const d of v){ if (!d || !d.id) continue; if (c === 'settings' && !['budgets','fire','fx'].includes(d.id)) continue;
+      const { id, ...rest } = d; DERIVED.forEach(k => delete rest[k]); writes.push([c, id, rest]); }
+  }
+  $('#rsSave').disabled = true; $('#rsSave').textContent = 'Restoring…';
+  try {
+    for (let i = 0; i < writes.length; i += 400){ const b = writeBatch(fs); writes.slice(i, i + 400).forEach(([c, id, d]) => b.set(doc(fs, c, id), d)); await b.commit(); }
+    $('#rsDlg').close(); state.rsData = null; toast(`Restored ${writes.length} records`);
+  } catch (x){ $('#rsErr').textContent = writeError(x); $('#rsErr').hidden = false; }
+  finally { $('#rsSave').disabled = false; $('#rsSave').textContent = 'Restore'; }
+});
+
 // ---------- profile menu ----------
 const pm = $('#profMenu'), pb = $('#profBtn');
 function pmNotes(){
@@ -3536,6 +3748,9 @@ function pmNotes(){
   $('#pmTrips').textContent = g[0] ? (tripStatus(g[0]) === 'ongoing' ? 'On: ' : 'Next: ') + g[0].name : state.trips.length ? state.trips.length + ' trips' : '';
   const nb = (state.budgets.items || []).filter(b => b.a > 0).length;
   $('#pmBudgets').textContent = nb ? nb + ' set' : 'not set';
+  const bk = state.backup;
+  $('#pmBackup').textContent = bk?.errorAt && (!bk.lastAt || bk.errorAt > bk.lastAt) ? 'Drive backup failed ' + shortDate(bk.errorAt.slice(0,10)) + ', see Netlify logs'
+    : bk?.lastAt ? 'Drive copy: ' + shortDate(bk.lastAt.slice(0,10)) + ' ' + bk.lastAt.slice(11,16) + ' UTC' : 'Drive backup not set up yet';
 }
 function toggleMenu(open){ pm.hidden = !open; pb.setAttribute('aria-expanded', open); if (open){ pmNotes(); pm.querySelector('.pm-item')?.focus(); } }
 pb.addEventListener('click', e => { e.stopPropagation(); toggleMenu(pm.hidden); });
@@ -3546,6 +3761,8 @@ pm.addEventListener('click', async e => {
   toggleMenu(false);
   const a = it.dataset.pm;
   if (a === 'budgets') openBudgets(false);
+  if (a === 'backup') downloadBackup();
+  if (a === 'restore') $('#rsFile').click();
   if (a === 'import'){ if (state.page !== 'transactions') location.hash = 'transactions'; state.txKind = 'expense'; $('#importFile').click(); }
   if (a === 'export'){ if (state.page !== 'transactions') toast('Exporting ' + (state.txKind === 'income' ? 'income' : state.txKind === 'transfer' ? 'transfers' : 'expenses') + ' for ' + periodName()); $('#exportBtn').click(); }
   if (a === 'install'){
