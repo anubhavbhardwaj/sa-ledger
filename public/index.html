@@ -255,6 +255,57 @@ table.mini .num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text
 table.mini th.num{font-family:var(--f-body)}
 .neg{color:var(--danger)}
 .mmeta{display:none;font-size:12px;color:var(--muted);margin-top:1px}
+/* wealth */
+.ilist{display:grid}
+.ilist .r{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:4px 12px;padding:11px 4px;border-bottom:1px solid var(--line);cursor:pointer;align-items:center;text-align:left;background:none;border-left:0;border-right:0;border-top:0;color:var(--ink);font:inherit;width:100%}
+.ilist .r:last-child{border-bottom:0}
+.ilist .r:hover{background:var(--sunk)}
+.ilist .dot{width:10px;height:10px;border-radius:3px}
+.ilist .nm{font-weight:600}
+.ilist .meta{font-size:12px;color:var(--muted)}
+.ilist .v{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:500;white-space:nowrap}
+.ilist .v small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+.ilist .tot{cursor:default;font-weight:600}.ilist .tot:hover{background:none}
+.pos{color:var(--good)}
+.modelled{font-size:11px;padding:0 7px;border-radius:4px;background:var(--warn-soft);color:var(--warn);margin-left:6px;vertical-align:1px;font-weight:500}
+.wrapleg{flex-wrap:wrap;gap:6px 14px}
+.sublbl{font-size:12.5px;color:var(--muted)}
+.split{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12.5px;color:var(--muted)}
+.split b{font-weight:600}
+table.snaps{min-width:0}
+table.snaps td,table.snaps th{padding:8px 10px}
+table.snaps td.num,table.snaps th.num{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+table.snaps th.num{font-family:var(--f-body)}
+table.snaps tr.pred td{color:var(--muted);font-style:italic}
+table.snaps tr.row:hover td{background:var(--sunk)}
+.umlist{display:grid;max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:2px 10px}
+.umrow{display:grid;grid-template-columns:minmax(0,1fr) 120px 130px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.umrow:last-child{border-bottom:0}
+.umrow input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:7px 9px;width:100%;min-width:0;font-family:var(--f-mono)}
+.umrow .hint{font-size:11.5px;color:var(--muted)}
+.umhead{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
+.checks{display:grid;gap:6px;margin:0;padding:0;list-style:none;font-size:13.5px}
+.checks li{display:grid;grid-template-columns:20px 1fr auto;gap:8px;align-items:baseline}
+.checks .ok{color:var(--good);font-weight:700}.checks .bad{color:var(--danger);font-weight:700}
+.checks .n{font-family:var(--f-mono);font-size:12.5px;color:var(--ink-2)}
+.fire-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px}
+.fire-grid label{display:grid;gap:4px;font-size:12.5px;color:var(--ink-2)}
+.fire-grid input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:8px 10px;width:100%;min-width:0;font-family:var(--f-mono)}
+.fire-grid .src{font-size:11.5px;color:var(--muted)}
+.fire-grid .src button{border:0;background:none;color:var(--accent);padding:0;cursor:pointer;font:inherit;text-decoration:underline}
+.progress{height:10px;border-radius:999px;background:var(--sunk);overflow:hidden}
+.progress i{display:block;height:100%;background:var(--bar);border-radius:999px}
+@media (max-width:640px){
+  .umrow{grid-template-columns:minmax(0,1fr) 92px 104px}
+  #wSeg{width:100%}#wSeg button{flex:1;padding:6px 8px}
+  .kpis.w .val{font-size:18px;white-space:nowrap}
+  table.snaps{font-size:13px}
+  table.snaps th:nth-child(4),table.snaps td:nth-child(4){display:none}
+  table.snaps td,table.snaps th{padding:7px 4px}
+  .tscroll table.snaps thead{display:table-header-group}
+  .tscroll table.snaps tr.row{display:table-row;padding:0}
+  .tscroll table.snaps tr.row td{border-bottom:1px solid var(--line);padding:9px 4px}
+}
 .install{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;background:var(--accent-soft);border-radius:12px;padding:10px 14px}
 .install p{margin:0;font-size:13px}
 .install .row{display:flex;gap:6px;align-items:center}
@@ -263,7 +314,7 @@ table.mini th.num{font-family:var(--f-body)}
   .appbar-in{min-height:52px}
   .appbar .tabs,.appbar #addBtn{display:none}
   .appbar .logo{margin-right:auto}
-  .bottomnav{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .bottomnav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
   .btab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px 7px;text-decoration:none;color:var(--muted);font-size:11px;font-weight:500;position:relative}
   .btab svg{width:22px;height:22px}
   .btab[aria-current="page"]{color:var(--accent);font-weight:600}
@@ -311,6 +362,7 @@ table.mini th.num{font-family:var(--f-body)}
 .kpi{padding:16px 18px;border-right:1px solid var(--line);display:grid;gap:4px;align-content:start}
 .kpi:last-child{border-right:0}
 .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.kpis.w .val{white-space:nowrap}
 .kpi .val{font:700 26px/1.1 var(--f-display);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
 .kpi .sub{font-size:12.5px;color:var(--muted)}
 .delta{display:inline-flex;align-items:center;gap:4px;font-weight:600;font-size:12.5px;padding:1px 8px;border-radius:999px}
@@ -435,15 +487,15 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <a class="tab" href="#overview" data-page="overview">Overview</a>
       <a class="tab" href="#transactions" data-page="transactions">Transactions<span class="badge" id="fbadge" hidden></span></a>
       <a class="tab" href="#visualizations" data-page="visualizations">Visualizations</a>
+      <a class="tab" href="#wealth" data-page="wealth">Wealth</a>
     </nav>
     <button class="btn primary" id="addBtn" type="button">+ <span class="long">Add expense</span></button>
     <button class="btn small inboxbtn" id="inboxBtn" type="button" hidden>To review <span class="badge" id="inboxCount">0</span></button>
     <div class="prof">
-      <button class="avatar" id="profBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="profMenu" aria-label="Menu: trips, accounts, budgets, settings"><span id="profInitial">A</span></button>
+      <button class="avatar" id="profBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="profMenu" aria-label="Menu: trips, budgets, settings"><span id="profInitial">A</span></button>
       <div class="pmenu" id="profMenu" role="menu" hidden>
         <div class="pm-head">Signed in as <strong id="whoName"></strong></div>
         <a class="pm-item" role="menuitem" href="#trips"><span>Trips</span><small id="pmTrips"></small></a>
-        <a class="pm-item" role="menuitem" href="#accounts"><span>Accounts</span><small id="pmAccounts"></small></a>
         <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
         <hr>
         <button class="pm-item" role="menuitem" type="button" data-pm="import"><span>Import CSV</span><small>into expenses</small></button>
@@ -535,19 +587,37 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     </div>
   </section>
 
-  <!-- ACCOUNTS -->
-  <section class="page" id="page-accounts" data-page="accounts" hidden>
+  <!-- WEALTH -->
+  <section class="page" id="page-wealth" data-page="wealth" hidden>
     <div style="display:grid;gap:16px">
       <div id="accListView" style="display:grid;gap:16px">
-        <div><button class="btn ghost" type="button" data-back>← Back</button></div>
         <div class="pagehead">
-          <div><h1>Accounts</h1><p>Balances, investments and net worth. Check in a real balance now and then; the app keeps an estimate in between.</p></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="newAcc" type="button">+ Add account</button><button class="btn primary" id="checkinAll" type="button">Check in balances</button></div>
+          <div><h1>Wealth</h1><p id="wSub">Investments, cash and your FIRE plan</p></div>
+          <div class="seg" role="radiogroup" aria-label="Show" id="wSeg"><button type="button" role="radio" data-wv="inv">Investments</button><button type="button" role="radio" data-wv="cash">Cash &amp; cards</button><button type="button" role="radio" data-wv="fire">FIRE</button></div>
         </div>
-        <div class="banner" id="accSetup" hidden></div>
-        <section class="kpis" id="accKpis" aria-label="Net worth"></section>
-        <section class="panel" id="nwPanel" hidden><header><h2>Net worth</h2><span class="hint">Month-end estimates from your check-ins</span></header><div id="nwChart"></div></section>
-        <div id="accList" style="display:grid;gap:18px"></div>
+
+        <div id="wv-inv" class="wview">
+          <div class="banner" id="invEmpty" hidden></div>
+          <section class="kpis w" id="invKpis" aria-label="Investments"></section>
+          <section class="panel" id="invGrowthP"><header><h2>Portfolio value</h2><span class="hint" id="invGrowthHint"></span></header><div id="invGrowth"></div><div class="legend wrapleg" id="invLegend"></div></section>
+          <section class="panel" id="invMonthlyP"><header><h2 id="invMTitle">Monthly return</h2><div class="seg" role="radiogroup" aria-label="Monthly chart" id="invMSeg"><button type="button" role="radio" data-im="profit">Return</button><button type="button" role="radio" data-im="invested">Invested</button></div></header><div id="invMonthly"></div><p class="hint" id="invMHint"></p></section>
+          <section class="panel">
+            <header><h2>Investment accounts</h2><div class="right"><button class="btn" id="newInv" type="button">+ Account</button><button class="btn primary" id="updMonth" type="button">Update month</button></div></header>
+            <div class="ilist" id="invList"></div>
+            <p class="hint" id="invFoot"></p>
+          </section>
+        </div>
+
+        <div id="wv-cash" class="wview" hidden>
+          <div class="pagehead" style="align-items:center"><p style="margin:0">Check in a real balance now and then; the app keeps an estimate in between.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="newAcc" type="button">+ Account</button><button class="btn primary" id="checkinAll" type="button">Check in balances</button></div></div>
+          <div class="banner" id="accSetup" hidden></div>
+          <section class="kpis" id="accKpis" aria-label="Cash and cards"></section>
+          <section class="panel" id="nwPanel" hidden><header><h2>Cash &amp; cards over time</h2><span class="hint">Month-end estimates from your check-ins</span></header><div id="nwChart"></div></section>
+          <div id="accList" style="display:grid;gap:18px"></div>
+        </div>
+
+        <div id="wv-fire" class="wview" hidden></div>
       </div>
       <div id="accDetail" hidden style="display:grid;gap:16px"></div>
     </div>
@@ -597,6 +667,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   <a class="btab" href="#overview" data-page="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
   <a class="btab" href="#transactions" data-page="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Transactions</span><span class="bdot" id="fbadge2" hidden></span></a>
   <a class="btab" href="#visualizations" data-page="visualizations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg><span>Visualizations</span></a>
+  <a class="btab" href="#wealth" data-page="wealth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg><span>Wealth</span></a>
 </nav>
 <button class="fab" id="fab" type="button" aria-label="Add expense">+</button>
 </div>
@@ -660,6 +731,13 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <label class="f">Owner<select id="a-owner"><option>Anubhav</option><option>Sulekha</option><option>Shared</option></select></label>
       <label class="f full">Notes<input id="a-notes" autocomplete="off"></label>
     </div>
+    <div class="fields inv-only" hidden>
+      <label class="f">Kind<select id="a-invType"></select></label>
+      <label class="f">Value comes from<select id="a-valueMode"><option value="manual">What I type in each month</option><option value="auto">Modelled from the return rate</option></select></label>
+      <label class="f">Expected return (% a year)<input id="a-returnPct" type="number" step="0.01" inputmode="decimal" placeholder="e.g. 7"></label>
+      <label class="f"><span id="lb-target">Target per month</span><input id="a-target" type="number" step="1" min="0" inputmode="decimal" placeholder="optional"></label>
+      <p class="f full muted" style="margin:0;font-size:12.5px">Modelled suits insurance-linked plans (ULIP, LIC) without a monthly statement: you type the first value and each month grows it by the return rate. You can still type a real value from a statement in any month.</p>
+    </div>
     <p class="muted" id="accRenameNote" hidden style="margin:0;font-size:12.5px"></p>
     <p class="err" id="accErr" hidden></p>
     <div class="dlg-actions">
@@ -679,6 +757,44 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <div class="dlg-actions"><div class="right"><button class="btn" id="ckCancel" type="button">Cancel</button><button class="btn primary" id="ckSave" type="submit">Save check-in</button></div></div>
   </form>
 </dialog>
+
+<dialog id="snapDlg">
+  <form id="snapForm" novalidate style="display:grid;gap:14px;padding:20px">
+    <h3 id="snapTitle">Month</h3>
+    <div class="fields">
+      <label class="f">Month<input id="s-month" type="month"></label>
+      <label class="f"><span id="lb-sinv">Invested this month</span><input id="s-inv" type="number" step="0.01" inputmode="decimal"></label>
+      <label class="f full"><span id="lb-sval">Value at month end</span><input id="s-val" type="number" step="0.01" inputmode="decimal"></label>
+    </div>
+    <p class="muted" id="snapHint" style="margin:0;font-size:12.5px"></p>
+    <p class="err" id="snapErr" hidden></p>
+    <div class="dlg-actions">
+      <button class="btn danger" id="snapDel" type="button" hidden>Delete month</button>
+      <div class="right"><button class="btn" id="snapCancel" type="button">Cancel</button><button class="btn primary" id="snapSave" type="submit">Save</button></div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="umDlg">
+  <form id="umForm" novalidate style="display:grid;gap:14px;padding:20px">
+    <h3>Update month</h3>
+    <p class="muted" style="margin:0;font-size:13px">For each account: what you put in this month and what it's worth now, in the account's currency. Leave a row empty to skip it. Modelled accounts fill their own value.</p>
+    <label class="f" style="max-width:200px">Month<input id="um-month" type="month"></label>
+    <div id="umList" class="umlist"></div>
+    <p class="err" id="umErr" hidden></p>
+    <div class="dlg-actions"><div class="right"><button class="btn" id="umCancel" type="button">Cancel</button><button class="btn primary" id="umSave" type="submit">Save</button></div></div>
+  </form>
+</dialog>
+
+<dialog id="itDlg">
+  <form id="itForm" novalidate style="display:grid;gap:14px;padding:20px">
+    <h3>Import from InvestTrack</h3>
+    <div id="itBody"></div>
+    <p class="err" id="itErr" hidden></p>
+    <div class="dlg-actions"><div class="right"><button class="btn" id="itCancel" type="button">Cancel</button><button class="btn primary" id="itSave" type="submit" disabled>Import</button></div></div>
+  </form>
+</dialog>
+<input id="itFile" type="file" accept=".json,application/json" hidden>
 
 <div id="tip" hidden></div>
 <div class="toast" id="toast" hidden></div>
@@ -752,6 +868,7 @@ const incomeCol = collection(fs, "income");
 const transfersCol = collection(fs, "transfers");
 const accountsCol = collection(fs, "accounts");
 const checkinsCol = collection(fs, "checkins");
+const snapsCol = collection(fs, "invSnapshots");
 const INC_KEYS = ['amount','date','source','category','account','earner','comment','createdAt','createdBy','updatedBy','currency','origAmount','fxRate'];
 const TR_KEYS = ['amount','date','from','to','comment','createdAt','createdBy','updatedBy','currency','origAmount','fxRate'];
 const pickDoc = (keys, it, over = {}) => { const o = {}; for (const k of keys){ const v = k in over ? over[k] : it[k]; if (v !== undefined && v !== null && v !== '') o[k] = v; } return o; };
@@ -777,14 +894,14 @@ const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','
 const CC = {Germany:'DE', Italy:'IT', India:'IN', France:'FR', Spain:'ES', Switzerland:'CH', Austria:'AT'};
 const DIMS = ['category','spender','account','country','tripKind','tripName'];
 const LABEL = {category:'Category', spender:'Spender', account:'Account', country:'Country', tripKind:'Trip type', tripName:'Trip'};
-const PAGES = ['overview','transactions','trips','accounts','visualizations'];
+const PAGES = ['overview','transactions','trips','wealth','visualizations'];
 const FIELDS = ['amount','date','store','category','subcategory','account','spender','country','comment'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' + y; };
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -794,7 +911,7 @@ onAuthStateChanged(auth, user => {
   state.user = user;
   unsubs.forEach(f => f()); unsubs = [];
   if (!user){
-    state.items = []; state.income = []; state.trips = []; state.transfers = []; state.accounts = []; state.checkins = []; state.ready = false; state.tripsReady = false;
+    state.items = []; state.income = []; state.trips = []; state.transfers = []; state.accounts = []; state.checkins = []; state.snaps = []; pfCache = null; state.ready = false; state.tripsReady = false;
     $('#app').hidden = true; $('#login').hidden = false; $('#l-user').focus();
     return;
   }
@@ -819,8 +936,12 @@ onAuthStateChanged(auth, user => {
   unsubs.push(onSnapshot(accountsCol, snap => {
     state.accounts = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => a.name.localeCompare(b.name));
     state.accByName = Object.fromEntries(state.accounts.map(a => [a.name.toLowerCase(), a]));
-    state.accountsReady = true; render();
+    state.accountsReady = true; pfCache = null; render();
   }, onErr('accounts')));
+  unsubs.push(onSnapshot(snapsCol, snap => {
+    state.snaps = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    state.snapsReady = true; pfCache = null; render();
+  }, onErr('investment values')));
   unsubs.push(onSnapshot(checkinsCol, snap => {
     state.checkins = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     render();
@@ -836,7 +957,10 @@ onAuthStateChanged(auth, user => {
   unsubs.push(onSnapshot(settingsCol, snap => {
     const d = snap.docs.find(x => x.id === 'budgets');
     state.budgets = d ? { items:[], ...d.data() } : { items:[] };
-    render();
+    const fx = snap.docs.find(x => x.id === 'fx'), fire = snap.docs.find(x => x.id === 'fire');
+    state.fxMonths = { ...(fx ? fx.data().months || {} : {}), ...state.fxMonthsLocal };
+    state.fire = fire ? fire.data() : {};
+    pfCache = null; render();
   }, onErr('budgets')));
   unsubs.push(onSnapshot(tripsCol, snap => {
     state.trips = snap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -926,10 +1050,11 @@ const periodName = () => state.period === 'all' ? 'All time' : monthLabel(state.
 function route(){
   const h = location.hash.replace('#','');
   if (h === 'add'){ history.replaceState(null, '', '#overview'); if (state.user) setTimeout(openAdd, 0); }
-  state.page = PAGES.includes(h) ? h : 'overview';
+  if (h === 'accounts'){ state.wv = 'cash'; history.replaceState(null, '', '#wealth'); }
+  state.page = h === 'accounts' ? 'wealth' : PAGES.includes(h) ? h : 'overview';
   if (state.page !== 'trips') state.openTrip = null;
-  if (state.page !== 'accounts') state.openAcc = null;
-  $('#months').hidden = state.page === 'trips' || state.page === 'accounts';
+  if (state.page !== 'wealth') state.openAcc = null;
+  $('#months').hidden = state.page === 'trips' || state.page === 'wealth';
   $$('section.page').forEach(s => s.hidden = s.dataset.page !== state.page);
   $$('.tab, .btab').forEach(t => t.setAttribute('aria-current', t.dataset.page === state.page ? 'page' : 'false'));
   render();
@@ -953,7 +1078,7 @@ function render(){
   if (state.page === 'transactions') renderTransactions();
   if (state.page === 'visualizations') renderVisualizations();
   if (state.page === 'trips') renderTrips();
-  if (state.page === 'accounts') renderAccounts();
+  if (state.page === 'wealth') renderWealth();
   fillDatalists();
 }
 
@@ -994,7 +1119,8 @@ function renderOverview(ms){
   const net = incTotal - total;
   const earners = group(inc, 'earner');
   const tr = state.transfers.filter(inPeriod).map(t => ({ ...t, ttype: transferType(t) }));
-  const invested = sum(tr.filter(t => t.ttype === 'Investment')) - sum(tr.filter(t => t.ttype === 'Withdrawal'));
+  const snapInv = investedIn(state.period);
+  const invested = snapInv !== null ? snapInv : sum(tr.filter(t => t.ttype === 'Investment')) - sum(tr.filter(t => t.ttype === 'Withdrawal'));
   const bud = state.period !== 'all' && (state.budgets.items || []).some(b => b.a > 0) ? budgetStatus(state.period) : null;
   const left = bud ? bud.total.budget - bud.total.spent : null;
   const issues = bud ? ['over','risk'].map(k => bud.rows.filter(r => r.status === k).length) : [0,0];
@@ -2154,6 +2280,7 @@ document.addEventListener('click', e => {
 // ---------- accounts & balances ----------
 const ACC_TYPE = { bank:'Bank', card:'Credit card', cash:'Cash', investment:'Investment' };
 const ACC_DOT = { bank:'var(--s1)', card:'var(--s2)', cash:'var(--s3)', investment:'var(--s7)' };
+const INV_TYPE = { equity:'Stocks & funds', ulip:'ULIP / LIC policy', pension:'Pension', deposit:'Deposit', no_growth:'No growth', other:'Other' };
 const accOf = name => state.accByName[String(name || '').toLowerCase()];
 // An entry's value in the account's own currency.
 function inAccCur(acc, r){
@@ -2201,7 +2328,7 @@ function investInfo(acc){
 async function loadRates(){
   const curs = [...new Set(state.accounts.map(a => a.currency).filter(c => c && c !== 'EUR'))].filter(c => !state.fxLatest[c]);
   for (const c of curs){ try { const r = await getRate(c, today()); state.fxLatest[c] = typeof r === 'number' ? r : r.rate; } catch {} }
-  if (curs.length && state.page === 'accounts') render();
+  if (curs.length){ pfCache = null; if (state.page === 'wealth' || state.page === 'overview') render(); }
 }
 
 function suggestAccounts(){
@@ -2248,11 +2375,12 @@ function accCard(a){
 
 function netWorthAt(date){
   let total = 0, any = false;
-  for (const a of state.accounts){ const e = estimate(a, date); if (e){ total += toEur(a, e.balance); any = true; } }
+  for (const a of state.accounts){ if (a.type === 'investment') continue; const e = estimate(a, date); if (e){ total += toEur(a, e.balance); any = true; } }
   return any ? total : null;
 }
 function renderNetWorthChart(){
-  const first = state.checkins.map(c => c.date).sort()[0];
+  const cashIds = new Set(state.accounts.filter(a => a.type !== 'investment').map(a => a.id));
+  const first = state.checkins.filter(c => cashIds.has(c.accountId)).map(c => c.date).sort()[0];
   const panel = $('#nwPanel');
   if (!first){ panel.hidden = true; return; }
   const pts = [];
@@ -2281,28 +2409,23 @@ function renderNetWorthChart(){
   $('#nwChart').innerHTML = s;
 }
 
-function renderAccounts(){
-  loadRates();
+function renderCash(){
   renderAccSetup();
-  const open = state.openAcc && state.accounts.find(a => a.id === state.openAcc);
-  $('#accListView').hidden = !!open; $('#accDetail').hidden = !open;
-  if (open) return renderAccDetail(open);
+  const cashAccs = state.accounts.filter(a => a.type !== 'investment');
   const est = a => { const e = estimate(a); return e ? toEur(a, e.balance) : 0; };
-  const sumT = t => state.accounts.filter(a => t.includes(a.type)).reduce((x,a) => x + est(a), 0);
-  const missing = state.accounts.filter(a => !checkinsOf(a).length);
-  const invs = state.accounts.filter(a => a.type === 'investment').map(a => ({ a, i: investInfo(a) })).filter(x => x.i);
-  const gain = invs.reduce((x, v) => x + toEur(v.a, v.i.gain), 0);
-  const nw = sumT(['bank','cash','investment','card']);
-  $('#accKpis').hidden = !state.accounts.length;
+  const sumT = t => cashAccs.filter(a => t.includes(a.type)).reduce((x,a) => x + est(a), 0);
+  const missing = cashAccs.filter(a => !checkinsOf(a).length);
+  const net = sumT(['bank','cash','card']);
+  const need = [...new Set(cashAccs.map(a => a.currency).filter(c => c && c !== 'EUR'))], miss = need.filter(c => !state.fxLatest[c]);
+  $('#accKpis').hidden = !cashAccs.length;
   $('#accKpis').innerHTML = `
-    <div class="kpi"><span class="lbl">Net worth</span><span class="val ${nw<0?'neg':''}">${nw<0?'−':''}${eur.format(Math.abs(nw))}</span><span class="sub">${missing.length ? missing.length + ' account' + (missing.length===1?'':'s') + ' not checked in yet' : 'Estimated from your check-ins'}${(() => { const need = [...new Set(state.accounts.map(a => a.currency).filter(c => c && c !== 'EUR'))]; const miss = need.filter(c => !state.fxLatest[c]); return need.length ? (miss.length ? ' · waiting for ' + miss.join(', ') + ' rate' : ' · ' + need.join(', ') + ' at today’s rate') : ''; })()}</span></div>
-    <div class="kpi"><span class="lbl">Bank & cash</span><span class="val">${eur.format(sumT(['bank','cash']))}</span><span class="sub">${state.accounts.filter(a => a.type==='bank'||a.type==='cash').length} accounts</span></div>
-    <div class="kpi"><span class="lbl">Investments</span><span class="val">${eur.format(sumT(['investment']))}</span><span class="sub">${invs.length ? `Gain ${gain >= 0 ? '+' : '−'}${eur0.format(Math.abs(gain))} since tracking` : 'Add an investment account'}</span></div>
-    <div class="kpi"><span class="lbl">Cards owed</span><span class="val">${eur.format(Math.max(0, -sumT(['card'])))}</span><span class="sub">${state.accounts.filter(a => a.type==='card').length} card${state.accounts.filter(a => a.type==='card').length===1?'':'s'}</span></div>`;
+    <div class="kpi"><span class="lbl">Bank & cash</span><span class="val">${eur.format(sumT(['bank','cash']))}</span><span class="sub">${missing.length ? missing.length + ' account' + (missing.length===1?'':'s') + ' not checked in yet' : 'Estimated from your check-ins'}${need.length ? (miss.length ? ' · waiting for ' + miss.join(', ') + ' rate' : ' · ' + need.join(', ') + ' at today’s rate') : ''}</span></div>
+    <div class="kpi"><span class="lbl">Cards owed</span><span class="val">${eur.format(Math.max(0, -sumT(['card'])))}</span><span class="sub">${cashAccs.filter(a => a.type==='card').length} card${cashAccs.filter(a => a.type==='card').length===1?'':'s'}</span></div>
+    <div class="kpi"><span class="lbl">Net cash</span><span class="val ${net<0?'neg':''}">${net<0?'−':''}${eur.format(Math.abs(net))}</span><span class="sub">Bank and cash minus cards</span></div>`;
   renderNetWorthChart();
-  const grp = (title, types) => { const arr = state.accounts.filter(a => types.includes(a.type)); return arr.length ? `<section class="tgroup"><h2>${title}</h2><div class="tgrid">${arr.map(accCard).join('')}</div></section>` : ''; };
-  $('#accList').innerHTML = state.accounts.length ? grp('Bank & cash', ['bank','cash']) + grp('Credit cards', ['card']) + grp('Investments', ['investment'])
-    : `<div class="panel"><p class="empty" style="margin:0">${state.accountsReady ? 'No accounts yet. Use the setup above, or “Add account”.' : 'Loading…'}</p></div>`;
+  const grp = (title, types) => { const arr = cashAccs.filter(a => types.includes(a.type)); return arr.length ? `<section class="tgroup"><h2>${title}</h2><div class="tgrid">${arr.map(accCard).join('')}</div></section>` : ''; };
+  $('#accList').innerHTML = cashAccs.length ? grp('Bank & cash', ['bank','cash']) + grp('Credit cards', ['card'])
+    : `<div class="panel"><p class="empty" style="margin:0">${state.accountsReady ? 'No accounts yet. Use the setup above, or “+ Account”.' : 'Loading…'}</p></div>`;
 }
 
 function renderAccDetail(a){
@@ -2317,7 +2440,7 @@ function renderAccDetail(a){
   const gaps = gapsOf(a).reverse();
   const shown = est ? (isCard ? -est.balance : est.balance) : null;
   $('#accDetail').innerHTML = `
-    <div><button class="btn ghost" type="button" data-backaccs>← All accounts</button></div>
+    <div><button class="btn ghost" type="button" data-backaccs>← Wealth</button></div>
     <div class="tdhead">
       <div><span class="ttype"><i style="background:${ACC_DOT[a.type]}"></i>${ACC_TYPE[a.type]}</span><h1>${esc(a.name)}</h1><p>${esc(a.owner)} · ${a.currency || 'EUR'}${a.notes ? ' · ' + esc(a.notes) : ''}</p></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2347,13 +2470,19 @@ function renderAccDetail(a){
 // account dialog
 const adlg = $('#accDlg'), A = k => $('#a-' + k);
 A('currency').innerHTML = CURRENCIES.map(c => `<option>${c}</option>`).join('');
-function setAccType(t){ state.accType = t; $$('#accTypeSeg [data-atype]').forEach(b => b.setAttribute('aria-checked', b.dataset.atype === t)); }
-function openAccDlg(a){
+A('invType').innerHTML = Object.entries(INV_TYPE).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+function setAccType(t){ state.accType = t; $$('#accTypeSeg [data-atype]').forEach(b => b.setAttribute('aria-checked', b.dataset.atype === t)); $('#accDlg .inv-only').hidden = t !== 'investment'; accTargetLabel(); }
+function accTargetLabel(){ $('#lb-target').textContent = 'Target per month (' + curSym(A('currency').value) + ')'; }
+A('currency').addEventListener('change', accTargetLabel);
+A('invType').addEventListener('change', () => { if (!state.editingAcc && A('invType').value === 'ulip') A('valueMode').value = 'auto'; });
+function openAccDlg(a, preset){
   state.editingAcc = a ? a.id : null;
   $('#accDlgTitle').textContent = a ? 'Edit account' : 'Add account';
   A('name').value = a ? a.name : ''; A('currency').value = a ? (a.currency || 'EUR') : 'EUR';
   A('owner').value = a ? a.owner : (cap(usernameOf(state.user)) === 'Sulekha' ? 'Sulekha' : 'Anubhav'); A('notes').value = a ? (a.notes || '') : '';
-  setAccType(a ? a.type : 'bank');
+  A('invType').value = a?.invType || 'equity'; A('valueMode').value = a?.valueMode || 'manual';
+  A('returnPct').value = a?.returnPct ?? ''; A('target').value = a?.target ?? '';
+  setAccType(a ? a.type : (typeof preset === 'string' ? preset : 'bank'));
   $('#accDel').hidden = !a; $('#accDel').classList.remove('armed'); $('#accDel').textContent = 'Delete account';
   $('#accErr').hidden = true; $('#accRenameNote').hidden = true;
   adlg.showModal(); A('name').focus();
@@ -2378,6 +2507,13 @@ $('#accForm').addEventListener('submit', async e => {
   const clash = accOf(name); if (clash && clash.id !== state.editingAcc){ err.textContent = 'There is already an account with that name.'; err.hidden = false; return; }
   const rec = { name, type: state.accType, currency: A('currency').value, owner: A('owner').value };
   const notes = A('notes').value.trim(); if (notes) rec.notes = notes;
+  if (rec.type === 'investment'){
+    rec.invType = A('invType').value; rec.valueMode = A('valueMode').value;
+    const rp = parseFloat(A('returnPct').value), tg = parseFloat(A('target').value);
+    if (A('returnPct').value.trim() !== ''){ if (!isFinite(rp) || rp < -50 || rp > 100){ err.textContent = 'Expected return should be a yearly percentage, like 7.'; err.hidden = false; return; } rec.returnPct = rp; }
+    if (A('target').value.trim() !== ''){ if (!isFinite(tg) || tg < 0){ err.textContent = 'Target per month can’t be negative.'; err.hidden = false; return; } rec.target = tg; }
+    if (rec.valueMode === 'auto' && rec.returnPct === undefined){ err.textContent = 'A modelled account needs an expected return.'; err.hidden = false; return; }
+  }
   $('#accSave').disabled = true;
   try {
     const me = usernameOf(state.user);
@@ -2405,10 +2541,10 @@ $('#accForm').addEventListener('submit', async e => {
 });
 $('#accDel').addEventListener('click', async () => {
   const b = $('#accDel'), a = state.accounts.find(x => x.id === state.editingAcc); if (!a) return;
-  const cks = checkinsOf(a);
-  if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = cks.length ? `Delete with ${cks.length} check-in${cks.length===1?'':'s'}` : 'Confirm delete'; return; }
+  const cks = checkinsOf(a), sn = state.snaps.filter(x => x.accountId === a.id);
+  if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = cks.length || sn.length ? `Delete with ${[cks.length ? cks.length + ' check-in' + (cks.length===1?'':'s') : '', sn.length ? sn.length + ' month' + (sn.length===1?'':'s') : ''].filter(Boolean).join(' and ')}` : 'Confirm delete'; return; }
   b.disabled = true;
-  try { const bt = writeBatch(fs); cks.forEach(c => bt.delete(doc(fs, 'checkins', c.id))); bt.delete(doc(fs, 'accounts', a.id)); await bt.commit();
+  try { const bt = writeBatch(fs); cks.forEach(c => bt.delete(doc(fs, 'checkins', c.id))); sn.forEach(x => bt.delete(doc(fs, 'invSnapshots', x.id))); bt.delete(doc(fs, 'accounts', a.id)); await bt.commit();
     state.openAcc = null; adlg.close(); toast('Account deleted. Entries that use its name are unchanged.'); }
   catch (x){ $('#accErr').textContent = writeError(x); $('#accErr').hidden = false; }
   finally { b.disabled = false; }
@@ -2417,7 +2553,7 @@ $('#accDel').addEventListener('click', async () => {
 // check-in dialog
 const ckdlg = $('#ckDlg');
 function openCheckin(onlyId){
-  const list = state.accounts.filter(a => !onlyId || a.id === onlyId);
+  const list = state.accounts.filter(a => onlyId ? a.id === onlyId : a.type !== 'investment');
   if (!list.length){ toast('Add an account first.'); return; }
   $('#ck-date').value = today(); $('#ckErr').hidden = true;
   $('#ckList').innerHTML = list.map(a => { const e = estimate(a), isCard = a.type === 'card';
@@ -2448,6 +2584,639 @@ $('#ckForm').addEventListener('submit', async e => {
   } catch (x){ err.textContent = writeError(x); err.hidden = false; }
   finally { $('#ckSave').disabled = false; }
 });
+
+// ---------- investments ----------
+// Monthly values per investment account (InvestTrack's model). Everything is kept in the account's own
+// currency; euro figures convert each month at that month's ECB rate (1st of the month) and today's
+// value at today's rate, so the gain can be split into what the market did and what the currency did.
+const eurK = new Intl.NumberFormat('en-IE', { style:'currency', currency:'EUR', notation:'compact', maximumFractionDigits:1 });
+const pct = (v, d = 1) => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(d) + '%';
+const signed = (v, f = eur0) => (v >= 0 ? '+' : '−') + f.format(Math.abs(v));
+const addMonth = (m, k) => { const d = new Date(Date.UTC(+m.slice(0,4), +m.slice(5,7) - 1 + k, 1)); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2,'0'); };
+const monthsBetween = (a, b) => { const out = []; for (let m = a; m <= b && out.length < 600; m = addMonth(m, 1)) out.push(m); return out; };
+const mShort = m => MON[+m.slice(5,7)-1] + " '" + m.slice(2,4);
+const mTime = m => Date.UTC(+m.slice(0,4), +m.slice(5,7) - 1, 1);
+const thisMonth = () => today().slice(0,7);
+const tick = (i, n, every) => (n - 1 - i) % every === 0 && (i === n - 1 || n - 1 - i >= every * 0.7);
+const rMonthly = a => a.invType === 'no_growth' ? 0 : (+a.returnPct || 0) / 1200;
+const snapId = (accId, m) => accId + '_' + m;
+const fmtW = (a, v) => { const c = a.currency || 'EUR'; try { return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en-IE', { style:'currency', currency:c, maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 2 }).format(v); } catch { return fmtW(a, v); } };
+const wideW = () => innerWidth <= 640 ? 440 : Math.max(640, Math.min(1100, Math.round(($('#accListView')?.clientWidth || 1100) - 40)));
+
+// Exchange rates for the 1st of each month, shared through settings/fx and fetched when missing.
+const needFx = new Set(), fxTried = new Set(); let fxBusy = false;
+function monthRate(cur, m){
+  if (!cur || cur === 'EUR') return 1;
+  const r = state.fxMonths[m]?.[cur]; if (r > 0) return r;
+  if (!fxTried.has(cur + '|' + m)) needFx.add(cur + '|' + m);
+  const ks = Object.keys(state.fxMonths).filter(k => state.fxMonths[k]?.[cur] > 0).sort();
+  const near = ks.filter(k => k <= m).pop() || ks[0];
+  return near ? state.fxMonths[near][cur] : (state.fxLatest[cur] || 0);
+}
+const latestRate = cur => !cur || cur === 'EUR' ? 1 : (state.fxLatest[cur] || monthRate(cur, thisMonth()));
+async function fillMonthRates(){
+  if (fxBusy || !needFx.size) return;
+  fxBusy = true; let got = 0;
+  for (const j of [...needFx]){
+    needFx.delete(j); fxTried.add(j);
+    const [cur, m] = j.split('|');
+    if (state.fxMonths[m]?.[cur] || m > thisMonth()) continue;
+    try {
+      const r = await fetch(`https://api.frankfurter.dev/v1/${m}-01?base=${cur}&symbols=EUR`); if (!r.ok) continue;
+      const v = (await r.json())?.rates?.EUR;
+      if (v > 0){ (state.fxMonths[m] ||= {})[cur] = v; (state.fxMonthsLocal[m] ||= {})[cur] = v; got++; }
+    } catch {}
+  }
+  fxBusy = false;
+  if (got){
+    pfCache = null; render();
+    try { await setDoc(doc(fs, 'settings', 'fx'), { months: state.fxMonths, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) }); } catch {}
+  }
+}
+
+const snapsOf = a => state.snaps.filter(s => s.accountId === a.id).sort((x,y) => x.month.localeCompare(y.month));
+// One row per recorded month, with the value resolved. Modelled accounts grow the previous value by the
+// monthly return and add the month's investment, unless a real value was typed for that month.
+function invRows(a){
+  const r = rMonthly(a), auto = a.valueMode === 'auto';
+  let prev = null; const out = [];
+  for (const s of snapsOf(a)){
+    const inv = +s.investment || 0, typed = s.value !== undefined && s.value !== null;
+    const expected = prev === null ? null : (prev + inv) * (1 + r);
+    const value = typed ? +s.value : prev === null ? inv : auto ? prev * (1 + r) + inv : prev + inv;
+    out.push({ s, month: s.month, inv, value, expected, diff: expected ? value / expected - 1 : null,
+      modelled: auto && !typed && prev !== null, missing: !auto && !typed, base: prev === null });
+    prev = value;
+  }
+  return out;
+}
+function predict(a, rows, n){
+  if (!rows.length) return [];
+  const r = rMonthly(a), t = +a.target || 0;
+  let v = rows[rows.length-1].value, inv = rows.reduce((s,x) => s + x.inv, 0), m = rows[rows.length-1].month;
+  const out = [];
+  for (let k = 0; k < n; k++){ m = addMonth(m, 1); v = (v + t) * (1 + r); inv += t; out.push({ month:m, inv:t, value:v, invested:inv }); }
+  return out;
+}
+
+function xirr(flows){
+  if (flows.length < 2 || !flows.some(f => f.v > 0) || !flows.some(f => f.v < 0)) return null;
+  const t0 = Math.min(...flows.map(f => f.t)); let r = 0.1;
+  for (let i = 0; i < 100; i++){
+    let f = 0, df = 0;
+    for (const c of flows){ const y = (c.t - t0) / 864e5 / 365, d = Math.pow(1 + r, y); f += c.v / d; df -= y * c.v / (d * (1 + r)); }
+    if (Math.abs(f) < 1e-7) return r;
+    if (!df) return null;
+    const nr = Math.min(10, Math.max(-0.99, r - f / df));
+    if (!isFinite(nr)) return null;
+    if (Math.abs(nr - r) < 1e-10) return nr;
+    r = nr;
+  }
+  return r;
+}
+
+let pfCache = null;
+function portfolio(){
+  if (pfCache) return pfCache;
+  const PAL = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
+  const accs = state.accounts.filter(a => a.type === 'investment').map(a => ({ a, cur: a.currency || 'EUR', rows: invRows(a) }));
+  const withData = accs.filter(x => x.rows.length);
+  const res = { accs, withData, tl: [], value: 0, cost: 0, market: 0, fx: 0, net: 0, xirr: null, l12: null };
+  if (!withData.length) return pfCache = res;
+  const first = withData.map(x => x.rows[0].month).sort()[0], last = withData.map(x => x.rows[x.rows.length-1].month).sort().pop();
+  const months = monthsBetween(first, last);
+  for (const x of withData){
+    const byM = Object.fromEntries(x.rows.map(r => [r.month, r]));
+    let v = null; x.vals = []; x.invs = [];
+    for (const m of months){ const r = byM[m]; if (r) v = r.value; x.vals.push(v); x.invs.push(r ? r.inv : 0); }
+    x.last = x.rows[x.rows.length-1];
+    x.invested = x.rows.reduce((s,r) => s + r.inv, 0);
+    x.value = x.last.value;
+    x.valueEur = x.value * latestRate(x.cur);
+    x.cost = x.rows.reduce((s,r) => s + r.inv * monthRate(x.cur, r.month), 0);
+    x.market = (x.value - x.invested) * latestRate(x.cur);
+    x.modelled = x.a.valueMode === 'auto';
+  }
+  withData.sort((p,q) => q.valueEur - p.valueEur).forEach((x, i) => x.color = `var(${PAL[i % PAL.length]})`);
+  accs.forEach(x => { if (!x.color) x.color = 'var(--s8)'; });
+  let cum = 0;
+  res.tl = months.map((m, i) => {
+    let tv = 0, inv = 0, profit = 0, base = 0, has = false;
+    const parts = [];
+    for (const x of withData){
+      const v = x.vals[i]; if (v === null){ parts.push(0); continue; }
+      const rt = monthRate(x.cur, m);
+      tv += v * rt; inv += x.invs[i] * rt; parts.push(v * rt);
+      // Market return: change in value minus money put in, both at this month's rate (currency moves left out).
+      if (i > 0 && x.vals[i-1] !== null){ profit += (v - x.vals[i-1] - x.invs[i]) * rt; base += x.vals[i-1] * rt; has = true; }
+    }
+    cum += inv;
+    return { m, tv, inv, cum, profit, pct: base > 0 ? profit / base : null, has, parts };
+  });
+  res.value = withData.reduce((s,x) => s + x.valueEur, 0);
+  res.cost = withData.reduce((s,x) => s + x.cost, 0);
+  res.market = withData.reduce((s,x) => s + x.market, 0);
+  res.net = res.value - res.cost; res.fx = res.net - res.market;
+  const end = Math.min(mTime(addMonth(last, 1)), Date.now());
+  res.xirr = xirr([...res.tl.filter(t => t.inv).map(t => ({ t: mTime(t.m), v: -t.inv })), { t: end, v: res.value }]);
+  const w = res.tl.slice(-12), wp = w.filter(t => t.has);
+  res.l12 = { invested: w.reduce((s,t) => s + t.inv, 0), profit: wp.reduce((s,t) => s + t.profit, 0), pos: wp.filter(t => t.profit > 0).length, n: wp.length, months: w.length };
+  res.last = last;
+  return pfCache = res;
+}
+// Euros put into investments in a month (or all time), from the monthly values. null when none recorded.
+function investedIn(period){
+  if (!state.snaps.length) return null;
+  const pf = portfolio(); if (!pf.withData.length) return null;
+  if (period === 'all') return pf.cost;
+  const t = pf.tl.find(t => t.m === period);
+  return t ? t.inv : null;
+}
+// Net transfers into an account during a month, in the account's currency.
+function ledgerInv(a, m){
+  const n = a.name.toLowerCase();
+  const tin = state.transfers.filter(t => t.date.startsWith(m) && String(t.to).toLowerCase() === n).reduce((s,t) => s + inAccCur(a, t), 0);
+  const tout = state.transfers.filter(t => t.date.startsWith(m) && String(t.from).toLowerCase() === n).reduce((s,t) => s + inAccCur(a, t), 0);
+  return Math.round((tin - tout) * 100) / 100;
+}
+
+// ---------- wealth page ----------
+function renderWealth(){
+  loadRates();
+  const open = state.openAcc && state.accounts.find(a => a.id === state.openAcc);
+  $('#accListView').hidden = !!open; $('#accDetail').hidden = !open;
+  if (open){ open.type === 'investment' ? renderInvDetail(open) : renderAccDetail(open); fillMonthRates(); return; }
+  $$('#wSeg [data-wv]').forEach(b => b.setAttribute('aria-checked', b.dataset.wv === state.wv));
+  ['inv','cash','fire'].forEach(v => $('#wv-' + v).hidden = v !== state.wv);
+  const pf = portfolio();
+  const cash = state.accounts.filter(a => a.type !== 'investment').reduce((x,a) => { const e = estimate(a); return x + (e ? toEur(a, e.balance) : 0); }, 0);
+  const nw = pf.value + cash;
+  $('#wSub').innerHTML = pf.withData.length || state.checkins.length
+    ? `Net worth ≈ <strong>${eur0.format(nw)}</strong> · investments ${eur0.format(pf.value)} · ${state.checkins.length ? 'cash &amp; cards ' + (cash < 0 ? '−' : '') + eur0.format(Math.abs(cash)) : 'cash &amp; cards not checked in yet'}`
+    : 'Investments, cash and your FIRE plan';
+  if (state.wv === 'inv') renderInvestments(pf);
+  if (state.wv === 'cash') renderCash();
+  if (state.wv === 'fire') renderFire(pf);
+  fillMonthRates();
+}
+
+function renderInvestments(pf){
+  const has = pf.withData.length;
+  $('#invEmpty').hidden = !!has;
+  $('#invEmpty').innerHTML = `<div class="left" style="display:grid;gap:4px"><strong>Bring in your investment history</strong><span class="sublbl">Import the InvestTrack export file, or add an account and its monthly values by hand.</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-itimport>Import InvestTrack file</button></div>`;
+  $('#invKpis').hidden = $('#invGrowthP').hidden = $('#invMonthlyP').hidden = !has;
+  if (has){
+    const l = pf.l12, gp = pf.cost > 0 ? pf.net / pf.cost : 0;
+    $('#invKpis').innerHTML = `
+      <div class="kpi"><span class="lbl">Value</span><span class="val">${eur0.format(pf.value)}</span><span class="sub">${eur0.format(pf.cost)} invested · at today’s rates</span></div>
+      <div class="kpi"><span class="lbl">Net gain</span><span class="val ${pf.net < 0 ? 'neg' : ''}">${signed(pf.net)}</span><span class="split"><span>Market <b class="${pf.market >= 0 ? 'pos' : 'neg'}">${signed(pf.market, eurK)}</b></span><span>Currency <b class="${pf.fx >= 0 ? 'pos' : 'neg'}">${signed(pf.fx, eurK)}</b></span></span></div>
+      <div class="kpi"><span class="lbl">Return a year (XIRR)</span><span class="val">${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + '%'}</span><span class="sub">${pct(gp)} overall, in euros</span></div>
+      <div class="kpi"><span class="lbl">Last 12 months</span><span class="val ${l.profit < 0 ? 'neg' : ''}">${signed(l.profit)}</span><span class="sub">market return · ${l.n ? l.pos + ' of ' + l.n + ' months up' : 'not enough months'} · ${eurK.format(l.invested)} put in</span></div>`;
+    $('#invGrowthHint').textContent = 'Each month at that month’s exchange rate';
+    renderGrowth(pf);
+    $$('#invMSeg [data-im]').forEach(b => b.setAttribute('aria-checked', b.dataset.im === state.im));
+    $('#invMTitle').textContent = state.im === 'profit' ? 'Monthly return' : 'Monthly investment';
+    $('#invMHint').textContent = state.im === 'profit' ? 'Change in value minus money put in, at each month’s rate, so currency swings are left out.' : 'Money put in each month, in euros at that month’s rate.';
+    renderMonthly(pf);
+  }
+  const rows = pf.accs.slice().sort((p,q) => (q.valueEur || 0) - (p.valueEur || 0));
+  $('#invList').innerHTML = rows.length ? rows.map(x => {
+    const a = x.a, n = x.rows.length;
+    const g = n && x.invested > 0 ? (x.value - x.invested) / x.invested : null;
+    return `<button type="button" class="r" data-acc="${esc(a.id)}"><span class="dot" style="background:${x.color}"></span>
+      <span><span class="nm">${esc(a.name)}</span>${x.modelled ? '<span class="modelled" title="Value grows by the expected return; not from a statement">modelled</span>' : ''}<br>
+        <span class="meta">${INV_TYPE[a.invType] || 'Investment'}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''} · ${n ? 'updated ' + monthLabel(x.last.month) : 'no values yet'}</span></span>
+      <span class="v">${n ? fmtW(a, x.value) : '—'}<small>${n ? (x.cur !== 'EUR' ? '≈ ' + eur0.format(x.valueEur) + ' · ' : '') + (g === null ? '' : `<span class="${g >= 0 ? 'pos' : 'neg'}">${pct(g)}</span>`) : 'Add month'}</small></span></button>`;
+  }).join('') + (pf.withData.length > 1 ? `<div class="r tot"><span></span><span>Total</span><span class="v">${eur0.format(pf.value)}<small>${pct(pf.cost > 0 ? pf.net / pf.cost : 0)} in euros</small></span></div>` : '')
+    : `<p class="empty" style="margin:0">${state.accountsReady ? 'No investment accounts yet.' : 'Loading…'}</p>`;
+  $('#updMonth').hidden = !rows.length;
+  $('#invFoot').innerHTML = rows.length ? `Gain per account is in its own currency, so it leaves out exchange-rate moves. <a href="#" data-itimport>Import from InvestTrack</a>` : '';
+}
+
+// Stacked value by account, with the money put in as a dashed line.
+function renderGrowth(pf){
+  const tl = pf.tl, n = tl.length, narrow = innerWidth <= 640;
+  const W = wideW(), H = narrow ? 240 : 300, L = narrow ? 78 : 58, R = 10, T = 12, B = 26;
+  const max = niceMax(Math.max(...tl.map(t => Math.max(t.tv, t.cum))));
+  const x = i => L + (W-L-R) * (n === 1 ? 0.5 : i / (n-1)), y = v => T + (H-T-B) * (1 - v / max);
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Portfolio value by month, stacked by account">`;
+  for (let k = 0; k <= 4; k++){ const v = max * k / 4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${eurK.format(v)}</text>`; }
+  const accs = pf.withData;
+  const base = tl.map(() => 0);
+  accs.slice().reverse().forEach((xa) => {
+    const j = accs.indexOf(xa);
+    const top = tl.map((t, i) => base[i] + t.parts[j]);
+    const d = tl.map((t,i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(top[i]).toFixed(1)).join(' ') + ' ' + tl.map((t,i) => 'L' + x(n-1-i).toFixed(1) + ',' + y(base[n-1-i]).toFixed(1)).join(' ') + ' Z';
+    s += `<path d="${d}" fill="${xa.color}" fill-opacity=".85" stroke="var(--surface)" stroke-width="1"/>`;
+    top.forEach((v, i) => base[i] = v);
+  });
+  s += `<path d="${tl.map((t,i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(t.cum).toFixed(1)).join(' ')}" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+  const every = Math.max(1, Math.ceil(n / (narrow ? 4 : 10)));
+  tl.forEach((t, i) => {
+    const bw = (W-L-R) / Math.max(1, n-1);
+    s += `<rect x="${x(i) - bw/2}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(t.m)} · value ${eur0.format(t.tv)} · put in so far ${eur0.format(t.cum)}"/>`;
+    if (tick(i, n, every)) s += `<text x="${x(i)}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : 'middle'}">${mShort(t.m)}</text>`;
+  });
+  s += `</svg>`;
+  $('#invGrowth').innerHTML = s;
+  $('#invLegend').innerHTML = accs.map(xa => `<span><i style="background:${xa.color}"></i>${esc(xa.a.name)}</span>`).join('') + `<span><i style="background:none;border-top:2px dashed var(--ink);height:0;border-radius:0;vertical-align:3px"></i>Put in</span>`;
+}
+
+function renderMonthly(pf){
+  const tl = pf.tl.filter(t => state.im === 'invested' || t.has).slice(-24), n = tl.length, narrow = innerWidth <= 640;
+  if (!n){ $('#invMonthly').innerHTML = '<div class="empty">Needs at least two months.</div>'; return; }
+  const W = wideW(), H = narrow ? 200 : 230, L = narrow ? 70 : 52, R = 8, T = 12, B = 26;
+  const val = t => state.im === 'profit' ? (t.pct || 0) : t.inv;
+  const vs = tl.map(val), hi = Math.max(0, ...vs), lo = Math.min(0, ...vs);
+  const span = niceMax(Math.max(hi - lo, 1e-9)), step = span / 4;
+  const top = Math.ceil(hi / step) * step || step, bot = Math.floor(lo / step) * step;
+  const y = v => T + (H-T-B) * (top - v) / (top - bot || 1);
+  const fmt = v => state.im === 'profit' ? (v * 100).toFixed(Math.abs(step) < 0.01 ? 1 : 0) + '%' : eurK.format(v);
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${state.im === 'profit' ? 'Monthly market return' : 'Monthly investment'}">`;
+  for (let v = bot; v <= top + step / 2; v += step) s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${fmt(Math.abs(v) < step / 1e6 ? 0 : v)}</text>`;
+  const bw = (W-L-R) / n, w = Math.min(18, bw * 0.62), every = Math.max(1, Math.ceil(n / (narrow ? 4 : 12)));
+  tl.forEach((t, i) => {
+    const v = vs[i], cx = L + i*bw + bw/2, y0 = y(0), y1 = y(v);
+    const color = state.im === 'invested' ? 'var(--c-inc)' : v >= 0 ? 'var(--good)' : 'var(--danger)';
+    s += `<rect x="${cx - w/2}" y="${Math.min(y0, y1)}" width="${w}" height="${Math.max(1, Math.abs(y1 - y0))}" rx="2" fill="${color}"/>`;
+    s += `<rect x="${L + i*bw}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(t.m)} · ${state.im === 'profit' ? `return ${signed(t.profit)} (${t.pct === null ? '—' : pct(t.pct)})` : `put in ${eur0.format(t.inv)}`}"/>`;
+    if (tick(i, n, every)) s += `<text x="${i === n-1 ? W-R : cx}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : 'middle'}">${mShort(t.m)}</text>`;
+  });
+  s += `<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/></svg>`;
+  $('#invMonthly').innerHTML = s;
+}
+
+function renderInvDetail(a){
+  const rows = invRows(a), cur = a.currency || 'EUR';
+  const invested = rows.reduce((s,r) => s + r.inv, 0), last = rows[rows.length-1];
+  const value = last ? last.value : null, g = last && invested > 0 ? (value - invested) / invested : null;
+  const pred = state.showPred ? predict(a, rows, 60) : [];
+  const fx = cur !== 'EUR' && value !== null ? latestRate(cur) : 0;
+  $('#accDetail').innerHTML = `
+    <div><button class="btn ghost" type="button" data-backaccs>← Wealth</button></div>
+    <div class="tdhead">
+      <div><span class="ttype"><i style="background:${ACC_DOT.investment}"></i>${INV_TYPE[a.invType] || 'Investment'}</span>${a.valueMode === 'auto' ? '<span class="modelled">modelled</span>' : ''}<h1>${esc(a.name)}</h1>
+        <p>${esc(a.owner)} · ${cur}${a.returnPct !== undefined ? ' · expects ' + a.returnPct + '% a year' : ''}${a.target ? ' · target ' + fmtW(a, a.target) + ' a month' : ''}</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" type="button" data-editacc="${esc(a.id)}">Edit</button>
+        <button class="btn primary" type="button" data-addsnap="${esc(a.id)}">+ Add month</button>
+      </div>
+    </div>
+    ${rows.length ? `<section class="kpis w">
+      <div class="kpi"><span class="lbl">Value</span><span class="val">${fmtW(a, value)}</span><span class="sub">${monthLabel(last.month)}${fx ? ' · ≈ ' + eur0.format(value * fx) + ' today' : ''}</span></div>
+      <div class="kpi"><span class="lbl">Invested</span><span class="val">${fmtW(a, invested)}</span><span class="sub">since ${monthLabel(rows[0].month)}${rows[0].value > rows[0].inv ? ', first month includes earlier money' : ''}</span></div>
+      <div class="kpi"><span class="lbl">Gain</span><span class="val ${value - invested < 0 ? 'neg' : ''}">${value - invested >= 0 ? '+' : '−'}${fmtW(a, Math.abs(value - invested))}</span><span class="sub">${g === null ? '' : pct(g) + ' in ' + cur}</span></div>
+    </section>
+    <section class="panel"><header><h2>Value and money put in</h2><button class="btn ghost" type="button" data-pred aria-pressed="${state.showPred}">${state.showPred ? 'Hide' : 'Show'} 5-year projection</button></header>
+      <div id="accChart"></div>
+      <div class="legend"><span><i style="background:var(--bar)"></i>Value</span><span><i style="background:none;border-top:2px dashed var(--ink);height:0;border-radius:0;vertical-align:3px"></i>Put in</span>${state.showPred ? `<span><i style="background:var(--bar-dim)"></i>Projection at ${a.returnPct || 0}% with ${fmtW(a, a.target || 0)} a month</span>` : ''}</div>
+    </section>
+    <section class="panel"><header><h2>Monthly values</h2><span class="hint">Expected = last value plus this month’s money, grown by one month of the expected return</span></header>
+      <div class="tscroll"><table class="snaps"><thead><tr><th>Month</th><th class="num">Put in</th><th class="num">Value</th><th class="num">Expected</th><th class="num">Diff</th></tr></thead>
+      <tbody>${pred.slice(0, 12).reverse().map(p => `<tr class="pred"><td>${monthLabel(p.month)}</td><td class="num">${fmtW(a, p.inv)}</td><td class="num">${fmtW(a, p.value)}</td><td class="num"></td><td class="num">—</td></tr>`).join('')}
+      ${rows.slice().reverse().map(r => `<tr class="row" data-editsnap="${esc(r.s.id)}" tabindex="0"><td>${monthLabel(r.month)}${r.modelled ? '<span class="modelled">modelled</span>' : ''}${r.missing ? '<span class="modelled">no value</span>' : ''}</td><td class="num">${fmtW(a, r.inv)}</td><td class="num">${fmtW(a, r.value)}</td>
+        <td class="num">${r.expected === null ? '—' : fmtW(a, r.expected)}</td><td class="num ${r.diff === null || r.modelled ? '' : r.diff >= 0 ? 'pos' : 'neg'}">${r.diff === null || r.base ? '—' : pct(r.diff, 2)}</td></tr>`).join('')}</tbody></table></div>
+    </section>` : `<div class="panel"><p class="empty" style="margin:0">No monthly values yet. Use “+ Add month” to enter${a.valueMode === 'auto' ? ' the first value; later months are modelled from the return rate' : ' what you put in and what it was worth'}.</p></div>`}`;
+  if (rows.length) renderAccChart(a, rows, pred);
+}
+
+function renderAccChart(a, rows, pred){
+  let cum = 0;
+  const pts = rows.map(r => ({ m: r.month, v: r.value, c: (cum += r.inv) })).concat(pred.map(p => ({ m: p.month, v: p.value, c: p.invested, p: true })));
+  const n = pts.length, narrow = innerWidth <= 640;
+  const W = wideW(), H = narrow ? 220 : 260, L = narrow ? 92 : 70, R = 10, T = 12, B = 26;
+  const max = niceMax(Math.max(...pts.map(p => Math.max(p.v, p.c))));
+  const x = i => L + (W-L-R) * (n === 1 ? 0.5 : i / (n-1)), y = v => T + (H-T-B) * (1 - v / max);
+  const kf = new Intl.NumberFormat(a.currency === 'INR' ? 'en-IN' : 'en-IE', { style:'currency', currency: a.currency || 'EUR', notation:'compact', maximumFractionDigits:1 });
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Value and money put in by month">`;
+  for (let k = 0; k <= 4; k++){ const v = max * k / 4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${kf.format(v)}</text>`; }
+  const h = rows.length;
+  const line = (key, from, to) => pts.slice(from, to).map((p, i) => (i ? 'L' : 'M') + x(from + i).toFixed(1) + ',' + y(p[key]).toFixed(1)).join(' ');
+  s += `<path d="${line('v', 0, h)} L${x(h-1)},${y(0)} L${x(0)},${y(0)} Z" fill="var(--bar)" fill-opacity=".12"/>`;
+  s += `<path d="${line('v', 0, h)}" fill="none" stroke="var(--bar)" stroke-width="2.2" stroke-linejoin="round"/>`;
+  s += `<path d="${line('c', 0, h)}" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  if (pred.length){
+    s += `<path d="${line('v', h-1, n)}" fill="none" stroke="var(--bar-dim)" stroke-width="2.2" stroke-dasharray="2 3"/>`;
+    s += `<path d="${line('c', h-1, n)}" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="5 4"/>`;
+    s += `<line x1="${x(h-1)}" x2="${x(h-1)}" y1="${T}" y2="${H-B}" stroke="var(--line)"/>`;
+  }
+  const every = Math.max(1, Math.ceil(n / (narrow ? 3 : 10)));
+  pts.forEach((p, i) => {
+    const bw = (W-L-R) / Math.max(1, n-1);
+    s += `<rect x="${x(i) - bw/2}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(p.m)}${p.p ? ' (projected)' : ''} · value ${fmtW(a, p.v)} · put in ${fmtW(a, p.c)}"/>`;
+    if (tick(i, n, every)) s += `<text x="${x(i)}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : 'middle'}">${mShort(p.m)}</text>`;
+  });
+  $('#accChart').innerHTML = s + '</svg>';
+}
+
+// ---------- FIRE ----------
+function ledgerAnnualSpend(){
+  const cm = thisMonth(), by = {};
+  state.items.forEach(i => { const m = i.date.slice(0,7); if (m < cm) by[m] = (by[m] || 0) + (+i.amount || 0); });
+  const ms = Object.keys(by).sort().slice(-12);
+  if (ms.length < 3) return null;
+  return { v: ms.reduce((s,m) => s + by[m], 0) / ms.length * 12, n: ms.length };
+}
+function fireCalc(p){
+  const r = p.ret / 100, yrs = Math.max(0, p.year - new Date().getFullYear());
+  const fae = p.exp * Math.pow(1 + p.inf / 100, yrs), num = p.wr > 0 ? fae / (p.wr / 100) : 0;
+  const grow = Math.pow(1 + r, yrs), pmt = p.save * 12;
+  const fvC = r > 0 ? pmt * (grow - 1) / r : pmt * yrs;
+  const proj = p.cur * grow + fvC;
+  const need = yrs > 0 ? Math.max(0, (num - p.cur * grow) * (r > 0 ? r / (grow - 1) : 1 / yrs) / 12) : null;
+  // First year the projected portfolio covers that year's FIRE number.
+  let reach = null;
+  for (let k = 0; k <= 60; k++){ const g = Math.pow(1 + r, k), v = p.cur * g + (r > 0 ? pmt * (g - 1) / r : pmt * k), t = p.exp * Math.pow(1 + p.inf / 100, k) / (p.wr / 100); if (v >= t){ reach = new Date().getFullYear() + k; break; } }
+  return { yrs, fae, num, proj, need, reach, on: proj >= num };
+}
+function renderFire(pf){
+  const f = state.fire || {}, led = ledgerAnnualSpend(), y0 = new Date().getFullYear();
+  const ledSave = pf.l12 && pf.l12.months ? pf.l12.invested / pf.l12.months : null;
+  const p = { exp: f.expenses ?? (led ? Math.round(led.v) : 0), inf: f.inflation ?? 3, year: f.fireYear ?? y0 + 20, wr: f.withdrawal ?? 4,
+    save: f.savings ?? (ledSave !== null ? Math.round(ledSave) : 0), ret: f.returnPct ?? 7, cur: pf.value };
+  const c = fireCalc(p), prog = c.num > 0 ? p.cur / c.num : 0;
+  const src = (key, val, label) => val === null ? '' : f[key] !== undefined && f[key] !== null
+    ? `<span class="src">${label}: ${eur0.format(val)} · <button type="button" data-fireuse="${key}">use this</button></span>` : `<span class="src">From ${label.toLowerCase()}</span>`;
+  $('#wv-fire').innerHTML = `
+    <section class="kpis w">
+      <div class="kpi"><span class="lbl">FIRE number</span><span class="val">${eur0.format(c.num)}</span><span class="sub">${eur0.format(c.fae)} a year in ${p.year}, at ${p.wr}% withdrawal</span></div>
+      <div class="kpi"><span class="lbl">Invested today</span><span class="val">${eur0.format(p.cur)}</span><span class="sub">${(prog * 100).toFixed(0)}% of the way</span><div class="progress" aria-hidden="true"><i style="width:${Math.min(100, prog * 100).toFixed(1)}%"></i></div></div>
+      <div class="kpi"><span class="lbl">Projected in ${p.year}</span><span class="val">${eur0.format(c.proj)}</span><span class="sub"><span class="pill ${c.on ? 'ontrack' : 'over'}">${c.on ? 'On track' : 'Behind'}</span> ${c.num > 0 ? (c.proj / c.num * 100).toFixed(0) + '% of target' : ''}</span></div>
+      <div class="kpi"><span class="lbl">Needed a month</span><span class="val">${c.need === null ? '—' : eur0.format(c.need)}</span><span class="sub">${c.reach ? 'At your pace: FIRE around ' + c.reach : 'Not reached within 60 years at this pace'}</span></div>
+    </section>
+    <section class="panel"><header><h2>Path to FIRE</h2><span class="legend"><span><i style="background:var(--bar)"></i>Projected portfolio</span><span><i style="background:var(--s2)"></i>FIRE number that year</span></span></header><div id="fireChart"></div></section>
+    <section class="panel"><header><h2>Assumptions</h2><span class="hint">Changes save for both of you</span></header>
+      <div class="fire-grid">
+        <label>Yearly spending today (€)<input type="number" step="100" min="0" inputmode="decimal" data-fire="expenses" value="${f.expenses ?? ''}" placeholder="${led ? Math.round(led.v) : 'e.g. 30000'}">${src('expenses', led ? led.v : null, led ? `Ledger, ${led.n} month${led.n===1?'':'s'}` : 'Ledger')}${led && (f.expenses === undefined || f.expenses === null) ? `<span class="src">Average of ${led.n} month${led.n===1?'':'s'} × 12</span>` : ''}</label>
+        <label>Invested per month (€)<input type="number" step="10" min="0" inputmode="decimal" data-fire="savings" value="${f.savings ?? ''}" placeholder="${ledSave !== null ? Math.round(ledSave) : ''}">${src('savings', ledSave, 'Last 12 months')}</label>
+        <label>FIRE year<input type="number" step="1" min="${y0}" max="${y0 + 60}" inputmode="numeric" data-fire="fireYear" value="${p.year}"><span class="src">${c.yrs} year${c.yrs===1?'':'s'} from now</span></label>
+        <label>Return a year (%)<input type="number" step="0.1" inputmode="decimal" data-fire="returnPct" value="${p.ret}"><span class="src">Your XIRR so far: ${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + '%'}</span></label>
+        <label>Inflation (%)<input type="number" step="0.1" inputmode="decimal" data-fire="inflation" value="${p.inf}"></label>
+        <label>Withdrawal rate (%)<input type="number" step="0.1" min="0.1" inputmode="decimal" data-fire="withdrawal" value="${p.wr}"></label>
+      </div>
+      <p class="hint">Invested today is the live value of your investment accounts. Leave spending or monthly investing empty to follow your ledger.</p>
+    </section>`;
+  const yrs = Math.max(c.yrs, c.reach ? c.reach - y0 : 0, 5), r = p.ret / 100;
+  const pts = []; for (let k = 0; k <= yrs; k++){ const g = Math.pow(1 + r, k); pts.push({ yr: y0 + k, v: p.cur * g + (r > 0 ? p.save * 12 * (g - 1) / r : p.save * 12 * k), t: p.wr > 0 ? p.exp * Math.pow(1 + p.inf / 100, k) / (p.wr / 100) : 0 }); }
+  const W = wideW(), H = innerWidth <= 640 ? 220 : 260, L = innerWidth <= 640 ? 78 : 58, R = 10, T = 12, B = 26, n = pts.length;
+  const max = niceMax(Math.max(...pts.map(q => Math.max(q.v, q.t))));
+  const x = i => L + (W-L-R) * i / Math.max(1, n-1), yy = v => T + (H-T-B) * (1 - v / max);
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Projected portfolio against the FIRE number by year">`;
+  for (let k = 0; k <= 4; k++){ const v = max * k / 4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${yy(v)}" y2="${yy(v)}"/><text x="${L-8}" y="${yy(v)+4}" text-anchor="end">${eurK.format(v)}</text>`; }
+  s += `<path d="${pts.map((q,i) => (i?'L':'M') + x(i).toFixed(1) + ',' + yy(q.t).toFixed(1)).join(' ')}" fill="none" stroke="var(--s2)" stroke-width="2" stroke-dasharray="6 4"/>`;
+  s += `<path d="${pts.map((q,i) => (i?'L':'M') + x(i).toFixed(1) + ',' + yy(q.v).toFixed(1)).join(' ')}" fill="none" stroke="var(--bar)" stroke-width="2.4"/>`;
+  const fi = pts.findIndex(q => q.yr === p.year);
+  if (fi >= 0) s += `<line x1="${x(fi)}" x2="${x(fi)}" y1="${T}" y2="${H-B}" stroke="var(--muted)" stroke-dasharray="2 3"/><text x="${x(fi) - 4}" y="${T+10}" text-anchor="end" style="fill:var(--ink-2)">${p.year}</text>`;
+  const every = Math.max(1, Math.ceil(n / (innerWidth <= 640 ? 4 : 10)));
+  pts.forEach((q, i) => { s += `<rect x="${x(i) - (W-L-R)/Math.max(1,n-1)/2}" y="${T}" width="${(W-L-R)/Math.max(1,n-1)}" height="${H-T-B}" fill="transparent" data-tip="${q.yr} · projected ${eur0.format(q.v)} · FIRE number ${eur0.format(q.t)}"/>`;
+    if (i % every === 0) s += `<text x="${x(i)}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : i === 0 ? 'start' : 'middle'}">${q.yr}</text>`; });
+  $('#fireChart').innerHTML = s + '</svg>';
+}
+const FIRE_KEYS = ['expenses','inflation','fireYear','withdrawal','savings','returnPct'];
+async function saveFire(patch){
+  const next = { ...state.fire, ...patch }, o = {};
+  for (const k of FIRE_KEYS) if (typeof next[k] === 'number' && isFinite(next[k])) o[k] = next[k];
+  o.updatedAt = new Date().toISOString(); o.updatedBy = usernameOf(state.user);
+  state.fire = o; render();
+  try { await setDoc(doc(fs, 'settings', 'fire'), o); } catch (x){ toast(writeError(x)); }
+}
+document.addEventListener('change', e => {
+  const i = e.target.closest('[data-fire]'); if (!i) return;
+  const k = i.dataset.fire, raw = i.value.trim(), v = parseFloat(raw);
+  if (raw === ''){ if (k === 'expenses' || k === 'savings') saveFire({ [k]: null }); return; }
+  if (!isFinite(v)) return;
+  if (k === 'fireYear' && (v < new Date().getFullYear() || v > new Date().getFullYear() + 80)) return toast('Pick a year between now and ' + (new Date().getFullYear() + 80) + '.');
+  if (k === 'withdrawal' && v <= 0) return toast('Withdrawal rate must be above 0.');
+  saveFire({ [k]: k === 'fireYear' ? Math.round(v) : v });
+});
+
+// ---------- one month for one account ----------
+const sdlg = $('#snapDlg'), S = k => $('#s-' + k);
+function prevValue(a, m){ const r = invRows(a).filter(x => x.month < m); return r.length ? r[r.length-1].value : null; }
+function snapHint(){
+  const a = state.accounts.find(x => x.id === state.snapAcc); if (!a) return;
+  const m = S('month').value, prev = m ? prevValue(a, m) : null, inv = parseFloat(S('inv').value) || 0;
+  const auto = a.valueMode === 'auto' && prev !== null, sym = curSym(a.currency || 'EUR');
+  $('#lb-sinv').textContent = `Put in this month (${sym})`;
+  $('#lb-sval').textContent = auto ? `Value from a statement (${sym}, optional)` : `Value at month end (${sym})`;
+  S('val').placeholder = auto ? 'modelled: ' + fmtAcc(a, prev * (1 + rMonthly(a)) + inv) : '';
+  const led = m ? ledgerInv(a, m) : 0;
+  $('#snapHint').innerHTML = [led ? `Transfers into ${esc(a.name)} in ${monthLabel(m)}: <strong>${fmtAcc(a, led)}</strong>` : '',
+    auto ? 'Leave the value empty to use the modelled value.' : prev === null && a.valueMode === 'auto' ? 'This is the first month: type its value, later months are modelled from it.' : ''].filter(Boolean).join('<br>');
+}
+function openSnap(a, snap){
+  state.snapAcc = a.id; state.editingSnap = snap ? snap.id : null;
+  const rows = invRows(a), lastM = rows.length ? rows[rows.length-1].month : null;
+  const m = snap ? snap.month : !lastM ? thisMonth() : lastM >= thisMonth() ? thisMonth() : addMonth(lastM, 1);
+  $('#snapTitle').textContent = (snap ? 'Edit ' : 'Add ') + a.name + ' month';
+  S('month').value = m;
+  const led = ledgerInv(a, m);
+  S('inv').value = snap ? snap.investment : led || '';
+  S('inv').placeholder = a.target ? String(a.target) : '0';
+  S('val').value = snap && snap.value !== undefined && snap.value !== null ? snap.value : '';
+  $('#snapDel').hidden = !snap; $('#snapDel').classList.remove('armed'); $('#snapDel').textContent = 'Delete month';
+  $('#snapErr').hidden = true; snapHint();
+  sdlg.showModal(); S(snap ? 'val' : 'inv').focus();
+}
+S('month').addEventListener('change', () => { const a = state.accounts.find(x => x.id === state.snapAcc); if (a && !state.editingSnap){ const led = ledgerInv(a, S('month').value); if (led) S('inv').value = led; } snapHint(); });
+S('inv').addEventListener('input', snapHint);
+$('#snapCancel').addEventListener('click', () => sdlg.close());
+$('#snapForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const a = state.accounts.find(x => x.id === state.snapAcc), err = $('#snapErr'); err.hidden = true;
+  const m = S('month').value, inv = S('inv').value.trim() === '' ? 0 : parseFloat(S('inv').value), vraw = S('val').value.trim(), val = parseFloat(vraw);
+  if (!/^\d{4}-\d{2}$/.test(m)){ err.textContent = 'Pick a month.'; err.hidden = false; return; }
+  if (m > thisMonth()){ err.textContent = 'That month hasn’t started yet.'; err.hidden = false; return; }
+  if (!isFinite(inv)){ err.textContent = 'The amount put in isn’t a number.'; err.hidden = false; return; }
+  const prev = prevValue(a, m), needVal = a.valueMode !== 'auto' || prev === null;
+  if (vraw === '' && needVal){ err.textContent = 'Type the value' + (a.valueMode === 'auto' ? ' for this first month.' : '.'); err.hidden = false; return; }
+  if (vraw !== '' && (!isFinite(val) || val < 0)){ err.textContent = 'The value isn’t a valid number.'; err.hidden = false; return; }
+  const id = snapId(a.id, m), clash = state.snaps.find(x => x.id === id);
+  if (clash && clash.id !== state.editingSnap){ err.textContent = monthLabel(m) + ' already has values. Edit that row instead.'; err.hidden = false; return; }
+  const old = state.editingSnap && state.snaps.find(x => x.id === state.editingSnap), me = usernameOf(state.user);
+  const d = { accountId: a.id, month: m, investment: Math.round(inv * 100) / 100, createdAt: old?.createdAt || new Date().toISOString(), createdBy: old?.createdBy || me, updatedBy: me };
+  if (vraw !== '') d.value = Math.round(val * 100) / 100;
+  $('#snapSave').disabled = true;
+  try {
+    const b = writeBatch(fs);
+    if (old && old.id !== id) b.delete(doc(fs, 'invSnapshots', old.id));
+    b.set(doc(fs, 'invSnapshots', id), d); await b.commit();
+    sdlg.close(); toast(monthLabel(m) + ' saved for ' + a.name);
+  } catch (x){ err.textContent = writeError(x); err.hidden = false; }
+  finally { $('#snapSave').disabled = false; }
+});
+$('#snapDel').addEventListener('click', async () => {
+  const b = $('#snapDel'); if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'Confirm delete'; return; }
+  b.disabled = true;
+  try { await deleteDoc(doc(fs, 'invSnapshots', state.editingSnap)); sdlg.close(); toast('Month deleted'); }
+  catch (x){ $('#snapErr').textContent = writeError(x); $('#snapErr').hidden = false; }
+  finally { b.disabled = false; }
+});
+
+// ---------- one month for every account ----------
+const umdlg = $('#umDlg');
+function umRows(){
+  const m = $('#um-month').value, accs = state.accounts.filter(a => a.type === 'investment');
+  $('#umList').innerHTML = `<div class="umrow umhead"><span>Account</span><span>Put in</span><span>Value</span></div>` + accs.map(a => {
+    const ex = state.snaps.find(x => x.id === snapId(a.id, m)), prev = prevValue(a, m), auto = a.valueMode === 'auto' && prev !== null, led = ledgerInv(a, m);
+    const inv = ex ? ex.investment : led || '';
+    return `<div class="umrow" data-umacc="${esc(a.id)}"><span><span class="nm" style="font-weight:600">${esc(a.name)}</span>${auto ? '<span class="modelled">modelled</span>' : ''}<br>
+      <span class="hint">${curSym(a.currency || 'EUR')} · ${ex ? 'already saved, edit below' : prev !== null ? 'last ' + fmtAcc(a, prev) : 'first month'}${!ex && led ? ' · from transfers' : ''}</span></span>
+      <input type="number" step="0.01" inputmode="decimal" data-um="inv" value="${inv}" placeholder="${a.target || 0}" aria-label="${esc(a.name)}: put in">
+      <input type="number" step="0.01" inputmode="decimal" data-um="val" value="${ex && ex.value !== undefined && ex.value !== null ? ex.value : ''}" placeholder="${auto ? 'modelled' : ''}" aria-label="${esc(a.name)}: value"></div>`;
+  }).join('');
+}
+function openUpdateMonth(){
+  if (!state.accounts.some(a => a.type === 'investment')){ toast('Add an investment account first.'); return; }
+  const last = state.snaps.map(s => s.month).sort().pop();
+  $('#um-month').value = !last ? thisMonth() : last >= thisMonth() ? thisMonth() : addMonth(last, 1);
+  $('#umErr').hidden = true; umRows(); umdlg.showModal();
+}
+$('#um-month').addEventListener('change', umRows);
+$('#umCancel').addEventListener('click', () => umdlg.close());
+$('#updMonth').addEventListener('click', openUpdateMonth);
+$('#newInv').addEventListener('click', () => openAccDlg(null, 'investment'));
+$('#umForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const m = $('#um-month').value, err = $('#umErr'); err.hidden = true;
+  if (!/^\d{4}-\d{2}$/.test(m) || m > thisMonth()){ err.textContent = 'Pick a month that has started.'; err.hidden = false; return; }
+  const me = usernameOf(state.user), now = new Date().toISOString(), out = [];
+  for (const row of $$('#umList [data-umacc]')){
+    const a = state.accounts.find(x => x.id === row.dataset.umacc);
+    const iv = row.querySelector('[data-um="inv"]').value.trim(), vv = row.querySelector('[data-um="val"]').value.trim();
+    if (iv === '' && vv === '') continue;
+    const inv = iv === '' ? 0 : parseFloat(iv), val = parseFloat(vv), prev = prevValue(a, m);
+    if (!isFinite(inv) || (vv !== '' && (!isFinite(val) || val < 0))){ err.textContent = a.name + ': that isn’t a number.'; err.hidden = false; return; }
+    if (vv === '' && (a.valueMode !== 'auto' || prev === null)){ err.textContent = a.name + ': add the value too, or clear the row.'; err.hidden = false; return; }
+    const ex = state.snaps.find(x => x.id === snapId(a.id, m));
+    const d = { accountId: a.id, month: m, investment: Math.round(inv * 100) / 100, createdAt: ex?.createdAt || now, createdBy: ex?.createdBy || me, updatedBy: me };
+    if (vv !== '') d.value = Math.round(val * 100) / 100;
+    out.push([snapId(a.id, m), d]);
+  }
+  if (!out.length){ err.textContent = 'Nothing to save yet.'; err.hidden = false; return; }
+  $('#umSave').disabled = true;
+  try { const b = writeBatch(fs); out.forEach(([id, d]) => b.set(doc(fs, 'invSnapshots', id), d)); await b.commit(); umdlg.close(); toast(`${monthLabel(m)} saved for ${out.length} account${out.length===1?'':'s'}`); }
+  catch (x){ err.textContent = writeError(x); err.hidden = false; }
+  finally { $('#umSave').disabled = false; }
+});
+
+// ---------- import from InvestTrack ----------
+const IT_TYPE = { equity:'equity', ulip:'ulip', no_growth:'no_growth', pension:'pension', fd:'deposit', deposit:'deposit' };
+// Recomputes InvestTrack's own dashboard from the file, the way InvestTrack does it, to prove nothing is lost.
+function itVerify(ex){
+  const rate = {}; (ex.fxRates || []).forEach(r => { if (r.to === 'EUR' && r.rate > 0) (rate[r.month] ||= {})[r.from] = r.rate; });
+  const rt = (c, m) => !c || c === 'EUR' ? 1 : rate[m]?.[c];
+  const latestM = Object.keys(rate).sort().pop();
+  const by = {}; ex.snapshots.forEach(s => (by[s.accountId] ||= []).push(s));
+  Object.values(by).forEach(a => a.sort((p,q) => p.month.localeCompare(q.month)));
+  let value = 0, invested = 0, mOk = 0, mN = 0, noRate = false;
+  const accById = Object.fromEntries(ex.accounts.map(a => [a.id, a]));
+  for (const a of ex.accounts){
+    const ss = by[a.id] || []; if (!ss.length) continue;
+    const last = ss[ss.length-1], r1 = rt(a.currency, last.month), rl = rt(a.currency, latestM);
+    if (!r1 || !rl){ noRate = true; continue; }
+    value += last.value * r1; invested += ss.reduce((s,x) => s + (+x.investment || 0), 0) * rl;
+    if (a.valueMode === 'auto'){
+      const r = (a.type === 'no_growth' ? 0 : +a.expectedAnnualReturnPct || 0) / 1200; let v = null;
+      for (const s of ss){ if (v === null || !s.valueIsAuto) v = +s.value; else { v = v * (1 + r) + (+s.investment || 0); mN++; if (Math.abs(v - s.value) <= Math.max(0.05, Math.abs(s.value) * 1e-6)) mOk++; } }
+    }
+  }
+  const all = ex.snapshots.map(s => s.month).sort(), months = all.length ? monthsBetween(all[0], all[all.length-1]) : [];
+  const carry = {}; const tl = months.map(m => {
+    let tv = 0, inv = 0;
+    for (const a of ex.accounts){ const s = (by[a.id] || []).find(x => x.month === m); if (s){ carry[a.id] = +s.value; inv += (+s.investment || 0) * (rt(a.currency, m) || 0); } if (carry[a.id] !== undefined) tv += carry[a.id] * (rt(a.currency, m) || 0); }
+    return { m, tv, inv };
+  });
+  const P = tl.map((t, i) => i ? t.tv - tl[i-1].tv - t.inv : null), w = tl.map((t,i) => ({ ...t, p: P[i] })).slice(-12);
+  const l12 = { inv: w.reduce((s,t) => s + t.inv, 0), profit: w.reduce((s,t) => s + (t.p || 0), 0), pos: w.filter(t => t.p > 0).length };
+  const x = xirr([...tl.filter(t => t.inv).map(t => ({ t: mTime(t.m), v: -t.inv })), { t: mTime(months[months.length-1]), v: value }]);
+  const d = ex.dashboardSummary || {};
+  const near = (a, b, tol) => typeof b === 'number' && Math.abs(a - b) <= tol;
+  return { noRate, accById, by, checks: [
+    { ok: near(value, d.totalPortfolioValue, 0.5), label: 'Portfolio value', got: eur.format(value), want: d.totalPortfolioValue },
+    { ok: near(invested, d.totalInvested, 0.5), label: 'Total invested', got: eur.format(invested), want: d.totalInvested },
+    { ok: x !== null && near(x * 100, d.overallXirrPct, 0.05), label: 'XIRR', got: x === null ? '—' : (x * 100).toFixed(2) + '%', want: d.overallXirrPct, pctWant: true },
+    { ok: near(l12.inv, d.last12MonthsInvested, 1) && near(l12.profit, d.last12MonthsProfit, 1) && l12.pos === d.positiveMonthsLast12, label: 'Last 12 months', got: `${eur0.format(l12.inv)} in, ${eur0.format(l12.profit)} profit, ${l12.pos} months up` },
+    ...(mN ? [{ ok: mOk === mN, label: 'Modelled values (ULIP/LIC)', got: `${mOk} of ${mN} reproduce` }] : []),
+  ] };
+}
+function itShow(ex){
+  const v = itVerify(ex), okAll = v.checks.every(c => c.ok) && !v.noRate;
+  const match = ex.accounts.filter(a => accOf(a.name)).map(a => a.name);
+  const fxMonths = new Set((ex.fxRates || []).map(r => r.month)).size;
+  $('#itBody').innerHTML = `<div style="display:grid;gap:12px">
+    <p style="margin:0">${ex.accounts.length} accounts · ${ex.snapshots.length} monthly values · exchange rates for ${fxMonths} months${ex.fireSettings ? ' · FIRE settings' : ''}.</p>
+    <div><strong style="font-size:13px">Checked against InvestTrack’s own dashboard</strong>
+    <ul class="checks" style="margin-top:6px">${v.checks.map(c => `<li><span class="${c.ok ? 'ok' : 'bad'}">${c.ok ? '✓' : '✗'}</span><span>${c.label}</span><span class="n">${c.got}${!c.ok && c.want !== undefined ? ' (file says ' + (c.pctWant ? c.want.toFixed(2) + '%' : eur.format(c.want)) + ')' : ''}</span></li>`).join('')}</ul></div>
+    <p class="muted" style="margin:0;font-size:12.5px">${match.length ? 'Already here, will be updated: ' + match.map(esc).join(', ') + '. ' : ''}New accounts get owner Anubhav; change it per account. ULIP and LIC values stay modelled from their return rate, as in InvestTrack. Importing again later just overwrites the same months.</p>
+    ${okAll ? '' : '<p class="err" style="margin:0">Some numbers don’t match, so nothing will be imported. Send this screen to Claude.</p>'}
+  </div>`;
+  $('#itSave').disabled = !okAll; $('#itErr').hidden = true;
+  state.itData = ex;
+  $('#itDlg').showModal();
+}
+$('#itFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const ex = JSON.parse(await f.text());
+    if (!Array.isArray(ex.accounts) || !Array.isArray(ex.snapshots)) throw new Error('shape');
+    itShow(ex);
+  } catch { toast('That file isn’t an InvestTrack export.'); }
+});
+$('#itCancel').addEventListener('click', () => { $('#itDlg').close(); state.itData = null; });
+$('#itForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const ex = state.itData; if (!ex) return;
+  const me = usernameOf(state.user), now = new Date().toISOString(), writes = [], ids = {};
+  for (const a of ex.accounts){
+    const old = accOf(a.name), id = old ? old.id : doc(accountsCol).id;
+    ids[a.id] = id;
+    const rec = { name: old ? old.name : String(a.name).slice(0, 60), type: 'investment', currency: a.currency || 'EUR', owner: old?.owner || 'Anubhav',
+      invType: IT_TYPE[a.type] || 'other', valueMode: a.valueMode === 'auto' ? 'auto' : 'manual',
+      createdAt: old?.createdAt || a.createdAt || now, createdBy: old?.createdBy || me, updatedBy: me };
+    if (isFinite(+a.expectedAnnualReturnPct)) rec.returnPct = +a.expectedAnnualReturnPct;
+    if (+a.targetMonthlyInvestment > 0) rec.target = +a.targetMonthlyInvestment;
+    if (old?.notes) rec.notes = old.notes;
+    writes.push(['accounts', id, rec]);
+  }
+  for (const s of ex.snapshots){
+    const accId = ids[s.accountId]; if (!accId) continue;
+    const d = { accountId: accId, month: s.month, investment: +s.investment || 0, createdAt: s.createdAt || now, createdBy: me, updatedBy: me };
+    if (!s.valueIsAuto) d.value = +s.value;
+    writes.push(['invSnapshots', snapId(accId, s.month), d]);
+  }
+  const months = { ...state.fxMonths };
+  (ex.fxRates || []).forEach(r => { if (r.to === 'EUR' && r.rate > 0) (months[r.month] ||= {})[r.from] = r.rate; });
+  writes.push(['settings', 'fx', { months, updatedAt: now, updatedBy: me }]);
+  const fsx = ex.fireSettings;
+  if (fsx){
+    const yr = new Date(fsx.updatedAt || now).getFullYear() + (+fsx.yearsUntilFire || 20);
+    const fire = { expenses: +fsx.currentAnnualExpenses, inflation: +fsx.inflationRatePct, fireYear: yr, withdrawal: +fsx.withdrawalRatePct, savings: +fsx.monthlySavings, returnPct: +fsx.expectedAnnualReturnPct };
+    Object.keys(fire).forEach(k => { if (!isFinite(fire[k])) delete fire[k]; });
+    writes.push(['settings', 'fire', { ...fire, updatedAt: now, updatedBy: me }]);
+  }
+  $('#itSave').disabled = true; $('#itSave').textContent = 'Importing…';
+  try {
+    for (let i = 0; i < writes.length; i += 400){ const b = writeBatch(fs); writes.slice(i, i + 400).forEach(([c, id, d]) => b.set(doc(fs, c, id), d)); await b.commit(); }
+    $('#itDlg').close(); state.itData = null; state.wv = 'inv'; state.openAcc = null;
+    if (state.page !== 'wealth') location.hash = 'wealth'; else render();
+    toast(`Imported ${ex.accounts.length} accounts and ${ex.snapshots.length} monthly values`);
+  } catch (x){ $('#itErr').textContent = writeError(x) + (x?.code === 'permission-denied' ? ' Update the Firestore rules first.' : ''); $('#itErr').hidden = false; $('#itSave').disabled = false; }
+  finally { $('#itSave').textContent = 'Import'; }
+});
+
+document.addEventListener('click', e => {
+  const t = e.target;
+  const wv = t.closest('#wSeg [data-wv]'); if (wv){ state.wv = wv.dataset.wv; render(); return; }
+  const im = t.closest('#invMSeg [data-im]'); if (im){ state.im = im.dataset.im; render(); return; }
+  if (t.closest('[data-itimport]')){ e.preventDefault(); $('#itFile').click(); return; }
+  if (t.closest('[data-pred]')){ state.showPred = !state.showPred; render(); return; }
+  const as = t.closest('[data-addsnap]'); if (as){ openSnap(state.accounts.find(a => a.id === as.dataset.addsnap), null); return; }
+  const es = t.closest('[data-editsnap]'); if (es){ const s = state.snaps.find(x => x.id === es.dataset.editsnap); if (s) openSnap(state.accounts.find(a => a.id === s.accountId), s); return; }
+  const fu = t.closest('[data-fireuse]'); if (fu){ saveFire({ [fu.dataset.fireuse]: null }); return; }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches?.('[data-editsnap]')) e.target.click(); });
 
 document.addEventListener('click', async e => {
   const t = e.target;
@@ -2592,8 +3361,6 @@ const pm = $('#profMenu'), pb = $('#profBtn');
 function pmNotes(){
   const g = state.trips.filter(t => ['ongoing','upcoming'].includes(tripStatus(t))).sort((a,b) => (a.start||'').localeCompare(b.start||''));
   $('#pmTrips').textContent = g[0] ? (tripStatus(g[0]) === 'ongoing' ? 'On: ' : 'Next: ') + g[0].name : state.trips.length ? state.trips.length + ' trips' : '';
-  const nw = state.accounts.length ? state.accounts.reduce((x,a) => { const e = estimate(a); return x + (e ? toEur(a, e.balance) : 0); }, 0) : null;
-  $('#pmAccounts').textContent = nw !== null ? 'Net worth ' + eur0.format(nw) : '';
   const nb = (state.budgets.items || []).filter(b => b.a > 0).length;
   $('#pmBudgets').textContent = nb ? nb + ' set' : 'not set';
 }
