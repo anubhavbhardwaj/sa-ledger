@@ -135,7 +135,31 @@ a{color:var(--accent)}
 .unlink{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;border-radius:6px;width:28px;height:28px}
 .unlink:hover{background:var(--danger-soft);color:var(--danger)}
 .muted{color:var(--muted)}
-@media (max-width:640px){ .btab{font-size:10.5px;padding-inline:2px} .btab span{white-space:nowrap} }
+/* profile menu */
+.prof{position:relative}
+.avatar{width:36px;height:36px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);font:700 15px/1 var(--f-display);cursor:pointer;display:grid;place-items:center}
+.avatar[aria-expanded="true"]{box-shadow:0 0 0 3px var(--accent-soft)}
+.pmenu{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:250px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:grid}
+.pmenu[hidden]{display:none!important}
+.pm-head{font-size:12.5px;color:var(--muted);padding:8px 10px 6px}
+.pm-head strong{color:var(--ink)}
+.pm-item{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:var(--ink);font-size:14px;font-weight:500}
+.pm-item small{color:var(--muted);font-size:11.5px;font-weight:400;text-align:right}
+.pm-item:hover,.pm-item:focus-visible{background:var(--sunk)}
+.pmenu hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+/* transactions bar */
+.txbar{display:flex;gap:8px;align-items:center}
+.txbar input{flex:1 1 auto;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px}
+#filterBtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:11px;line-height:18px;text-align:center;font-weight:700}
+/* + form: more details */
+.morebtn{all:unset;box-sizing:border-box;grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border:1px dashed var(--line);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2)}
+.morebtn:hover,.morebtn:focus-visible{border-color:var(--muted)}
+.morebtn .msum{font-weight:400;color:var(--muted);font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.morebtn .chev{transition:transform .15s}
+.morebtn[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.more{grid-column:1/-1}
+.budsum{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+
 /* accounts */
 .abal{font:700 22px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
 .abal.neg{color:var(--danger)}
@@ -235,7 +259,7 @@ table.mini th.num{font-family:var(--f-body)}
   .appbar-in{min-height:52px}
   .appbar .tabs,.appbar #addBtn{display:none}
   .appbar .logo{margin-right:auto}
-  .bottomnav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .bottomnav{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
   .btab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px 7px;text-decoration:none;color:var(--muted);font-size:11px;font-weight:500;position:relative}
   .btab svg{width:22px;height:22px}
   .btab[aria-current="page"]{color:var(--accent);font-weight:600}
@@ -406,13 +430,25 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <nav class="tabs" aria-label="Pages">
       <a class="tab" href="#overview" data-page="overview">Overview</a>
       <a class="tab" href="#transactions" data-page="transactions">Transactions<span class="badge" id="fbadge" hidden></span></a>
-      <a class="tab" href="#trips" data-page="trips">Trips</a>
-      <a class="tab" href="#accounts" data-page="accounts">Accounts</a>
       <a class="tab" href="#visualizations" data-page="visualizations">Visualizations</a>
     </nav>
     <button class="btn primary" id="addBtn" type="button">+ <span class="long">Add expense</span></button>
     <button class="btn small inboxbtn" id="inboxBtn" type="button" hidden>To review <span class="badge" id="inboxCount">0</span></button>
-    <span class="who"><span class="name">Signed in as <strong id="whoName"></strong></span><button class="btn small" id="logoutBtn" type="button">Sign out</button></span>
+    <div class="prof">
+      <button class="avatar" id="profBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="profMenu" aria-label="Menu: trips, accounts, budgets, settings"><span id="profInitial">A</span></button>
+      <div class="pmenu" id="profMenu" role="menu" hidden>
+        <div class="pm-head">Signed in as <strong id="whoName"></strong></div>
+        <a class="pm-item" role="menuitem" href="#trips"><span>Trips</span><small id="pmTrips"></small></a>
+        <a class="pm-item" role="menuitem" href="#accounts"><span>Accounts</span><small id="pmAccounts"></small></a>
+        <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
+        <hr>
+        <button class="pm-item" role="menuitem" type="button" data-pm="import"><span>Import CSV</span><small>into expenses</small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="export"><span>Export CSV</span><small>current transactions view</small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="install" id="pmInstall" hidden><span>Install app</span><small>on this device</small></button>
+        <hr>
+        <button class="pm-item" role="menuitem" type="button" id="logoutBtn"><span>Sign out</span></button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -451,15 +487,12 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <div style="display:grid;gap:8px"><h1 id="txTitle">Transactions</h1><p id="txSub" style="margin:0"></p>
           <div class="seg" role="radiogroup" aria-label="Show" id="txKind"><button type="button" role="radio" data-txkind="expense" aria-checked="true">Expenses</button><button type="button" role="radio" data-txkind="income" aria-checked="false">Income</button><button type="button" role="radio" data-txkind="transfer" aria-checked="false">Transfers</button></div>
         </div>
-        <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
-          <label class="btn" for="importFile" id="importLbl" style="cursor:pointer">Import CSV</label>
-          <input id="importFile" type="file" accept=".csv,text/csv" hidden>
-          <button class="btn" id="exportBtn" type="button">Export CSV</button>
-        </div>
+        <input id="importFile" type="file" accept=".csv,text/csv" hidden>
+        <button id="exportBtn" type="button" hidden>Export CSV</button>
       </div>
       <div class="banner" id="importBar" hidden></div>
-      <div class="toolbar" id="toolbar" role="group" aria-label="Filters">
-        <label class="search"><span class="lbl">Search</span><input id="search" type="search" placeholder="Store, comment or category"></label>
+      <div class="txbar"><input id="search" type="search" placeholder="Search store, comment or category" aria-label="Search transactions"><button class="btn" id="filterBtn" type="button" aria-expanded="false" aria-controls="toolbar">Filters <span class="badge" id="filterCount" hidden></span></button></div>
+      <div class="toolbar" id="toolbar" role="group" aria-label="Filters" hidden>
         <label><span class="lbl">Category</span><select id="fl-category"></select></label>
         <label><span class="lbl">Spender</span><select id="fl-spender"></select></label>
         <label><span class="lbl">Account</span><select id="fl-account"></select></label>
@@ -485,6 +518,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   <section class="page" id="page-trips" data-page="trips" hidden>
     <div style="display:grid;gap:16px">
       <div id="tripListView" style="display:grid;gap:16px">
+        <div><button class="btn ghost" type="button" data-back>← Back</button></div>
         <div class="pagehead">
           <div><h1>Trips</h1><p>Visits, holidays and office travel. Link any expense to a trip, whenever it was paid.</p></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="repeatVisit" type="button">Repeat last visit</button><button class="btn primary" id="newTrip" type="button">+ New trip</button></div>
@@ -501,6 +535,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   <section class="page" id="page-accounts" data-page="accounts" hidden>
     <div style="display:grid;gap:16px">
       <div id="accListView" style="display:grid;gap:16px">
+        <div><button class="btn ghost" type="button" data-back>← Back</button></div>
         <div class="pagehead">
           <div><h1>Accounts</h1><p>Balances, investments and net worth. Check in a real balance now and then; the app keeps an estimate in between.</p></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="newAcc" type="button">+ Add account</button><button class="btn primary" id="checkinAll" type="button">Check in balances</button></div>
@@ -519,6 +554,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <div style="display:grid;gap:14px">
       <div class="pagehead"><div><h1 id="vzTitle">Visualizations</h1><p>Tap any bar, slice or row to filter. Your selection carries over to Transactions. Switch each chart between types with the buttons on its right.</p></div></div>
       <div class="banner" id="vzBanner"></div>
+      <section class="kpis" id="vzKpis" aria-label="Highlights"></section>
       <div class="grid">
         <section class="panel span-7">
           <header><h2>Monthly spend</h2><span class="right" data-vzslot="trend"></span></header>
@@ -556,8 +592,6 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 <nav class="bottomnav" aria-label="Pages">
   <a class="btab" href="#overview" data-page="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
   <a class="btab" href="#transactions" data-page="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Transactions</span><span class="bdot" id="fbadge2" hidden></span></a>
-  <a class="btab" href="#trips" data-page="trips"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 19h19"/><path d="M4.5 13.5l3.5 1.2 9-5.2c1.2-.7 2.8-.4 3.3.6.4.8-.1 1.7-1 2.2L8.6 18.2 3.4 15.9z"/><path d="M8 9.5l2.4-1.4 4.1 1.6"/></svg><span>Trips</span></a>
-  <a class="btab" href="#accounts" data-page="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-5 9 5"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20h18"/></svg><span>Accounts</span></a>
   <a class="btab" href="#visualizations" data-page="visualizations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg><span>Visualizations</span></a>
 </nav>
 <button class="fab" id="fab" type="button" aria-label="Add expense">+</button>
@@ -650,19 +684,25 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <h3 id="dlgTitle">Add expense</h3>
     <div class="seg" role="radiogroup" aria-label="Entry type" id="kindSeg"><button type="button" role="radio" data-kind="expense" aria-checked="true">Expense</button><button type="button" role="radio" data-kind="income" aria-checked="false">Income</button><button type="button" role="radio" data-kind="transfer" aria-checked="false">Transfer</button></div>
     <div class="fields">
-      <label class="f">Amount<span class="amtrow"><input class="amount-in" id="f-amount" type="number" step="0.01" min="0" inputmode="decimal" required><select id="f-cur" aria-label="Currency"></select></span></label>
+      <label class="f"><span id="lb-amount">Amount (€)</span><input class="amount-in" id="f-amount" type="number" step="0.01" min="0" inputmode="decimal" required></label>
       <label class="f">Date<input id="f-date" type="date" required></label>
       <div class="fxline" id="fxLine" hidden><span id="fxText"></span><label>Rate: 1 <span id="fxCur"></span> = €<input id="f-rate" type="number" step="any" min="0" inputmode="decimal" aria-label="Exchange rate in euros"></label></div>
       <label class="f full not-tr"><span id="lb-store">Store</span><input id="f-store" data-list="dl-store" autocomplete="off" required></label>
       <label class="f not-tr"><span>Category</span><input id="f-category" data-list="dl-category" autocomplete="off" required></label>
-      <label class="f exp-only">Sub category<input id="f-subcategory" data-list="dl-subcategory" autocomplete="off" placeholder="e.g. Flight, Taxi"></label>
       <label class="f"><span id="lb-account">Account / card</span><input id="f-account" data-list="dl-account" autocomplete="off" required></label>
       <label class="f tr-only" hidden><span>To account</span><input id="f-to" data-list="dl-account" autocomplete="off"></label>
-      <label class="f not-tr"><span id="lb-spender">Spender</span><select id="f-spender"><option>Anubhav</option><option>Sulekha</option></select></label>
-      <label class="f exp-only">Country<input id="f-country" data-list="dl-country" autocomplete="off"></label>
-      <label class="f full exp-only">Trip<select id="f-trip"></select></label>
       <p class="f full tr-only muted" id="trHint" hidden style="margin:0;font-size:12.5px"></p>
-      <label class="f full">Comment<input id="f-comment" autocomplete="off"></label>
+      <button type="button" class="morebtn" id="moreBtn" aria-expanded="false" aria-controls="moreBox"><span>More details <span class="chev" aria-hidden="true">▾</span></span><span class="msum" id="moreSum"></span></button>
+      <div class="more" id="moreBox" hidden>
+        <div class="fields">
+          <label class="f">Currency<select id="f-cur"></select></label>
+          <label class="f not-tr"><span id="lb-spender">Spender</span><select id="f-spender"><option>Anubhav</option><option>Sulekha</option></select></label>
+          <label class="f exp-only">Sub category<input id="f-subcategory" data-list="dl-subcategory" autocomplete="off" placeholder="e.g. Flight, Taxi"></label>
+          <label class="f exp-only">Country<input id="f-country" data-list="dl-country" autocomplete="off"></label>
+          <label class="f full exp-only">Trip<select id="f-trip"></select></label>
+          <label class="f full">Comment<input id="f-comment" autocomplete="off"></label>
+        </div>
+      </div>
     </div>
     <p class="err" id="formErr" hidden></p>
     <div class="dlg-actions">
@@ -756,6 +796,7 @@ onAuthStateChanged(auth, user => {
   }
   $('#login').hidden = true; $('#app').hidden = false;
   $('#whoName').textContent = cap(usernameOf(user));
+  $('#profInitial').textContent = (usernameOf(user)[0] || '?').toUpperCase();
   const byDate = (a,b) => b.date.localeCompare(a.date) || String(b.createdAt||'').localeCompare(String(a.createdAt||''));
   const onErr = what => err => {
     $('#status').textContent = err.code === 'permission-denied'
@@ -820,7 +861,7 @@ $('#loginForm').addEventListener('submit', async e => {
     err.hidden = false;
   } finally { $('#loginBtn').disabled = false; $('#loginBtn').textContent = 'Sign in'; }
 });
-$('#logoutBtn').addEventListener('click', () => signOut(auth));
+$('#logoutBtn').addEventListener('click', () => { $('#profMenu').hidden = true; signOut(auth); });
 
 // ---------- trips helpers ----------
 const shortDate = (d, withYear) => { if (!d) return ''; const [y,m,dd] = d.split('-'); return (+dd) + ' ' + MON[+m-1] + (withYear ? ' ' + y : ''); };
@@ -948,19 +989,16 @@ function renderOverview(ms){
   const incTotal = sum(inc);
   const net = incTotal - total;
   const earners = group(inc, 'earner');
+  const tr = state.transfers.filter(inPeriod).map(t => ({ ...t, ttype: transferType(t) }));
+  const invested = sum(tr.filter(t => t.ttype === 'Investment')) - sum(tr.filter(t => t.ttype === 'Withdrawal'));
+  const bud = state.period !== 'all' && (state.budgets.items || []).some(b => b.a > 0) ? budgetStatus(state.period) : null;
+  const left = bud ? bud.total.budget - bud.total.spent : null;
+  const issues = bud ? ['over','risk'].map(k => bud.rows.filter(r => r.status === k).length) : [0,0];
   $('#kpis').innerHTML = `
     <div class="kpi"><span class="lbl">Spent</span><span class="val">${eur.format(total)}</span>${deltaHtml}</div>
-    ${(() => { const onTrips = rows.filter(r => r.tripId); const tt = sum(onTrips); const parts = group(onTrips, 'tripKind');
-      return `<div class="kpi"><span class="lbl">Daily life</span><span class="val">${eur.format(total - tt)}</span><span class="sub">${tt > 0 ? '+ ' + parts.map(p => esc(p.key) + ' ' + eur0.format(p.total)).join(' · ') + ' on trips' : 'No trip spending this period'}</span></div>`; })()}
     <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
-    ${(() => { const tr = state.transfers.filter(inPeriod).map(t => ({ ...t, ttype: transferType(t) }));
-      const inv = sum(tr.filter(t => t.ttype === 'Investment')) - sum(tr.filter(t => t.ttype === 'Withdrawal'));
-      const cardp = sum(tr.filter(t => t.ttype === 'Card payment'));
-      return `<div class="kpi"><span class="lbl">Invested</span><span class="val ${inv<0?'neg':''}">${inv<0?'−':''}${eur.format(Math.abs(inv))}</span><span class="sub">${incTotal > 0 && inv > 0 ? (inv/incTotal*100).toFixed(0) + '% of income' : tr.length ? 'Not counted as spending' : 'Record investments as a Transfer'}${cardp > 0 ? ' · card bills paid ' + eur0.format(cardp) : ''}</span></div>`; })()}
-    <div class="kpi"><span class="lbl">Net saved</span><span class="val ${net<0?'neg':''}">${net<0?'−':''}${eur.format(Math.abs(net))}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income saved' : 'Spent more than earned') : 'Add income to see savings'}</span></div>
-    <div class="kpi"><span class="lbl">Top category</span><span class="val">${top?esc(top.key):'—'}</span><span class="sub">${top?eur.format(top.total)+' · '+(top.total/total*100).toFixed(0)+'% of spend':''}</span></div>
-    <div class="kpi"><span class="lbl">Largest expense</span><span class="val">${big?eur.format(big.amount):'—'}</span><span class="sub">${big?esc(big.store)+(big.comment?' · '+esc(big.comment):''):''}</span></div>
-    <div class="kpi"><span class="lbl">Who paid</span><span class="val">${rows.length} <span style="font-size:14px;font-weight:500;color:var(--muted)">txns</span></span><span class="sub">${who.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ')} · ${eur.format(total/days)}/day</span></div>`;
+    <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0?'neg':''}">${net<0?'−':''}${eur.format(Math.abs(net))}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' : ''}</span></div>
+    <div class="kpi"><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`;
   renderBudgets();
   renderIncomeVsSpend($('#ovTrend'));
   renderBars('category', $('#ovCats'), {max:6, filtered:false, goto:'transactions'});
@@ -1026,7 +1064,9 @@ const INC_HEAD = '<tr><th>Date</th><th>Source</th><th>Category</th><th>Received 
 function renderTransactions(){
   const isInc = state.txKind === 'income', isTr = state.txKind === 'transfer';
   $$('#txKind [data-txkind]').forEach(b => b.setAttribute('aria-checked', b.dataset.txkind === state.txKind));
-  $('#toolbar').hidden = isInc || isTr; $('#txFilters').hidden = isInc || isTr; $('#importLbl').hidden = isInc || isTr;
+  $('#toolbar').hidden = isInc || isTr || !state.showFilters; $('#txFilters').hidden = isInc || isTr; $('#filterBtn').hidden = isInc || isTr;
+  $('#filterBtn').setAttribute('aria-expanded', !!state.showFilters);
+  { const n = activeFilters().length; $('#filterCount').hidden = !n; $('#filterCount').textContent = n; }
   $('#thead').innerHTML = isInc ? INC_HEAD : isTr ? TR_HEAD : EXP_HEAD;
   if (isInc) return renderIncomeTable();
   if (isTr) return renderTransferTable();
@@ -1101,7 +1141,7 @@ function renderChips(el, withLink){
   const parts = act.map(k => `<button class="fchip" type="button" data-clear="${k}" aria-label="Remove ${LABEL[k]} filter">${LABEL[k]}: ${esc(state.filters[k])} <span class="x">×</span></button>`);
   if (state.q) parts.push(`<button class="fchip" type="button" data-clear="q">Search: “${esc(state.q)}” <span class="x">×</span></button>`);
   if (parts.length > 1) parts.push(`<button class="btn ghost" type="button" data-clear="*">Clear all</button>`);
-  el.innerHTML = parts.length ? parts.join('') : `<span class="note">No filters. ${withLink ? 'Tap a bar to filter.' : 'Use the menus above, or click bars on Visualizations.'}</span>`;
+  el.innerHTML = parts.length ? parts.join('') : withLink ? `<span class="note">No filters. Tap a bar to filter.</span>` : '';
 }
 
 // ---------- chart type choices (remembered per device) ----------
@@ -1122,6 +1162,17 @@ function renderVisualizations(){
   $('#vzBanner').innerHTML = `<div class="left"><span class="lbl">Showing</span><strong>${rows.length} transactions · ${eur.format(sum(rows))}</strong><span class="filterline" id="vzChips"></span></div>
     <a class="btn ${act?'primary':''}" href="#transactions">View in Transactions →</a>`;
   renderChips($('#vzChips'), true);
+  { const big = rows.reduce((a,b) => (!a || +b.amount > +a.amount) ? b : a, null), top = group(rows, 'category')[0], who = group(rows, 'spender');
+    const ds = rows.map(r => r.date).sort(); let days = 1;
+    if (state.period === 'all') days = ds.length ? Math.max(1, Math.round((new Date(ds[ds.length-1]) - new Date(ds[0]))/864e5) + 1) : 1;
+    else { const [y,m] = state.period.split('-').map(Number); days = today().startsWith(state.period) ? +today().slice(8,10) : new Date(y, m, 0).getDate(); }
+    const tt = sum(rows.filter(r => r.tripId)), tot = sum(rows);
+    $('#vzKpis').innerHTML = `
+      <div class="kpi"><span class="lbl">Per day</span><span class="val">${eur.format(tot/days)}</span><span class="sub">over ${days} day${days===1?'':'s'}</span></div>
+      <div class="kpi"><span class="lbl">Top category</span><span class="val">${top?esc(top.key):'—'}</span><span class="sub">${top?eur.format(top.total)+' · '+(top.total/(tot||1)*100).toFixed(0)+'%':''}</span></div>
+      <div class="kpi"><span class="lbl">Largest expense</span><span class="val">${big?eur.format(big.amount):'—'}</span><span class="sub">${big?esc(big.store):''}</span></div>
+      <div class="kpi"><span class="lbl">Who paid</span><span class="val" style="font-size:18px">${who.map(w => esc(w.key)).join(' & ') || '—'}</span><span class="sub">${who.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ')}</span></div>
+      <div class="kpi"><span class="lbl">Daily life</span><span class="val">${eur.format(tot - tt)}</span><span class="sub">${tt > 0 ? eur0.format(tt) + ' on trips' : 'No trip spending'}</span></div>`; }
   $$('[data-vzslot]').forEach(el => el.innerHTML = vzSwitch(el.dataset.vzslot));
   renderTrend($('#vzTrend'), true, state.vz.trend);
   renderCum();
@@ -1348,6 +1399,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('tr.mrow')){ e.target.click(); return; } if (e.key === 'Enter'){ const ed = e.target.closest && e.target.closest('[data-edit]'); if (ed) openEdit(ed.dataset.edit, ed.dataset.kind || 'expense'); } });
 DIMS.forEach(k => $('#fl-'+k).addEventListener('change', e => { state.filters[k] = e.target.value || null; render(); }));
+$('#filterBtn').addEventListener('click', () => { state.showFilters = !state.showFilters; render(); });
 let qTimer; $('#search').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.q = e.target.value.trim(); render(); }, 150); });
 
 const tip = $('#tip');
@@ -1381,6 +1433,7 @@ function setKind(kind, locked){
   F('store').dataset.list = inc ? 'dl-isource' : 'dl-store';
   F('category').dataset.list = inc ? 'dl-icategory' : 'dl-category';
   $$('#dlg .exp-only').forEach(el => el.hidden = inc || tr);
+  if (typeof moreSummary === 'function' && state.user) moreSummary();
 }
 // What a transfer means, from the account types: investing, paying a card, or moving money.
 function transferType(t){
@@ -1428,6 +1481,7 @@ let fxSeq = 0;
 function fxShow(){
   const cur = F('cur').value, rate = parseFloat(F('rate').value), amt = parseFloat(F('amount').value);
   $('#fxLine').hidden = cur === 'EUR';
+  $('#lb-amount').textContent = 'Amount (' + (cur === 'EUR' ? '€' : cur) + ')';
   $('#fxCur').textContent = cur;
   if (cur === 'EUR') return;
   $('#fxText').innerHTML = rate > 0 && amt > 0 ? `= <strong>${eur.format(Math.round(amt * rate * 100) / 100)}</strong>${state.fxNote ? ' · ' + state.fxNote : ''}`
@@ -1484,6 +1538,7 @@ function openAdd(kind, tripId){
   fillTripSelect(tripId || '');
   const tr = tripId && state.tripMap[tripId];
   setCur(tr && tr.currency ? tr.currency : 'EUR');
+  setMore(!!tripId);
   setKind(kind, false);
   $('#delBtn').hidden = true; resetDel(); $('#formErr').hidden = true;
   dlg.showModal(); F('amount').focus();
@@ -1499,6 +1554,9 @@ function openEdit(id, kind = 'expense'){
   else fillTripSelect(it.tripId || '');
   if (it.currency && it.currency !== 'EUR' && it.origAmount){ F('amount').value = it.origAmount; setCur(it.currency, it.fxRate); }
   else setCur('EUR');
+  { const me = cap(usernameOf(state.user));
+    setMore(!!((it.currency && it.currency !== 'EUR') || it.tripId || it.subcategory || it.comment
+      || (kind === 'expense' && it.spender && it.spender !== me) || (kind === 'income' && it.earner && it.earner !== me))); }
   setKind(kind, true);
   $('#delBtn').hidden = false; resetDel(); $('#formErr').hidden = true;
   dlg.showModal();
@@ -2018,7 +2076,15 @@ function renderBudgets(){
   }
   const b = budgetStatus(state.period);
   const counts = ['over','risk'].map(k => b.rows.filter(r => r.status === k).length);
-  el.innerHTML = `<header><h2>Budgets · ${monthLabel(state.period)}</h2><span class="right"><span class="hint">${b.isCur ? `Day ${b.d} of ${b.D} · ` : ''}daily life only${counts[0] || counts[1] ? ` · ${[counts[0] ? counts[0] + ' over' : '', counts[1] ? counts[1] + ' at risk' : ''].filter(Boolean).join(', ')}` : ''}</span><button class="btn small" type="button" data-editbudgets>Edit budgets</button></span></header>
+  if (!state.budAll){
+    const attention = b.rows.filter(r => r.status === 'over' || r.status === 'risk');
+    const okN = b.rows.length - attention.length;
+    el.innerHTML = `<header><h2>Budgets · ${monthLabel(state.period)}</h2><span class="right"><button class="btn ghost small" type="button" data-budall>All ${b.rows.length} budgets</button></span></header>
+      <div class="brows">${bRow(b.total, true)}${attention.map(r => bRow(r)).join('')}</div>
+      <p class="bfoot" style="margin:0">${attention.length ? okN + ' other budget' + (okN===1?' is':'s are') + ' on track.' : 'Every category is on track' + (b.isCur ? ' so far.' : '.')}</p>`;
+    return;
+  }
+  el.innerHTML = `<header><h2>Budgets · ${monthLabel(state.period)}</h2><span class="right"><span class="hint">${b.isCur ? `Day ${b.d} of ${b.D} · ` : ''}daily life only${counts[0] || counts[1] ? ` · ${[counts[0] ? counts[0] + ' over' : '', counts[1] ? counts[1] + ' at risk' : ''].filter(Boolean).join(', ')}` : ''}</span><button class="btn ghost small" type="button" data-budall>Show less</button><button class="btn small" type="button" data-editbudgets>Edit budgets</button></span></header>
     <div class="brows">${bRow(b.total, true)}${b.rows.map(r => bRow(r)).join('')}</div>
     ${b.unbudgeted.length ? `<p class="bfoot" style="margin:0">No budget yet: ${b.unbudgeted.map(u => `${esc(u.cat)} ${eur0.format(u.spent)}`).join(' · ')}</p>` : ''}
     ${b.isCur ? '<p class="bfoot" style="margin:0">The vertical mark shows where spending would be if it were spread evenly over the month.</p>' : ''}`;
@@ -2064,7 +2130,8 @@ $('#budForm').addEventListener('submit', async e => {
   finally { $('#budSave').disabled = false; }
 });
 document.addEventListener('click', e => {
-  const eb = e.target.closest('[data-editbudgets]'); if (eb){ openBudgets(eb.dataset.editbudgets === 'suggest'); return; }
+  const eb = e.target.closest('[data-editbudgets]'); if (eb){ e.preventDefault(); openBudgets(eb.dataset.editbudgets === 'suggest'); return; }
+  if (e.target.closest('[data-budall]')){ state.budAll = !state.budAll; render(); return; }
   const bc = e.target.closest('[data-budgetcat]');
   if (bc){ for (const x of DIMS) state.filters[x] = null; state.q = ''; state.filters.category = bc.dataset.budgetcat; state.filters.tripKind = 'Daily life'; state.txKind = 'expense'; location.hash = 'transactions'; }
 });
@@ -2428,6 +2495,22 @@ function attachCombo(input){
 }
 $$('#dlg input[data-list]').forEach(attachCombo);
 
+// ---------- + form: "More details" ----------
+function setMore(open){ $('#moreBox').hidden = !open; $('#moreBtn').setAttribute('aria-expanded', open); moreSummary(); }
+function moreSummary(){
+  const parts = [], k = state.kind, me = cap(usernameOf(state.user));
+  if (F('cur').value !== 'EUR') parts.push(F('cur').value);
+  if (k === 'expense' && F('trip').value && state.tripMap[F('trip').value]) parts.push(state.tripMap[F('trip').value].name);
+  if (k === 'expense' && F('subcategory').value.trim()) parts.push(F('subcategory').value.trim());
+  if (k !== 'transfer' && F('spender').value !== me && ['Anubhav','Sulekha'].includes(me)) parts.push((k === 'income' ? 'earned by ' : 'paid by ') + F('spender').value);
+  if (k === 'expense' && F('country').value.trim() && F('country').value.trim() !== 'Germany') parts.push(F('country').value.trim());
+  if (F('comment').value.trim()) parts.push('“' + F('comment').value.trim().slice(0, 24) + (F('comment').value.trim().length > 24 ? '…' : '') + '”');
+  $('#moreSum').textContent = $('#moreBox').hidden ? (parts.join(' · ') || (k === 'transfer' ? 'currency, comment' : k === 'income' ? 'currency, earned by, comment' : 'currency, trip, who paid, comment…')) : '';
+  return parts.length;
+}
+$('#moreBtn').addEventListener('click', () => setMore($('#moreBox').hidden));
+['cur','trip','subcategory','spender','country','comment'].forEach(k => { F(k).addEventListener('change', moreSummary); F(k).addEventListener('input', moreSummary); });
+
 // ---------- captured payments inbox ----------
 const localDate = iso => { const d = new Date(iso); return isNaN(d) ? today() : d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
 const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m/60) + ' h ago' : Math.round(m/1440) + ' d ago'; };
@@ -2474,6 +2557,7 @@ function addFromInbox(id){
   if (it.account && (!h || !h.account)) F('account').value = it.account;
   if (kind === 'income' && !F('category').value) F('category').value = 'Salary';
   setCur(it.currency || 'EUR');
+  setMore(!!(it.currency && it.currency !== 'EUR'));
   (F('category').value ? $('#saveBtn') : F('category')).focus();
 }
 async function doneInbox(){
@@ -2488,6 +2572,34 @@ document.addEventListener('click', async e => {
   if (d){ d.disabled = true; try { await deleteDoc(doc(fs, 'inbox', d.dataset.ibdismiss)); toast('Dismissed'); } catch (x){ toast(writeError(x)); d.disabled = false; } }
 });
 
+// ---------- profile menu ----------
+const pm = $('#profMenu'), pb = $('#profBtn');
+function pmNotes(){
+  const g = state.trips.filter(t => ['ongoing','upcoming'].includes(tripStatus(t))).sort((a,b) => (a.start||'').localeCompare(b.start||''));
+  $('#pmTrips').textContent = g[0] ? (tripStatus(g[0]) === 'ongoing' ? 'On: ' : 'Next: ') + g[0].name : state.trips.length ? state.trips.length + ' trips' : '';
+  const nw = state.accounts.length ? state.accounts.reduce((x,a) => { const e = estimate(a); return x + (e ? toEur(a, e.balance) : 0); }, 0) : null;
+  $('#pmAccounts').textContent = nw !== null ? 'Net worth ' + eur0.format(nw) : '';
+  const nb = (state.budgets.items || []).filter(b => b.a > 0).length;
+  $('#pmBudgets').textContent = nb ? nb + ' set' : 'not set';
+}
+function toggleMenu(open){ pm.hidden = !open; pb.setAttribute('aria-expanded', open); if (open){ pmNotes(); pm.querySelector('.pm-item')?.focus(); } }
+pb.addEventListener('click', e => { e.stopPropagation(); toggleMenu(pm.hidden); });
+document.addEventListener('click', e => { if (!pm.hidden && !e.target.closest('.prof')) toggleMenu(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pm.hidden){ toggleMenu(false); pb.focus(); } });
+pm.addEventListener('click', async e => {
+  const it = e.target.closest('.pm-item'); if (!it) return;
+  toggleMenu(false);
+  const a = it.dataset.pm;
+  if (a === 'budgets') openBudgets(false);
+  if (a === 'import'){ if (state.page !== 'transactions') location.hash = 'transactions'; state.txKind = 'expense'; $('#importFile').click(); }
+  if (a === 'export'){ if (state.page !== 'transactions') toast('Exporting ' + (state.txKind === 'income' ? 'income' : state.txKind === 'transfer' ? 'transfers' : 'expenses') + ' for ' + periodName()); $('#exportBtn').click(); }
+  if (a === 'install'){
+    if (installEvt){ installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; showInstall(); }
+    else if (isIOS) toast('In Safari: tap Share, then “Add to Home Screen”.');
+  }
+});
+document.addEventListener('click', e => { if (e.target.closest('[data-back]')){ if (history.length > 1) history.back(); else location.hash = 'overview'; } });
+
 // ---------- install as an app ----------
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -2495,6 +2607,9 @@ let installEvt = null;
 function dismissed(){ try { return localStorage.getItem('installDismissed') === '1'; } catch { return false; } }
 function showInstall(){
   const bar = $('#installBar');
+  bar.hidden = true;
+  $('#pmInstall').hidden = standalone || (!installEvt && !isIOS);
+  return;
   if (standalone || dismissed()) { bar.hidden = true; return; }
   if (installEvt){
     bar.innerHTML = '<p><strong>Install S&amp;A Ledger</strong> on this device for one-tap access.</p><span class="row"><button class="btn small" type="button" id="instNo">Not now</button><button class="btn primary small" type="button" id="instGo">Install</button></span>';
