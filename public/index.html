@@ -296,7 +296,7 @@ table.snaps tr.row:hover td{background:var(--sunk)}
 .checks .ok{color:var(--good);font-weight:700}.checks .bad{color:var(--danger);font-weight:700}
 .checks .n{font-family:var(--f-mono);font-size:12.5px;color:var(--ink-2)}
 .fire-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px}
-.fire-grid label{display:grid;gap:4px;font-size:12.5px;color:var(--ink-2)}
+.fire-grid label{display:grid;gap:4px;align-content:start;font-size:12.5px;color:var(--ink-2)}
 .fire-grid input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:8px 10px;width:100%;min-width:0;font-family:var(--f-mono)}
 .fire-grid .src{font-size:11.5px;color:var(--muted)}
 .fire-grid .src button{border:0;background:none;color:var(--accent);padding:0;cursor:pointer;font:inherit;text-decoration:underline}
@@ -370,7 +370,7 @@ table.snaps tr.row:hover td{background:var(--sunk)}
 .kpi{padding:16px 18px;border-right:1px solid var(--line);display:grid;gap:4px;align-content:start}
 .kpi:last-child{border-right:0}
 .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
-.kpis.w .val{white-space:nowrap}
+.kpi .val{white-space:nowrap}
 .kpi .val{font:700 26px/1.1 var(--f-display);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
 .kpi .sub{font-size:12.5px;color:var(--muted)}
 .delta{display:inline-flex;align-items:center;gap:4px;font-weight:600;font-size:12.5px;padding:1px 8px;border-radius:999px}
@@ -916,7 +916,7 @@ const TRIP_DOT = { visit:'var(--s1)', holiday:'var(--s2)', other:'var(--s3)', of
 const EXP_KEYS = ['amount','date','store','category','subcategory','account','spender','country','comment','createdAt','createdBy','updatedBy','tripId','currency','origAmount','fxRate'];
 const CURRENCIES = ['EUR','INR','CHF','USD','GBP','CZK','PLN','HUF','DKK','SEK','NOK','TRY','JPY','CAD','AUD','SGD','THB'];
 const FIXED_GUESS = /^(rent|insurance|phone\/internet|subscriptions|fitness)$/i;
-const money = (v, c = 'EUR') => { try { return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en-IE', {style:'currency', currency:c}).format(v); } catch { return c + ' ' + (+v).toFixed(2); } };
+const money = (v, c = 'EUR') => { if (Math.abs(v) < 0.005) v = 0; try { return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en-IE', {style:'currency', currency:c}).format(v); } catch { return c + ' ' + (+v).toFixed(2); } };
 const curSym = c => { try { return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en-IE', {style:'currency', currency:c}).formatToParts(0).find(p => p.type === 'currency').value; } catch { return c; } };
 const origHtml = r => r.currency && r.currency !== 'EUR' && r.origAmount ? `<span class="orig">${money(r.origAmount, r.currency)}</span>` : '';
 const settingsCol = collection(fs, "settings");
@@ -1163,7 +1163,7 @@ function renderOverview(ms){
   $('#kpis').innerHTML = `
     <div class="kpi"><span class="lbl">Spent</span><span class="val">${eur.format(total)}</span>${deltaHtml}</div>
     <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
-    <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0?'neg':''}">${net<0?'−':''}${eur.format(Math.abs(net))}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' : ''}</span></div>
+    <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' : ''}</span></div>
     <div class="kpi"><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`;
   renderBudgets();
   renderIncomeVsSpend($('#ovTrend'));
@@ -2663,7 +2663,7 @@ const thisMonth = () => today().slice(0,7);
 const tick = (i, n, every) => (n - 1 - i) % every === 0 && (i === n - 1 || n - 1 - i >= every * 0.7);
 const rMonthly = a => a.invType === 'no_growth' ? 0 : (+a.returnPct || 0) / 1200;
 const snapId = (accId, m) => accId + '_' + m;
-const fmtW = (a, v) => { const c = a.currency || 'EUR'; try { return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en-IE', { style:'currency', currency:c, maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 2 }).format(v); } catch { return fmtW(a, v); } };
+const fmtW = (a, v) => { const c = a.currency || 'EUR'; if (Math.abs(v) < 0.5) v = 0; try { return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en-IE', { style:'currency', currency:c, maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 2 }).format(v); } catch { return fmtW(a, v); } };
 const wideW = () => innerWidth <= 640 ? 440 : Math.max(640, Math.min(1100, Math.round(($('#accListView')?.clientWidth || 1100) - 40)));
 
 // Exchange rates for the 1st of each month, shared through settings/fx and fetched when missing.
