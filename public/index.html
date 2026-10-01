@@ -135,6 +135,22 @@ a{color:var(--accent)}
 .unlink{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;border-radius:6px;width:28px;height:28px}
 .unlink:hover{background:var(--danger-soft);color:var(--danger)}
 .muted{color:var(--muted)}
+@media (max-width:640px){ .btab{font-size:10.5px;padding-inline:2px} .btab span{white-space:nowrap} }
+/* accounts */
+.abal{font:700 22px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.abal.neg{color:var(--danger)}
+.anote{font-size:12px;color:var(--muted)}
+.gap{font-size:12px;border-radius:6px;padding:2px 8px;display:inline-block}
+.gap.ok{background:var(--good-soft);color:var(--good)}
+.gap.off{background:var(--warn-soft);color:var(--warn)}
+.ckrow{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line)}
+.ckrow:last-child{border-bottom:0}
+.ckrow .nm{font-weight:500}
+.ckrow .hint{font-size:11.5px;color:var(--muted)}
+.ckrow input{width:100%;border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:7px 9px;font-family:var(--f-mono);text-align:right}
+.hist{display:grid}
+.hist .h{display:grid;grid-template-columns:90px minmax(0,1fr) auto;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line);align-items:center}
+.hist .h:last-child{border-bottom:0}
 /* dropdown fields (combobox) */
 .combo{position:relative;display:block}
 label.f .combo > input{padding-right:30px!important;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
@@ -219,7 +235,7 @@ table.mini th.num{font-family:var(--f-body)}
   .appbar-in{min-height:52px}
   .appbar .tabs,.appbar #addBtn{display:none}
   .appbar .logo{margin-right:auto}
-  .bottomnav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .bottomnav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
   .btab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px 7px;text-decoration:none;color:var(--muted);font-size:11px;font-weight:500;position:relative}
   .btab svg{width:22px;height:22px}
   .btab[aria-current="page"]{color:var(--accent);font-weight:600}
@@ -391,6 +407,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <a class="tab" href="#overview" data-page="overview">Overview</a>
       <a class="tab" href="#transactions" data-page="transactions">Transactions<span class="badge" id="fbadge" hidden></span></a>
       <a class="tab" href="#trips" data-page="trips">Trips</a>
+      <a class="tab" href="#accounts" data-page="accounts">Accounts</a>
       <a class="tab" href="#visualizations" data-page="visualizations">Visualizations</a>
     </nav>
     <button class="btn primary" id="addBtn" type="button">+ <span class="long">Add expense</span></button>
@@ -432,7 +449,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <div style="display:grid;gap:14px">
       <div class="pagehead">
         <div style="display:grid;gap:8px"><h1 id="txTitle">Transactions</h1><p id="txSub" style="margin:0"></p>
-          <div class="seg" role="radiogroup" aria-label="Show" id="txKind"><button type="button" role="radio" data-txkind="expense" aria-checked="true">Expenses</button><button type="button" role="radio" data-txkind="income" aria-checked="false">Income</button></div>
+          <div class="seg" role="radiogroup" aria-label="Show" id="txKind"><button type="button" role="radio" data-txkind="expense" aria-checked="true">Expenses</button><button type="button" role="radio" data-txkind="income" aria-checked="false">Income</button><button type="button" role="radio" data-txkind="transfer" aria-checked="false">Transfers</button></div>
         </div>
         <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
           <label class="btn" for="importFile" id="importLbl" style="cursor:pointer">Import CSV</label>
@@ -480,6 +497,23 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     </div>
   </section>
 
+  <!-- ACCOUNTS -->
+  <section class="page" id="page-accounts" data-page="accounts" hidden>
+    <div style="display:grid;gap:16px">
+      <div id="accListView" style="display:grid;gap:16px">
+        <div class="pagehead">
+          <div><h1>Accounts</h1><p>Balances, investments and net worth. Check in a real balance now and then; the app keeps an estimate in between.</p></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="newAcc" type="button">+ Add account</button><button class="btn primary" id="checkinAll" type="button">Check in balances</button></div>
+        </div>
+        <div class="banner" id="accSetup" hidden></div>
+        <section class="kpis" id="accKpis" aria-label="Net worth"></section>
+        <section class="panel" id="nwPanel" hidden><header><h2>Net worth</h2><span class="hint">Month-end estimates from your check-ins</span></header><div id="nwChart"></div></section>
+        <div id="accList" style="display:grid;gap:18px"></div>
+      </div>
+      <div id="accDetail" hidden style="display:grid;gap:16px"></div>
+    </div>
+  </section>
+
   <!-- VISUALIZATIONS -->
   <section class="page" id="page-visualizations" data-page="visualizations" hidden>
     <div style="display:grid;gap:14px">
@@ -523,6 +557,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   <a class="btab" href="#overview" data-page="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
   <a class="btab" href="#transactions" data-page="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Transactions</span><span class="bdot" id="fbadge2" hidden></span></a>
   <a class="btab" href="#trips" data-page="trips"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 19h19"/><path d="M4.5 13.5l3.5 1.2 9-5.2c1.2-.7 2.8-.4 3.3.6.4.8-.1 1.7-1 2.2L8.6 18.2 3.4 15.9z"/><path d="M8 9.5l2.4-1.4 4.1 1.6"/></svg><span>Trips</span></a>
+  <a class="btab" href="#accounts" data-page="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-5 9 5"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20h18"/></svg><span>Accounts</span></a>
   <a class="btab" href="#visualizations" data-page="visualizations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg><span>Visualizations</span></a>
 </nav>
 <button class="fab" id="fab" type="button" aria-label="Add expense">+</button>
@@ -575,24 +610,58 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   </form>
 </dialog>
 
+<dialog id="accDlg">
+  <form id="accForm" novalidate style="display:grid;gap:14px;padding:20px">
+    <h3 id="accDlgTitle">Add account</h3>
+    <div class="seg" role="radiogroup" aria-label="Account type" id="accTypeSeg">
+      <button type="button" role="radio" data-atype="bank">Bank</button><button type="button" role="radio" data-atype="card">Credit card</button><button type="button" role="radio" data-atype="cash">Cash</button><button type="button" role="radio" data-atype="investment">Investment</button>
+    </div>
+    <div class="fields">
+      <label class="f full">Name (as used on your entries)<input id="a-name" autocomplete="off" placeholder="e.g. Deutsche Bank, Trade Republic"></label>
+      <label class="f">Currency<select id="a-currency"></select></label>
+      <label class="f">Owner<select id="a-owner"><option>Anubhav</option><option>Sulekha</option><option>Shared</option></select></label>
+      <label class="f full">Notes<input id="a-notes" autocomplete="off"></label>
+    </div>
+    <p class="muted" id="accRenameNote" hidden style="margin:0;font-size:12.5px"></p>
+    <p class="err" id="accErr" hidden></p>
+    <div class="dlg-actions">
+      <button class="btn danger" id="accDel" type="button" hidden>Delete account</button>
+      <div class="right"><button class="btn" id="accCancel" type="button">Cancel</button><button class="btn primary" id="accSave" type="submit">Save</button></div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="ckDlg">
+  <form id="ckForm" novalidate style="display:grid;gap:14px;padding:20px">
+    <h3>Check in balances</h3>
+    <p class="muted" style="margin:0;font-size:13px">Type what your banking or broker app shows. Leave an account empty to skip it. For credit cards, enter the amount you currently owe.</p>
+    <label class="f" style="max-width:200px">As of<input id="ck-date" type="date"></label>
+    <div id="ckList" style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:2px 8px"></div>
+    <p class="err" id="ckErr" hidden></p>
+    <div class="dlg-actions"><div class="right"><button class="btn" id="ckCancel" type="button">Cancel</button><button class="btn primary" id="ckSave" type="submit">Save check-in</button></div></div>
+  </form>
+</dialog>
+
 <div id="tip" hidden></div>
 <div class="toast" id="toast" hidden></div>
 
 <dialog id="dlg">
   <form id="form" method="dialog" novalidate>
     <h3 id="dlgTitle">Add expense</h3>
-    <div class="seg" role="radiogroup" aria-label="Entry type" id="kindSeg"><button type="button" role="radio" data-kind="expense" aria-checked="true">Expense</button><button type="button" role="radio" data-kind="income" aria-checked="false">Income</button></div>
+    <div class="seg" role="radiogroup" aria-label="Entry type" id="kindSeg"><button type="button" role="radio" data-kind="expense" aria-checked="true">Expense</button><button type="button" role="radio" data-kind="income" aria-checked="false">Income</button><button type="button" role="radio" data-kind="transfer" aria-checked="false">Transfer</button></div>
     <div class="fields">
       <label class="f">Amount<span class="amtrow"><input class="amount-in" id="f-amount" type="number" step="0.01" min="0" inputmode="decimal" required><select id="f-cur" aria-label="Currency"></select></span></label>
       <label class="f">Date<input id="f-date" type="date" required></label>
       <div class="fxline" id="fxLine" hidden><span id="fxText"></span><label>Rate: 1 <span id="fxCur"></span> = €<input id="f-rate" type="number" step="any" min="0" inputmode="decimal" aria-label="Exchange rate in euros"></label></div>
-      <label class="f full"><span id="lb-store">Store</span><input id="f-store" data-list="dl-store" autocomplete="off" required></label>
-      <label class="f"><span>Category</span><input id="f-category" data-list="dl-category" autocomplete="off" required></label>
+      <label class="f full not-tr"><span id="lb-store">Store</span><input id="f-store" data-list="dl-store" autocomplete="off" required></label>
+      <label class="f not-tr"><span>Category</span><input id="f-category" data-list="dl-category" autocomplete="off" required></label>
       <label class="f exp-only">Sub category<input id="f-subcategory" data-list="dl-subcategory" autocomplete="off" placeholder="e.g. Flight, Taxi"></label>
       <label class="f"><span id="lb-account">Account / card</span><input id="f-account" data-list="dl-account" autocomplete="off" required></label>
-      <label class="f"><span id="lb-spender">Spender</span><select id="f-spender"><option>Anubhav</option><option>Sulekha</option></select></label>
+      <label class="f tr-only" hidden><span>To account</span><input id="f-to" data-list="dl-account" autocomplete="off"></label>
+      <label class="f not-tr"><span id="lb-spender">Spender</span><select id="f-spender"><option>Anubhav</option><option>Sulekha</option></select></label>
       <label class="f exp-only">Country<input id="f-country" data-list="dl-country" autocomplete="off"></label>
       <label class="f full exp-only">Trip<select id="f-trip"></select></label>
+      <p class="f full tr-only muted" id="trHint" hidden style="margin:0;font-size:12.5px"></p>
       <label class="f full">Comment<input id="f-comment" autocomplete="off"></label>
     </div>
     <p class="err" id="formErr" hidden></p>
@@ -637,6 +706,12 @@ try { fs = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabMa
 catch { fs = initializeFirestore(fbApp, {}); }
 const expensesCol = collection(fs, "expenses");
 const incomeCol = collection(fs, "income");
+const transfersCol = collection(fs, "transfers");
+const accountsCol = collection(fs, "accounts");
+const checkinsCol = collection(fs, "checkins");
+const INC_KEYS = ['amount','date','source','category','account','earner','comment','createdAt','createdBy','updatedBy','currency','origAmount','fxRate'];
+const TR_KEYS = ['amount','date','from','to','comment','createdAt','createdBy','updatedBy','currency','origAmount','fxRate'];
+const pickDoc = (keys, it, over = {}) => { const o = {}; for (const k of keys){ const v = k in over ? over[k] : it[k]; if (v !== undefined && v !== null && v !== '') o[k] = v; } return o; };
 const tripsCol = collection(fs, "trips");
 const inboxCol = collection(fs, "inbox");
 const TRIP_TYPE = { visit:'Visit', holiday:'Holiday', other:'Other', office:'Office' };
@@ -658,14 +733,14 @@ const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','
 const CC = {Germany:'DE', Italy:'IT', India:'IN', France:'FR', Spain:'ES', Switzerland:'CH', Austria:'AT'};
 const DIMS = ['category','spender','account','country','tripKind','tripName'];
 const LABEL = {category:'Category', spender:'Spender', account:'Account', country:'Country', tripKind:'Trip type', tripName:'Trip'};
-const PAGES = ['overview','transactions','trips','visualizations'];
+const PAGES = ['overview','transactions','trips','accounts','visualizations'];
 const FIELDS = ['amount','date','store','category','subcategory','account','spender','country','comment'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' + y; };
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { inbox:[], fromInbox:null, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -675,7 +750,7 @@ onAuthStateChanged(auth, user => {
   state.user = user;
   unsubs.forEach(f => f()); unsubs = [];
   if (!user){
-    state.items = []; state.income = []; state.trips = []; state.ready = false; state.tripsReady = false;
+    state.items = []; state.income = []; state.trips = []; state.transfers = []; state.accounts = []; state.checkins = []; state.ready = false; state.tripsReady = false;
     $('#app').hidden = true; $('#login').hidden = false; $('#l-user').focus();
     return;
   }
@@ -692,6 +767,19 @@ onAuthStateChanged(auth, user => {
     state.items = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort(byDate);
     state.ready = true; derive(); render();
   }, onErr('the ledger')));
+  unsubs.push(onSnapshot(transfersCol, snap => {
+    state.transfers = snap.docs.map(d => ({ ...d.data(), id: d.id, kind:'transfer' })).sort(byDate);
+    render();
+  }, onErr('transfers')));
+  unsubs.push(onSnapshot(accountsCol, snap => {
+    state.accounts = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => a.name.localeCompare(b.name));
+    state.accByName = Object.fromEntries(state.accounts.map(a => [a.name.toLowerCase(), a]));
+    state.accountsReady = true; render();
+  }, onErr('accounts')));
+  unsubs.push(onSnapshot(checkinsCol, snap => {
+    state.checkins = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    render();
+  }, onErr('check-ins')));
   unsubs.push(onSnapshot(incomeCol, snap => {
     state.income = snap.docs.map(d => ({ ...d.data(), id: d.id, kind:'income' })).sort(byDate);
     render();
@@ -769,7 +857,7 @@ function expenseDoc(it, over = {}){
 const tripExpenses = id => state.items.filter(i => i.tripId === id);
 
 // ---------- data helpers ----------
-const monthsPresent = () => [...new Set([...state.items, ...state.income].map(i => i.date.slice(0,7)))].sort();
+const monthsPresent = () => [...new Set([...state.items, ...state.income, ...state.transfers].map(i => i.date.slice(0,7)))].sort();
 const inPeriod = i => state.period === 'all' || i.date.startsWith(state.period);
 function passFilters(i, skip){
   for (const k of DIMS){ if (k === skip) continue; const v = state.filters[k]; if (v !== null && (i[k] || '—') !== v) return false; }
@@ -795,7 +883,8 @@ function route(){
   if (h === 'add'){ history.replaceState(null, '', '#overview'); if (state.user) setTimeout(openAdd, 0); }
   state.page = PAGES.includes(h) ? h : 'overview';
   if (state.page !== 'trips') state.openTrip = null;
-  $('#months').hidden = state.page === 'trips';
+  if (state.page !== 'accounts') state.openAcc = null;
+  $('#months').hidden = state.page === 'trips' || state.page === 'accounts';
   $$('section.page').forEach(s => s.hidden = s.dataset.page !== state.page);
   $$('.tab, .btab').forEach(t => t.setAttribute('aria-current', t.dataset.page === state.page ? 'page' : 'false'));
   render();
@@ -819,6 +908,7 @@ function render(){
   if (state.page === 'transactions') renderTransactions();
   if (state.page === 'visualizations') renderVisualizations();
   if (state.page === 'trips') renderTrips();
+  if (state.page === 'accounts') renderAccounts();
   fillDatalists();
 }
 
@@ -863,6 +953,10 @@ function renderOverview(ms){
     ${(() => { const onTrips = rows.filter(r => r.tripId); const tt = sum(onTrips); const parts = group(onTrips, 'tripKind');
       return `<div class="kpi"><span class="lbl">Daily life</span><span class="val">${eur.format(total - tt)}</span><span class="sub">${tt > 0 ? '+ ' + parts.map(p => esc(p.key) + ' ' + eur0.format(p.total)).join(' · ') + ' on trips' : 'No trip spending this period'}</span></div>`; })()}
     <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
+    ${(() => { const tr = state.transfers.filter(inPeriod).map(t => ({ ...t, ttype: transferType(t) }));
+      const inv = sum(tr.filter(t => t.ttype === 'Investment')) - sum(tr.filter(t => t.ttype === 'Withdrawal'));
+      const cardp = sum(tr.filter(t => t.ttype === 'Card payment'));
+      return `<div class="kpi"><span class="lbl">Invested</span><span class="val ${inv<0?'neg':''}">${inv<0?'−':''}${eur.format(Math.abs(inv))}</span><span class="sub">${incTotal > 0 && inv > 0 ? (inv/incTotal*100).toFixed(0) + '% of income' : tr.length ? 'Not counted as spending' : 'Record investments as a Transfer'}${cardp > 0 ? ' · card bills paid ' + eur0.format(cardp) : ''}</span></div>`; })()}
     <div class="kpi"><span class="lbl">Net saved</span><span class="val ${net<0?'neg':''}">${net<0?'−':''}${eur.format(Math.abs(net))}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income saved' : 'Spent more than earned') : 'Add income to see savings'}</span></div>
     <div class="kpi"><span class="lbl">Top category</span><span class="val">${top?esc(top.key):'—'}</span><span class="sub">${top?eur.format(top.total)+' · '+(top.total/total*100).toFixed(0)+'% of spend':''}</span></div>
     <div class="kpi"><span class="lbl">Largest expense</span><span class="val">${big?eur.format(big.amount):'—'}</span><span class="sub">${big?esc(big.store)+(big.comment?' · '+esc(big.comment):''):''}</span></div>
@@ -870,9 +964,14 @@ function renderOverview(ms){
   renderBudgets();
   renderIncomeVsSpend($('#ovTrend'));
   renderBars('category', $('#ovCats'), {max:6, filtered:false, goto:'transactions'});
-  const recent = [...rows.map(r => ({...r, kind:'expense'})), ...inc]
+  const recent = [...rows.map(r => ({...r, kind:'expense'})), ...inc, ...state.transfers.filter(inPeriod)]
     .sort((a,b) => b.date.localeCompare(a.date) || String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0, 8);
-  $('#recent').innerHTML = recent.length ? recent.map(r => r.kind === 'income' ? `
+  $('#recent').innerHTML = recent.length ? recent.map(r => r.kind === 'transfer' ? `
+    <div class="r" data-edit="${esc(r.id)}" data-kind="transfer" tabindex="0" role="button">
+      <span class="d">${r.date.slice(8,10)} ${MON[+r.date.slice(5,7)-1]}</span>
+      <span><span class="store">${esc(r.from)} → ${esc(r.to)}</span><br><span class="meta">${transferType(r)}${r.comment ? ' · ' + esc(r.comment) : ''}</span></span>
+      <span class="a muted">${eur.format(r.amount)}${origHtml(r)}</span>
+    </div>` : r.kind === 'income' ? `
     <div class="r" data-edit="${esc(r.id)}" data-kind="income" tabindex="0" role="button">
       <span class="d">${r.date.slice(8,10)} ${MON[+r.date.slice(5,7)-1]}</span>
       <span><span class="store">${esc(r.source)}</span><br><span class="meta">Income · ${esc(r.category)} · ${esc(r.account)} · ${esc(r.earner)}</span></span>
@@ -920,14 +1019,17 @@ function renderIncomeVsSpend(el){
 
 const incomeRows = () => state.income.filter(i => inPeriod(i) && (!state.q || (i.source+' '+(i.comment||'')+' '+(i.category||'')).toLowerCase().includes(state.q.toLowerCase())));
 const EXP_HEAD = '<tr><th>Date</th><th>Store</th><th>Category</th><th>Account</th><th>Spender</th><th>Country</th><th class="amt">Amount</th></tr>';
+const TR_HEAD = '<tr><th>Date</th><th>Transfer</th><th>Type</th><th>From</th><th>To</th><th></th><th class="amt">Amount</th></tr>';
+const transferRows = () => state.transfers.filter(t => inPeriod(t) && (!state.q || (t.from+' '+t.to+' '+(t.comment||'')).toLowerCase().includes(state.q.toLowerCase())));
 const INC_HEAD = '<tr><th>Date</th><th>Source</th><th>Category</th><th>Received in</th><th>Earned by</th><th></th><th class="amt">Amount</th></tr>';
 
 function renderTransactions(){
-  const isInc = state.txKind === 'income';
+  const isInc = state.txKind === 'income', isTr = state.txKind === 'transfer';
   $$('#txKind [data-txkind]').forEach(b => b.setAttribute('aria-checked', b.dataset.txkind === state.txKind));
-  $('#toolbar').hidden = isInc; $('#txFilters').hidden = isInc; $('#importLbl').hidden = isInc;
-  $('#thead').innerHTML = isInc ? INC_HEAD : EXP_HEAD;
+  $('#toolbar').hidden = isInc || isTr; $('#txFilters').hidden = isInc || isTr; $('#importLbl').hidden = isInc || isTr;
+  $('#thead').innerHTML = isInc ? INC_HEAD : isTr ? TR_HEAD : EXP_HEAD;
   if (isInc) return renderIncomeTable();
+  if (isTr) return renderTransferTable();
   const rows = filtered();
   $('#txTitle').textContent = 'Transactions · ' + periodName();
   $('#txSub').textContent = `${rows.length} transaction${rows.length===1?'':'s'} · ${eur.format(sum(rows))}`;
@@ -953,6 +1055,26 @@ function renderTransactions(){
   $('#foot').innerHTML = rows.length ? `<tr><td colspan="6">Total</td><td class="amt">${eur.format(sum(rows))}</td></tr>` : '';
   $('#status').textContent = !state.ready ? 'Loading…' : rows.length ? 'Click a row to edit or delete it.' : state.items.length ? 'No transactions match. Clear a filter or pick another month.' : 'No expenses yet. Add one, or use Import CSV.';
   renderImportBar();
+}
+
+function renderTransferTable(){
+  const rows = transferRows();
+  const byType = group(rows.map(r => ({ ...r, ttype: transferType(r) })), 'ttype');
+  $('#txTitle').textContent = 'Transfers · ' + periodName();
+  $('#txSub').textContent = `${rows.length} transfer${rows.length===1?'':'s'}${byType.length ? ' · ' + byType.map(g => g.key + ' ' + eur0.format(g.total)).join(' · ') : ''}`;
+  $('#importBar').hidden = true;
+  $('#rows').innerHTML = rows.map(r => `
+    <tr class="row" data-edit="${esc(r.id)}" data-kind="transfer" tabindex="0">
+      <td class="date"><span class="dd">${r.date.slice(8,10)}</span> <span class="mm">${MON[+r.date.slice(5,7)-1]}${state.period==='all'?' '+r.date.slice(2,4):''}</span></td>
+      <td><div class="store">${esc(r.from)} → ${esc(r.to)}</div><div class="mmeta">${transferType(r)}</div>${r.comment?`<div class="cmt">${esc(r.comment)}</div>`:''}</td>
+      <td class="dcol">${transferType(r)}</td>
+      <td class="acct dcol">${esc(r.from)}</td>
+      <td class="acct dcol">${esc(r.to)}</td>
+      <td class="dcol"></td>
+      <td class="amt">${eur.format(r.amount)}${origHtml(r)}</td>
+    </tr>`).join('');
+  $('#foot').innerHTML = rows.length ? `<tr><td colspan="6">Total moved</td><td class="amt">${eur.format(sum(rows))}</td></tr>` : '';
+  $('#status').textContent = !state.ready ? 'Loading…' : rows.length ? 'Transfers are not spending. Click a row to edit or delete it.' : 'No transfers in this period. Add one with the + button and choose Transfer.';
 }
 
 function renderIncomeTable(){
@@ -1195,7 +1317,7 @@ function fillDatalists(){
   const uniq = k => [...new Set(state.items.map(i => i[k]).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const set = (id, arr) => $(id).innerHTML = arr.map(v => `<option value="${esc(v)}"></option>`).join('');
   set('#dl-store', uniq('store')); set('#dl-category', uniq('category')); set('#dl-subcategory', uniq('subcategory'));
-  set('#dl-account', [...new Set([...uniq('account'), ...state.income.map(i => i.account).filter(Boolean)])].sort((a,b)=>a.localeCompare(b)));
+  set('#dl-account', [...new Set([...state.accounts.map(a => a.name), ...uniq('account'), ...state.income.map(i => i.account), ...state.transfers.flatMap(t => [t.from, t.to])].filter(Boolean))].sort((a,b)=>a.localeCompare(b)));
   set('#dl-isource', [...new Set(state.income.map(i => i.source).filter(Boolean))].sort((a,b)=>a.localeCompare(b)));
   set('#dl-icategory', [...new Set([...INCOME_CATS, ...state.income.map(i => i.category).filter(Boolean)])]); set('#dl-country', [...new Set(['Germany','Italy','India',...uniq('country')])]);
 }
@@ -1247,15 +1369,33 @@ const dlg = $('#dlg');
 const F = k => $('#f-' + k);
 function setKind(kind, locked){
   state.kind = kind;
-  const inc = kind === 'income';
+  const inc = kind === 'income', tr = kind === 'transfer';
   $$('#kindSeg [data-kind]').forEach(b => { b.setAttribute('aria-checked', b.dataset.kind === kind); b.disabled = !!locked && b.dataset.kind !== kind; });
-  $('#dlgTitle').textContent = (state.editing ? 'Edit ' : 'Add ') + (inc ? 'income' : 'expense');
+  $('#dlgTitle').textContent = (state.editing ? 'Edit ' : 'Add ') + kind;
+  $$('#dlg .not-tr').forEach(el => el.hidden = tr);
+  $$('#dlg .tr-only').forEach(el => el.hidden = !tr);
+  trHint();
   $('#lb-store').textContent = inc ? 'Source (e.g. PAYBACK salary)' : 'Store';
-  $('#lb-account').textContent = inc ? 'Received in' : 'Account / card';
+  $('#lb-account').textContent = tr ? 'From account' : inc ? 'Received in' : 'Account / card';
   $('#lb-spender').textContent = inc ? 'Earned by' : 'Spender';
   F('store').dataset.list = inc ? 'dl-isource' : 'dl-store';
   F('category').dataset.list = inc ? 'dl-icategory' : 'dl-category';
-  $$('#dlg .exp-only').forEach(el => el.hidden = inc);
+  $$('#dlg .exp-only').forEach(el => el.hidden = inc || tr);
+}
+// What a transfer means, from the account types: investing, paying a card, or moving money.
+function transferType(t){
+  const to = state.accByName[String(t.to || '').toLowerCase()], from = state.accByName[String(t.from || '').toLowerCase()];
+  if (to && to.type === 'investment' && !(from && from.type === 'investment')) return 'Investment';
+  if (from && from.type === 'investment' && !(to && to.type === 'investment')) return 'Withdrawal';
+  if (to && to.type === 'card') return 'Card payment';
+  return 'Transfer';
+}
+function trHint(){
+  if (state.kind !== 'transfer'){ return; }
+  const t = transferType({ from:F('account').value.trim(), to:F('to').value.trim() });
+  const msg = { Investment:'Counts as invested, not spent.', Withdrawal:'Money taken out of an investment.', 'Card payment':'Pays off a card. The card purchases themselves are the spending.', Transfer:'Moves money between your own accounts. Not counted as spending.' }[t];
+  const unknown = [F('account').value, F('to').value].filter(v => v.trim() && !state.accByName[v.trim().toLowerCase()]);
+  $('#trHint').textContent = msg + (unknown.length ? ` “${unknown[0].trim()}” isn’t in your Accounts yet; add it there so its type (for example Investment) is known.` : '');
 }
 function fillTripSelect(cur){
   const groups = { ongoing:[], upcoming:[], past:[], nodate:[] };
@@ -1313,6 +1453,8 @@ F('cur').addEventListener('change', () => { state.fxAuto = true; fxRefresh(); })
 F('date').addEventListener('change', () => { if (F('cur').value !== 'EUR' && state.fxAuto !== false) { state.fxAuto = true; fxRefresh(); } });
 F('rate').addEventListener('input', () => { state.fxAuto = false; state.fxNote = 'Your rate'; fxShow(); });
 F('amount').addEventListener('input', fxShow);
+F('account').addEventListener('change', trHint); F('to').addEventListener('change', trHint);
+F('account').addEventListener('input', trHint); F('to').addEventListener('input', trHint);
 F('trip').addEventListener('change', () => {
   const t = state.tripMap[F('trip').value];
   if (t && t.currency && t.currency !== F('cur').value && !state.editing){ F('cur').value = t.currency; state.fxAuto = true; fxRefresh(); }
@@ -1335,7 +1477,9 @@ function openAdd(kind, tripId){
   const me = cap(usernameOf(state.user));
   F('spender').value = ['Anubhav','Sulekha'].includes(me) ? me : 'Anubhav';
   state.lastAccount = { expense: lastE.account || '', income: lastI.account || '' };
-  F('account').value = state.lastAccount[kind];
+  F('account').value = state.lastAccount[kind] || '';
+  F('to').value = '';
+  if (kind === 'transfer'){ const lt = state.transfers[0]; F('account').value = lt ? lt.from : (lastE.account || ''); }
   if (kind === 'income') F('category').value = 'Salary';
   fillTripSelect(tripId || '');
   const tr = tripId && state.tripMap[tripId];
@@ -1345,10 +1489,12 @@ function openAdd(kind, tripId){
   dlg.showModal(); F('amount').focus();
 }
 function openEdit(id, kind = 'expense'){
-  const list = kind === 'income' ? state.income : state.items;
+  const list = kind === 'income' ? state.income : kind === 'transfer' ? state.transfers : state.items;
   const it = list.find(i => i.id === id); if (!it) return;
   state.editing = id;
   FIELDS.forEach(k => F(k).value = it[k] ?? '');
+  F('to').value = '';
+  if (kind === 'transfer'){ F('account').value = it.from || ''; F('to').value = it.to || ''; }
   if (kind === 'income'){ F('store').value = it.source || ''; F('spender').value = it.earner || 'Anubhav'; }
   else fillTripSelect(it.tripId || '');
   if (it.currency && it.currency !== 'EUR' && it.origAmount){ F('amount').value = it.origAmount; setCur(it.currency, it.fxRate); }
@@ -1363,7 +1509,8 @@ $('#kindSeg').addEventListener('click', e => {
   // Swap in sensible defaults when switching while adding.
   if (state.lastAccount && (!F('account').value || F('account').value === state.lastAccount[state.kind])) F('account').value = state.lastAccount[k];
   if (k === 'income' && !F('category').value) F('category').value = 'Salary';
-  else if (k === 'expense' && F('category').value === 'Salary') F('category').value = '';
+  else if (k !== 'income' && F('category').value === 'Salary') F('category').value = '';
+  if (k === 'transfer' && !F('account').value){ const lt = state.transfers[0]; if (lt) F('account').value = lt.from; }
   setKind(k, false);
 });
 function resetDel(){ const b = $('#delBtn'); b.classList.remove('armed'); b.textContent = 'Delete'; }
@@ -1380,12 +1527,31 @@ $('#form').addEventListener('submit', async e => {
   if (cur !== 'EUR' && !(rate > 0)){ err.textContent = 'Enter the exchange rate, or wait for it to load.'; err.hidden = false; return; }
   const amount = cur === 'EUR' ? entered : Math.round(entered * rate * 100) / 100;
   const fx = cur === 'EUR' ? {} : { currency:cur, origAmount:entered, fxRate:rate };
-  const need = {store:F('store').value.trim(), category:F('category').value.trim(), account:F('account').value.trim()};
+  const need = state.kind === 'transfer' ? { from:F('account').value.trim(), to:F('to').value.trim() } : {store:F('store').value.trim(), category:F('category').value.trim(), account:F('account').value.trim()};
   if (!(entered > 0) || !(amount > 0)) { err.textContent = 'Enter an amount above zero.'; err.hidden = false; return; }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { err.textContent = 'Pick a date.'; err.hidden = false; return; }
   const miss = Object.entries(need).filter(([,v]) => !v).map(([k]) => k);
-  if (miss.length){ const nm = state.kind === 'income' ? {store:'source', account:'received in'} : {}; err.textContent = 'Fill in ' + miss.map(m => nm[m] || m).join(', ') + '.'; err.hidden = false; return; }
+  if (state.kind === 'transfer' && need.from && need.from.toLowerCase() === need.to.toLowerCase()){ err.textContent = 'From and To must be different accounts.'; err.hidden = false; return; }
+  if (miss.length){ const nm = state.kind === 'income' ? {store:'source', account:'received in'} : state.kind === 'transfer' ? {from:'from account', to:'to account'} : {}; err.textContent = 'Fill in ' + miss.map(m => nm[m] || m).join(', ') + '.'; err.hidden = false; return; }
   $('#saveBtn').disabled = true;
+  if (state.kind === 'transfer'){
+    const rec = { amount, date, from:need.from, to:need.to, comment:F('comment').value.trim(), ...fx };
+    if (!rec.comment) delete rec.comment;
+    try {
+      if (state.editing){
+        const old = state.transfers.find(i => i.id === state.editing) || {};
+        await setDoc(doc(fs, 'transfers', state.editing), { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
+        toast('Saved changes');
+      } else {
+        await addDoc(transfersCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
+        if (state.period !== 'all') state.period = date.slice(0,7);
+        toast(`${transferType(rec)}: ${eur.format(amount)} from ${rec.from} to ${rec.to}`);
+      }
+      doneInbox(); dlg.close();
+    } catch (x) { err.textContent = writeError(x); err.hidden = false; }
+    finally { $('#saveBtn').disabled = false; }
+    return;
+  }
   if (state.kind === 'income'){
     const rec = { amount, date, source:need.store, category:need.category, account:need.account, earner:F('spender').value, comment:F('comment').value.trim(), ...fx };
     try {
@@ -1424,7 +1590,7 @@ $('#delBtn').addEventListener('click', async () => {
   const b = $('#delBtn');
   if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'Confirm delete'; return; }
   b.disabled = true;
-  try { await deleteDoc(doc(fs, state.kind === 'income' ? 'income' : 'expenses', state.editing)); dlg.close(); toast('Deleted'); }
+  try { await deleteDoc(doc(fs, state.kind === 'income' ? 'income' : state.kind === 'transfer' ? 'transfers' : 'expenses', state.editing)); dlg.close(); toast('Deleted'); }
   catch (x){ $('#formErr').textContent = writeError(x); $('#formErr').hidden = false; }
   finally { b.disabled = false; }
 });
@@ -1432,15 +1598,15 @@ $('#delBtn').addEventListener('click', async () => {
 // ---------- CSV export / import ----------
 const CSV_COLS = ['date','amount','store','category','subcategory','account','spender','country','comment'];
 $('#exportBtn').addEventListener('click', () => {
-  const isInc = state.txKind === 'income';
-  const rows = isInc ? incomeRows() : filtered();
-  const cols = [...(isInc ? ['date','amount','source','category','account','earner','comment'] : CSV_COLS), 'currency', 'original_amount'];
-  const out = rows.map(r => ({ ...r, currency: r.currency || 'EUR', original_amount: r.origAmount || r.amount }));
+  const isInc = state.txKind === 'income', isTr = state.txKind === 'transfer';
+  const rows = isInc ? incomeRows() : isTr ? transferRows() : filtered();
+  const cols = [...(isInc ? ['date','amount','source','category','account','earner','comment'] : isTr ? ['date','amount','from','to','type','comment'] : CSV_COLS), 'currency', 'original_amount'];
+  const out = rows.map(r => ({ ...r, type: isTr ? transferType(r) : undefined, currency: r.currency || 'EUR', original_amount: r.origAmount || r.amount }));
   const q = v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
   const csv = [cols.join(','), ...out.slice().reverse().map(r => cols.map(c => q(c==='amount' ? (+r.amount).toFixed(2) : r[c])).join(','))].join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-  a.download = (isInc ? 'income-' : 'expenses-') + state.period + '.csv';
+  a.download = (isInc ? 'income-' : isTr ? 'transfers-' : 'expenses-') + state.period + '.csv';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 });
@@ -1901,6 +2067,324 @@ document.addEventListener('click', e => {
   const eb = e.target.closest('[data-editbudgets]'); if (eb){ openBudgets(eb.dataset.editbudgets === 'suggest'); return; }
   const bc = e.target.closest('[data-budgetcat]');
   if (bc){ for (const x of DIMS) state.filters[x] = null; state.q = ''; state.filters.category = bc.dataset.budgetcat; state.filters.tripKind = 'Daily life'; state.txKind = 'expense'; location.hash = 'transactions'; }
+});
+
+// ---------- accounts & balances ----------
+const ACC_TYPE = { bank:'Bank', card:'Credit card', cash:'Cash', investment:'Investment' };
+const ACC_DOT = { bank:'var(--s1)', card:'var(--s2)', cash:'var(--s3)', investment:'var(--s7)' };
+const accOf = name => state.accByName[String(name || '').toLowerCase()];
+// An entry's value in the account's own currency.
+function inAccCur(acc, r){
+  if ((acc.currency || 'EUR') === 'EUR') return +r.amount || 0;
+  if (r.currency === acc.currency && r.origAmount) return +r.origAmount;
+  const rate = state.fxLatest[acc.currency];
+  return rate ? (+r.amount || 0) / rate : 0;
+}
+const toEur = (acc, v) => (acc.currency || 'EUR') === 'EUR' ? v : (state.fxLatest[acc.currency] ? v * state.fxLatest[acc.currency] : 0);
+const fmtAcc = (acc, v) => money(v, acc.currency || 'EUR');
+const checkinsOf = acc => state.checkins.filter(c => c.accountId === acc.id).sort((a,b) => a.date.localeCompare(b.date) || String(a.createdAt).localeCompare(String(b.createdAt)));
+// Money in and out of an account between two dates (after `from`, up to and including `to`).
+function flows(acc, from, to){
+  const n = acc.name.toLowerCase(), inR = d => d > from && d <= to;
+  const out = state.items.filter(i => inR(i.date) && String(i.account).toLowerCase() === n).reduce((a,i) => a + inAccCur(acc, i), 0);
+  const inc = state.income.filter(i => inR(i.date) && String(i.account).toLowerCase() === n).reduce((a,i) => a + inAccCur(acc, i), 0);
+  const tOut = state.transfers.filter(t => inR(t.date) && String(t.from).toLowerCase() === n).reduce((a,t) => a + inAccCur(acc, t), 0);
+  const tIn = state.transfers.filter(t => inR(t.date) && String(t.to).toLowerCase() === n).reduce((a,t) => a + inAccCur(acc, t), 0);
+  return { spent:out, income:inc, tOut, tIn, net: inc + tIn - out - tOut };
+}
+// Estimated balance on a date: last check-in on or before it, plus everything recorded since.
+function estimate(acc, asOf = today()){
+  const cks = checkinsOf(acc).filter(c => c.date <= asOf);
+  const base = cks[cks.length - 1];
+  if (!base) return null;
+  const f = flows(acc, base.date, asOf);
+  return { balance: base.balance + f.net, base, f };
+}
+function gapsOf(acc){
+  const cks = checkinsOf(acc);
+  return cks.map((c, i) => {
+    if (!i) return { c, gap:null };
+    const prev = cks[i-1], expected = prev.balance + flows(acc, prev.date, c.date).net;
+    return { c, gap: c.balance - expected, expected };
+  });
+}
+function investInfo(acc){
+  const cks = checkinsOf(acc); if (!cks.length) return null;
+  const first = cks[0], last = cks[cks.length - 1];
+  const contrib = flows(acc, first.date, last.date);
+  const put = first.balance + contrib.tIn - contrib.tOut;
+  const gain = last.balance - put;
+  return { gain, pct: put > 0 ? gain / put * 100 : 0, since: first.date };
+}
+async function loadRates(){
+  const curs = [...new Set(state.accounts.map(a => a.currency).filter(c => c && c !== 'EUR'))].filter(c => !state.fxLatest[c]);
+  for (const c of curs){ try { const r = await getRate(c, today()); state.fxLatest[c] = typeof r === 'number' ? r : r.rate; } catch {} }
+  if (curs.length && state.page === 'accounts') render();
+}
+
+function suggestAccounts(){
+  const names = {};
+  const add = (name, who, cur) => { if (!name) return; const k = name.trim(); names[k] ||= { spenders:{}, curs:{} }; names[k].spenders[who || '?'] = (names[k].spenders[who || '?'] || 0) + 1; names[k].curs[cur || 'EUR'] = (names[k].curs[cur || 'EUR'] || 0) + 1; };
+  state.items.forEach(i => add(i.account, i.spender, i.currency));
+  state.income.forEach(i => add(i.account, i.earner, i.currency));
+  state.transfers.forEach(t => { add(t.from); add(t.to); });
+  return Object.entries(names).filter(([n]) => !accOf(n)).map(([name, d]) => {
+    const who = Object.keys(d.spenders).filter(w => w !== '?');
+    const type = /amex|american express|visa|master|credit|kreditkarte/i.test(name) ? 'card' : /cash|bargeld|contanti/i.test(name) ? 'cash'
+      : /trade republic|scalable|depot|etf|broker|zerodha|groww|mutual|invest|fund/i.test(name) ? 'investment' : 'bank';
+    const owner = /common|joint|shared|gemeinsam/i.test(name) || who.length > 1 ? 'Shared' : who[0] === 'Sulekha' ? 'Sulekha' : 'Anubhav';
+    const currency = Object.entries(d.curs).sort((a,b) => b[1] - a[1])[0][0];
+    return { name, type, owner, currency };
+  });
+}
+function renderAccSetup(){
+  const bar = $('#accSetup');
+  const sug = state.accountsReady && state.ready ? suggestAccounts() : [];
+  if (!sug.length){ bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.innerHTML = `<div class="left" style="display:grid;gap:4px"><strong>${state.accounts.length ? 'Accounts used in your entries but not set up yet' : 'Set up your accounts from your entries'}</strong>
+    <span class="note" style="font-size:12.5px;color:var(--muted)">${sug.map(a => `${esc(a.name)} (${ACC_TYPE[a.type]}, ${a.owner}${a.currency !== 'EUR' ? ', ' + a.currency : ''})`).join(' · ')}. You can change any of these afterwards.</span></div>
+    <button class="btn primary" type="button" id="accSetupGo">Add ${sug.length} account${sug.length===1?'':'s'}</button>`;
+}
+
+function accCard(a){
+  const est = estimate(a);
+  const isCard = a.type === 'card', inv = a.type === 'investment' ? investInfo(a) : null;
+  const shown = est ? (isCard ? -est.balance : est.balance) : null;
+  const line = !est ? 'No check-in yet'
+    : `Checked in ${shortDate(est.base.date, true)}: ${fmtAcc(a, isCard ? -est.base.balance : est.base.balance)}${est.base.date < today() && (est.f.spent || est.f.income || est.f.tIn || est.f.tOut) ? ` · since then ${est.f.net >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(est.f.net))}` : ''}`;
+  return `<button type="button" class="tcard" data-acc="${esc(a.id)}">
+    <span class="top"><span class="ttype"><i style="background:${ACC_DOT[a.type]}"></i>${ACC_TYPE[a.type]}</span><span class="tmeta">${esc(a.owner)}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''}</span></span>
+    <span class="tname">${esc(a.name)}</span>
+    <span class="tmeta">${isCard ? 'Owed now (estimate)' : a.type === 'investment' ? 'Value (estimate)' : 'Balance now (estimate)'}</span>
+    <span class="abal ${shown !== null && !isCard && shown < 0 ? 'neg' : ''}">${shown === null ? '—' : fmtAcc(a, shown)}</span>
+    <span class="anote">${line}</span>
+    ${inv ? `<span class="anote">Gain since ${shortDate(inv.since, true)}: <strong style="color:var(${inv.gain >= 0 ? '--good' : '--danger'})">${inv.gain >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(inv.gain))} (${inv.pct >= 0 ? '+' : ''}${inv.pct.toFixed(1)}%)</strong></span>` : ''}
+  </button>`;
+}
+
+function netWorthAt(date){
+  let total = 0, any = false;
+  for (const a of state.accounts){ const e = estimate(a, date); if (e){ total += toEur(a, e.balance); any = true; } }
+  return any ? total : null;
+}
+function renderNetWorthChart(){
+  const first = state.checkins.map(c => c.date).sort()[0];
+  const panel = $('#nwPanel');
+  if (!first){ panel.hidden = true; return; }
+  const pts = [];
+  let [y, m] = first.split('-').map(Number);
+  const td = today();
+  while (true){
+    const end = new Date(y, m, 0); const iso = end.getFullYear() + '-' + String(end.getMonth()+1).padStart(2,'0') + '-' + String(end.getDate()).padStart(2,'0');
+    const d = iso > td ? td : iso;
+    const v = netWorthAt(d); if (v !== null) pts.push([d, v]);
+    if (iso >= td) break;
+    m++; if (m > 12){ m = 1; y++; }
+  }
+  if (pts.length < 2){ panel.hidden = true; return; }
+  panel.hidden = false;
+  const W = 640, H = 200, L = innerWidth <= 640 ? 92 : 70, R = 16, T = 14, B = 26;
+  const vals = pts.map(p => p[1]), lo = Math.min(0, ...vals), hi = niceMax(Math.max(...vals) - lo) + lo;
+  const x = i => L + (W-L-R) * (pts.length === 1 ? 0.5 : i/(pts.length-1));
+  const yy = v => T + (H-T-B) * (1 - (v - lo)/(hi - lo || 1));
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Net worth by month">`;
+  for (let k=0; k<=4; k++){ const v = lo + (hi-lo)*k/4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${yy(v)}" y2="${yy(v)}"/><text x="${L-8}" y="${yy(v)+4}" text-anchor="end">${eur0.format(v)}</text>`; }
+  const line = pts.map((p,i) => (i?'L':'M') + x(i).toFixed(1) + ',' + yy(p[1]).toFixed(1)).join(' ');
+  s += `<path d="${line}" fill="none" stroke="var(--bar)" stroke-width="2" stroke-linejoin="round"/>`;
+  pts.forEach((p,i) => { s += `<circle cx="${x(i)}" cy="${yy(p[1])}" r="4" fill="var(--surface)" stroke="var(--bar)" stroke-width="2"/><rect x="${x(i)-14}" y="${T}" width="28" height="${H-T-B}" fill="transparent" data-tip="${shortDate(p[0], true)}: ${eur.format(p[1])}"/>`;
+    s += `<text x="${x(i)}" y="${H-6}" text-anchor="middle">${MON[+p[0].slice(5,7)-1]}${p[0].slice(5,7)==='01'||i===0?" '"+p[0].slice(2,4):''}</text>`; });
+  s += `</svg>`;
+  $('#nwChart').innerHTML = s;
+}
+
+function renderAccounts(){
+  loadRates();
+  renderAccSetup();
+  const open = state.openAcc && state.accounts.find(a => a.id === state.openAcc);
+  $('#accListView').hidden = !!open; $('#accDetail').hidden = !open;
+  if (open) return renderAccDetail(open);
+  const est = a => { const e = estimate(a); return e ? toEur(a, e.balance) : 0; };
+  const sumT = t => state.accounts.filter(a => t.includes(a.type)).reduce((x,a) => x + est(a), 0);
+  const missing = state.accounts.filter(a => !checkinsOf(a).length);
+  const invs = state.accounts.filter(a => a.type === 'investment').map(a => ({ a, i: investInfo(a) })).filter(x => x.i);
+  const gain = invs.reduce((x, v) => x + toEur(v.a, v.i.gain), 0);
+  const nw = sumT(['bank','cash','investment','card']);
+  $('#accKpis').hidden = !state.accounts.length;
+  $('#accKpis').innerHTML = `
+    <div class="kpi"><span class="lbl">Net worth</span><span class="val ${nw<0?'neg':''}">${nw<0?'−':''}${eur.format(Math.abs(nw))}</span><span class="sub">${missing.length ? missing.length + ' account' + (missing.length===1?'':'s') + ' not checked in yet' : 'Estimated from your check-ins'}</span></div>
+    <div class="kpi"><span class="lbl">Bank & cash</span><span class="val">${eur.format(sumT(['bank','cash']))}</span><span class="sub">${state.accounts.filter(a => a.type==='bank'||a.type==='cash').length} accounts</span></div>
+    <div class="kpi"><span class="lbl">Investments</span><span class="val">${eur.format(sumT(['investment']))}</span><span class="sub">${invs.length ? `Gain ${gain >= 0 ? '+' : '−'}${eur0.format(Math.abs(gain))} since tracking` : 'Add an investment account'}</span></div>
+    <div class="kpi"><span class="lbl">Cards owed</span><span class="val">${eur.format(Math.max(0, -sumT(['card'])))}</span><span class="sub">${state.accounts.filter(a => a.type==='card').length} card${state.accounts.filter(a => a.type==='card').length===1?'':'s'}</span></div>`;
+  renderNetWorthChart();
+  const grp = (title, types) => { const arr = state.accounts.filter(a => types.includes(a.type)); return arr.length ? `<section class="tgroup"><h2>${title}</h2><div class="tgrid">${arr.map(accCard).join('')}</div></section>` : ''; };
+  $('#accList').innerHTML = state.accounts.length ? grp('Bank & cash', ['bank','cash']) + grp('Credit cards', ['card']) + grp('Investments', ['investment'])
+    : `<div class="panel"><p class="empty" style="margin:0">${state.accountsReady ? 'No accounts yet. Use the setup above, or “Add account”.' : 'Loading…'}</p></div>`;
+}
+
+function renderAccDetail(a){
+  const est = estimate(a), isCard = a.type === 'card', inv = a.type === 'investment' ? investInfo(a) : null;
+  const n = a.name.toLowerCase(), since = (() => { const d = new Date(); d.setDate(d.getDate() - 60); return d.toISOString().slice(0,10); })();
+  const moves = [
+    ...state.items.filter(i => String(i.account).toLowerCase() === n).map(i => ({ d:i.date, t:i.store, m:i.category, v:-inAccCur(a, i), id:i.id, k:'expense' })),
+    ...state.income.filter(i => String(i.account).toLowerCase() === n).map(i => ({ d:i.date, t:i.source, m:'Income', v:inAccCur(a, i), id:i.id, k:'income' })),
+    ...state.transfers.filter(t => String(t.from).toLowerCase() === n).map(t => ({ d:t.date, t:'To ' + t.to, m:transferType(t), v:-inAccCur(a, t), id:t.id, k:'transfer' })),
+    ...state.transfers.filter(t => String(t.to).toLowerCase() === n).map(t => ({ d:t.date, t:'From ' + t.from, m:transferType(t), v:inAccCur(a, t), id:t.id, k:'transfer' })),
+  ].filter(x => x.d >= since).sort((x,y) => y.d.localeCompare(x.d));
+  const gaps = gapsOf(a).reverse();
+  const shown = est ? (isCard ? -est.balance : est.balance) : null;
+  $('#accDetail').innerHTML = `
+    <div><button class="btn ghost" type="button" data-backaccs>← All accounts</button></div>
+    <div class="tdhead">
+      <div><span class="ttype"><i style="background:${ACC_DOT[a.type]}"></i>${ACC_TYPE[a.type]}</span><h1>${esc(a.name)}</h1><p>${esc(a.owner)} · ${a.currency || 'EUR'}${a.notes ? ' · ' + esc(a.notes) : ''}</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" type="button" data-editacc="${esc(a.id)}">Edit</button>
+        <button class="btn" type="button" data-transferfrom="${esc(a.name)}">+ Transfer</button>
+        <button class="btn primary" type="button" data-checkin="${esc(a.id)}">Check in</button>
+      </div>
+    </div>
+    <section class="kpis">
+      <div class="kpi"><span class="lbl">${isCard ? 'Owed now' : a.type === 'investment' ? 'Value now' : 'Balance now'} (estimate)</span><span class="val">${shown === null ? '—' : fmtAcc(a, shown)}</span><span class="sub">${est ? `Last check-in ${shortDate(est.base.date, true)}` : 'Check in to start tracking'}</span></div>
+      ${est ? `<div class="kpi"><span class="lbl">Since last check-in</span><span class="val" style="font-size:18px">${est.f.net >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(est.f.net))}</span><span class="sub">${[est.f.spent ? 'spent ' + fmtAcc(a, est.f.spent) : '', est.f.income ? 'income ' + fmtAcc(a, est.f.income) : '', est.f.tIn ? 'in ' + fmtAcc(a, est.f.tIn) : '', est.f.tOut ? 'out ' + fmtAcc(a, est.f.tOut) : ''].filter(Boolean).join(' · ') || 'Nothing recorded'}</span></div>` : ''}
+      ${inv ? `<div class="kpi"><span class="lbl">Gain since tracking</span><span class="val ${inv.gain<0?'neg':''}">${inv.gain >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(inv.gain))}</span><span class="sub">${inv.pct >= 0 ? '+' : ''}${inv.pct.toFixed(1)}% since ${shortDate(inv.since, true)}</span></div>` : ''}
+    </section>
+    <div class="grid">
+      <section class="panel span-5"><header><h2>Check-ins</h2><span class="hint">Gap = real balance minus what the entries predicted</span></header>
+        <div class="hist">${gaps.length ? gaps.map(g => `<div class="h"><span class="d" style="font-family:var(--f-mono);font-size:12.5px">${shortDate(g.c.date, true)}</span>
+          <span>${fmtAcc(a, isCard ? -g.c.balance : g.c.balance)}${g.gap === null ? ' <span class="anote">first check-in</span>' : Math.abs(g.gap) < 1 ? ' <span class="gap ok">matches entries</span>' : ` <span class="gap off" title="Expected ${fmtAcc(a, isCard ? -g.expected : g.expected)}">${a.type === 'investment' ? 'market move' : 'gap'} ${g.gap > 0 ? '+' : '−'}${fmtAcc(a, Math.abs(g.gap))}</span>`}</span>
+          <button class="unlink" type="button" data-delck="${esc(g.c.id)}" aria-label="Delete this check-in">×</button></div>`).join('') : '<p class="empty" style="margin:0">No check-ins yet.</p>'}</div>
+        ${gaps.some(g => g.gap !== null && Math.abs(g.gap) >= 1) && a.type !== 'investment' ? '<p class="anote" style="margin:0">A gap usually means a payment, fee or transfer that wasn’t logged.</p>' : ''}
+      </section>
+      <section class="panel span-7"><header><h2>Last 60 days</h2><span class="hint">Entries on this account</span></header>
+        <div class="recent">${moves.length ? moves.slice(0, 60).map(x => `<div class="r" data-edit="${esc(x.id)}" data-kind="${x.k}" tabindex="0" role="button"><span class="d">${shortDate(x.d)}</span><span><span class="store">${esc(x.t)}</span><br><span class="meta">${esc(x.m)}</span></span><span class="a ${x.v > 0 ? 'inc-amt' : ''}">${x.v > 0 ? '+' : '−'}${fmtAcc(a, Math.abs(x.v))}</span></div>`).join('') : '<div class="empty">Nothing recorded on this account in the last 60 days.</div>'}</div>
+      </section>
+    </div>`;
+}
+
+// account dialog
+const adlg = $('#accDlg'), A = k => $('#a-' + k);
+A('currency').innerHTML = CURRENCIES.map(c => `<option>${c}</option>`).join('');
+function setAccType(t){ state.accType = t; $$('#accTypeSeg [data-atype]').forEach(b => b.setAttribute('aria-checked', b.dataset.atype === t)); }
+function openAccDlg(a){
+  state.editingAcc = a ? a.id : null;
+  $('#accDlgTitle').textContent = a ? 'Edit account' : 'Add account';
+  A('name').value = a ? a.name : ''; A('currency').value = a ? (a.currency || 'EUR') : 'EUR';
+  A('owner').value = a ? a.owner : (cap(usernameOf(state.user)) === 'Sulekha' ? 'Sulekha' : 'Anubhav'); A('notes').value = a ? (a.notes || '') : '';
+  setAccType(a ? a.type : 'bank');
+  $('#accDel').hidden = !a; $('#accDel').classList.remove('armed'); $('#accDel').textContent = 'Delete account';
+  $('#accErr').hidden = true; $('#accRenameNote').hidden = true;
+  adlg.showModal(); A('name').focus();
+}
+$('#accTypeSeg').addEventListener('click', e => { const b = e.target.closest('[data-atype]'); if (b) setAccType(b.dataset.atype); });
+A('name').addEventListener('input', () => {
+  const a = state.editingAcc && state.accounts.find(x => x.id === state.editingAcc), nn = A('name').value.trim();
+  const uses = a && nn && nn !== a.name ? usesOf(a.name) : 0;
+  $('#accRenameNote').hidden = !uses;
+  $('#accRenameNote').textContent = uses ? `${uses} entr${uses===1?'y':'ies'} use “${a.name}”; they’ll be renamed to “${nn}” too.` : '';
+});
+function usesOf(name){ const n = name.toLowerCase();
+  return state.items.filter(i => String(i.account).toLowerCase() === n).length + state.income.filter(i => String(i.account).toLowerCase() === n).length
+    + state.transfers.filter(t => String(t.from).toLowerCase() === n || String(t.to).toLowerCase() === n).length; }
+$('#accCancel').addEventListener('click', () => adlg.close());
+$('#newAcc').addEventListener('click', () => openAccDlg(null));
+$('#accForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = $('#accErr'); err.hidden = true;
+  const name = A('name').value.trim();
+  if (!name){ err.textContent = 'Give the account a name.'; err.hidden = false; return; }
+  const clash = accOf(name); if (clash && clash.id !== state.editingAcc){ err.textContent = 'There is already an account with that name.'; err.hidden = false; return; }
+  const rec = { name, type: state.accType, currency: A('currency').value, owner: A('owner').value };
+  const notes = A('notes').value.trim(); if (notes) rec.notes = notes;
+  $('#accSave').disabled = true;
+  try {
+    const me = usernameOf(state.user);
+    if (state.editingAcc){
+      const old = state.accounts.find(x => x.id === state.editingAcc);
+      // Renaming: entries refer to accounts by name, so update them in the same go.
+      const writes = [];
+      if (old.name !== name){
+        const o = old.name.toLowerCase(), now = new Date().toISOString();
+        state.items.filter(i => String(i.account).toLowerCase() === o).forEach(i => writes.push(['expenses', i.id, expenseDoc(i, { account:name })]));
+        state.income.filter(i => String(i.account).toLowerCase() === o).forEach(i => writes.push(['income', i.id, { ...pickDoc(INC_KEYS, i, { account:name }), updatedBy: me }]));
+        state.transfers.filter(t => String(t.from).toLowerCase() === o || String(t.to).toLowerCase() === o).forEach(t => writes.push(['transfers', t.id, { ...pickDoc(TR_KEYS, t, {
+          from: String(t.from).toLowerCase() === o ? name : t.from, to: String(t.to).toLowerCase() === o ? name : t.to }), updatedBy: me }]));
+      }
+      writes.push(['accounts', old.id, { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || me, updatedBy: me }]);
+      for (let i = 0; i < writes.length; i += 400){ const b = writeBatch(fs); writes.slice(i, i+400).forEach(([c, id, d]) => b.set(doc(fs, c, id), d)); await b.commit(); }
+      toast(writes.length > 1 ? `Saved and renamed on ${writes.length - 1} entries` : 'Account saved');
+    } else {
+      await addDoc(accountsCol, { ...rec, createdAt: new Date().toISOString(), createdBy: me });
+      toast('Account added. Check in its balance to start tracking.');
+    }
+    adlg.close();
+  } catch (x){ err.textContent = writeError(x); err.hidden = false; }
+  finally { $('#accSave').disabled = false; }
+});
+$('#accDel').addEventListener('click', async () => {
+  const b = $('#accDel'), a = state.accounts.find(x => x.id === state.editingAcc); if (!a) return;
+  const cks = checkinsOf(a);
+  if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = cks.length ? `Delete with ${cks.length} check-in${cks.length===1?'':'s'}` : 'Confirm delete'; return; }
+  b.disabled = true;
+  try { const bt = writeBatch(fs); cks.forEach(c => bt.delete(doc(fs, 'checkins', c.id))); bt.delete(doc(fs, 'accounts', a.id)); await bt.commit();
+    state.openAcc = null; adlg.close(); toast('Account deleted. Entries that use its name are unchanged.'); }
+  catch (x){ $('#accErr').textContent = writeError(x); $('#accErr').hidden = false; }
+  finally { b.disabled = false; }
+});
+
+// check-in dialog
+const ckdlg = $('#ckDlg');
+function openCheckin(onlyId){
+  const list = state.accounts.filter(a => !onlyId || a.id === onlyId);
+  if (!list.length){ toast('Add an account first.'); return; }
+  $('#ck-date').value = today(); $('#ckErr').hidden = true;
+  $('#ckList').innerHTML = list.map(a => { const e = estimate(a), isCard = a.type === 'card';
+    return `<div class="ckrow"><span><span class="nm">${esc(a.name)}</span><br><span class="hint">${isCard ? 'Amount owed' : a.type === 'investment' ? 'Current value' : 'Balance'} in ${a.currency || 'EUR'}${e ? ' · estimate ' + fmtAcc(a, isCard ? -e.balance : e.balance) : ''}</span></span>
+      <input type="number" step="0.01" inputmode="decimal" data-ckacc="${esc(a.id)}" placeholder="${e ? (isCard ? -e.balance : e.balance).toFixed(2) : ''}" aria-label="${esc(a.name)}"></div>`; }).join('');
+  ckdlg.showModal();
+  $('#ckList input')?.focus();
+}
+$('#ckCancel').addEventListener('click', () => ckdlg.close());
+$('#checkinAll').addEventListener('click', () => openCheckin(null));
+$('#ckForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const date = $('#ck-date').value, err = $('#ckErr'); err.hidden = true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)){ err.textContent = 'Pick a date.'; err.hidden = false; return; }
+  const rows = $$('#ckList [data-ckacc]').filter(i => i.value.trim() !== '').map(i => {
+    const a = state.accounts.find(x => x.id === i.dataset.ckacc), v = Math.round(parseFloat(i.value) * 100) / 100;
+    return { a, balance: a.type === 'card' ? -Math.abs(v) : v, valid: isFinite(v) };
+  });
+  if (!rows.length){ err.textContent = 'Enter at least one balance.'; err.hidden = false; return; }
+  if (rows.some(r => !r.valid)){ err.textContent = 'One of the amounts isn’t a number.'; err.hidden = false; return; }
+  const notes = rows.map(r => { const prev = estimate(r.a, date); return prev ? { a:r.a, gap: r.balance - prev.balance } : null; }).filter(x => x && Math.abs(x.gap) >= 1 && x.a.type !== 'investment');
+  $('#ckSave').disabled = true;
+  try {
+    const b = writeBatch(fs), now = new Date().toISOString(), me = usernameOf(state.user);
+    rows.forEach(r => b.set(doc(checkinsCol), { accountId: r.a.id, date, balance: r.balance, createdAt: now, createdBy: me }));
+    await b.commit(); ckdlg.close();
+    toast(`Saved ${rows.length} check-in${rows.length===1?'':'s'}` + (notes.length ? ` · ${notes.map(n => `${n.a.name} ${n.gap > 0 ? '+' : '−'}${fmtAcc(n.a, Math.abs(n.gap))} vs entries`).join(', ')}` : ''));
+  } catch (x){ err.textContent = writeError(x); err.hidden = false; }
+  finally { $('#ckSave').disabled = false; }
+});
+
+document.addEventListener('click', async e => {
+  const t = e.target;
+  if (t.id === 'accSetupGo'){
+    const sug = suggestAccounts(); t.disabled = true;
+    try { const b = writeBatch(fs), now = new Date().toISOString(), me = usernameOf(state.user);
+      sug.forEach(a => b.set(doc(accountsCol), { ...a, createdAt: now, createdBy: me })); await b.commit();
+      toast(`Added ${sug.length} accounts. Next: check in their balances.`); }
+    catch (x){ toast(writeError(x)); t.disabled = false; }
+    return;
+  }
+  const card = t.closest('[data-acc]'); if (card){ state.openAcc = card.dataset.acc; render(); window.scrollTo(0,0); return; }
+  if (t.closest('[data-backaccs]')){ state.openAcc = null; render(); return; }
+  const ea = t.closest('[data-editacc]'); if (ea){ openAccDlg(state.accounts.find(a => a.id === ea.dataset.editacc)); return; }
+  const ck = t.closest('[data-checkin]'); if (ck){ openCheckin(ck.dataset.checkin); return; }
+  const tf = t.closest('[data-transferfrom]'); if (tf){ openAdd('transfer'); F('account').value = tf.dataset.transferfrom; setKind('transfer', false); return; }
+  const dc = t.closest('[data-delck]');
+  if (dc){ e.stopPropagation();
+    if (!dc.classList.contains('armed')){ dc.classList.add('armed'); dc.textContent = 'Delete?'; dc.style.width = 'auto'; return; }
+    try { await deleteDoc(doc(fs, 'checkins', dc.dataset.delck)); toast('Check-in deleted'); } catch (x){ toast(writeError(x)); } }
 });
 
 // ---------- dropdown fields ----------

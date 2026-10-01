@@ -92,6 +92,55 @@ service cloud.firestore {
       allow write: if isMember() && id == 'budgets' && validBudgets();
     }
 
+    // Money moved between own accounts (incl. investing and card payments). Not spending.
+    function validTransfer() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['amount','date','from','to','comment','createdAt','createdBy','updatedBy',
+                               'currency','origAmount','fxRate'])
+        && d.keys().hasAll(['amount','date','from','to'])
+        && d.amount is number && d.amount > 0 && d.amount < 10000000
+        && isDate(d.date)
+        && str(d.from, 60) && d.from.size() > 0 && str(d.to, 60) && d.to.size() > 0
+        && (!('comment' in d) || str(d.comment, 500))
+        && validFx(d);
+    }
+
+    match /transfers/{id} {
+      allow read, delete: if isMember();
+      allow create, update: if isMember() && validTransfer();
+    }
+
+    function validAccount() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name','type','currency','owner','notes','createdAt','createdBy','updatedBy'])
+        && d.keys().hasAll(['name','type','currency','owner'])
+        && str(d.name, 60) && d.name.size() > 0
+        && d.type in ['bank','card','cash','investment']
+        && d.currency is string && d.currency.size() == 3
+        && d.owner in ['Anubhav','Sulekha','Shared']
+        && (!('notes' in d) || str(d.notes, 500));
+    }
+
+    match /accounts/{id} {
+      allow read, delete: if isMember();
+      allow create, update: if isMember() && validAccount();
+    }
+
+    // A real balance typed in from the bank or broker app (card debt stored as a negative number).
+    function validCheckin() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['accountId','date','balance','note','createdAt','createdBy','updatedBy'])
+        && d.keys().hasAll(['accountId','date','balance'])
+        && str(d.accountId, 60) && isDate(d.date)
+        && d.balance is number && d.balance > -100000000 && d.balance < 100000000
+        && (!('note' in d) || str(d.note, 500));
+    }
+
+    match /checkins/{id} {
+      allow read, delete: if isMember();
+      allow create, update: if isMember() && validCheckin();
+    }
+
     // Captured payment notifications. Only the capture function (server, admin access) creates them;
     // the app reads them and deletes each one once it's added or dismissed.
     match /inbox/{id} {
