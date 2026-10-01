@@ -2676,6 +2676,9 @@ function monthRate(cur, m){
   const near = ks.filter(k => k <= m).pop() || ks[0];
   return near ? state.fxMonths[near][cur] : (state.fxLatest[cur] || 0);
 }
+// An opening balance is a value, so it's priced like one: at the rate when its month ends (today, while that
+// month is still running). That way a new account starts at exactly zero gain instead of a fake currency move.
+const openRate = (cur, m) => m >= thisMonth() ? latestRate(cur) : monthRate(cur, addMonth(m, 1));
 const latestRate = cur => !cur || cur === 'EUR' ? 1 : (state.fxLatest[cur] || monthRate(cur, thisMonth()));
 async function fillMonthRates(){
   if (fxBusy || !needFx.size) return;
@@ -2757,11 +2760,12 @@ function portfolio(){
     x.invested = x.rows.reduce((s,r) => s + r.inv, 0);
     x.value = x.last.value;
     x.valueEur = x.value * latestRate(x.cur);
-    x.cost = x.rows.reduce((s,r) => s + r.inv * monthRate(x.cur, r.month), 0);
+    x.cost = x.rows.reduce((s,r) => s + r.inv * (r.opening ? openRate(x.cur, r.month) : monthRate(x.cur, r.month)), 0);
+    x.openIdx = x.rows[0].opening ? months.indexOf(x.rows[0].month) : -1;
     x.market = (x.value - x.invested) * latestRate(x.cur);
     x.modelled = x.a.valueMode === 'auto';
   }
-  withData.sort((p,q) => q.valueEur - p.valueEur).forEach((x, i) => x.color = `var(${PAL[i % PAL.length]})`);
+  withData.sort((p,q) => q.valueEur - p.valueEur).forEach((x, i) => x.color = `var(${PAL[Math.min(i, PAL.length - 1)]})`);
   accs.forEach(x => { if (!x.color) x.color = 'var(--s8)'; });
   let cum = 0;
   res.tl = months.map((m, i) => {
@@ -2770,7 +2774,7 @@ function portfolio(){
     for (const x of withData){
       const v = x.vals[i]; if (v === null){ parts.push(0); continue; }
       const rt = monthRate(x.cur, m);
-      tv += v * rt; inv += x.invs[i] * rt; fresh += x.fresh[i] * rt; parts.push(v * rt);
+      tv += v * rt; inv += x.invs[i] * (i === x.openIdx ? openRate(x.cur, m) : rt); fresh += x.fresh[i] * rt; parts.push(v * rt);
       // Market return: change in value minus money put in, both at this month's rate (currency moves left out).
       if (i > 0 && x.vals[i-1] !== null){ profit += (v - x.vals[i-1] - x.invs[i]) * rt; base += x.vals[i-1] * rt; if (x.rec[i]) has = true; }
     }
@@ -2964,6 +2968,7 @@ function renderAccChart(a, rows, pred){
   s += `<path d="${line('v', 0, h)} L${x(h-1)},${y(0)} L${x(0)},${y(0)} Z" fill="var(--bar)" fill-opacity=".12"/>`;
   s += `<path d="${line('v', 0, h)}" fill="none" stroke="var(--bar)" stroke-width="2.2" stroke-linejoin="round"/>`;
   s += `<path d="${line('c', 0, h)}" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  if (h === 1) s += `<circle cx="${x(0)}" cy="${y(pts[0].v)}" r="5" fill="var(--bar)"/><text x="${x(0) + 10}" y="${y(pts[0].v) - 8}" style="fill:var(--ink-2)">${fmtW(a, pts[0].v)}</text>`;
   if (pred.length){
     s += `<path d="${line('v', h-1, n)}" fill="none" stroke="var(--bar-dim)" stroke-width="2.2" stroke-dasharray="2 3"/>`;
     s += `<path d="${line('c', h-1, n)}" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="5 4"/>`;
