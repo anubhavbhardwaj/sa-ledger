@@ -744,6 +744,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <label class="f">Value comes from<select id="a-valueMode"><option value="manual">What I type in each month</option><option value="auto">Modelled from the return rate</option></select></label>
       <label class="f">Expected return (% a year)<input id="a-returnPct" type="number" step="0.01" inputmode="decimal" placeholder="e.g. 7"></label>
       <label class="f"><span id="lb-target">Target per month</span><input id="a-target" type="number" step="1" min="0" inputmode="decimal" placeholder="optional"></label>
+      <label class="chk f full"><input type="checkbox" id="a-inFire"> <span>Count towards FIRE (untick for money you can’t reach before retiring, like a pension)</span></label>
       <p class="f full muted" style="margin:0;font-size:12.5px">Modelled suits insurance-linked plans (ULIP, LIC) without a monthly statement: you type the first value and each month grows it by the return rate. You can still type a real value from a statement in any month.</p>
     </div>
     <p class="muted" id="accRenameNote" hidden style="margin:0;font-size:12.5px"></p>
@@ -799,6 +800,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <label class="f"><span id="lb-sinv">Invested this month</span><input id="s-inv" type="number" step="0.01" inputmode="decimal"></label>
       <label class="f full"><span id="lb-sval">Value at month end</span><input id="s-val" type="number" step="0.01" inputmode="decimal"></label>
     </div>
+    <label class="chk" id="snapOpenRow" hidden><input type="checkbox" id="s-open"> <span>Opening balance: money already in the account when you start tracking. It counts toward gains and XIRR, but not as new money put in this month.</span></label>
     <p class="muted" id="snapHint" style="margin:0;font-size:12.5px"></p>
     <p class="err" id="snapErr" hidden></p>
     <div class="dlg-actions">
@@ -2530,7 +2532,10 @@ A('invType').innerHTML = Object.entries(INV_TYPE).map(([k,v]) => `<option value=
 function setAccType(t){ state.accType = t; $$('#accTypeSeg [data-atype]').forEach(b => b.setAttribute('aria-checked', b.dataset.atype === t)); $('#accDlg .inv-only').hidden = t !== 'investment'; accTargetLabel(); }
 function accTargetLabel(){ $('#lb-target').textContent = 'Target per month (' + curSym(A('currency').value) + ')'; }
 A('currency').addEventListener('change', accTargetLabel);
-A('invType').addEventListener('change', () => { if (!state.editingAcc && A('invType').value === 'ulip') A('valueMode').value = 'auto'; });
+A('invType').addEventListener('change', () => {
+  if (!state.editingAcc && A('invType').value === 'ulip') A('valueMode').value = 'auto';
+  if (!state.editingAcc) A('inFire').checked = A('invType').value !== 'pension';
+});
 function openAccDlg(a, preset){
   state.editingAcc = a ? a.id : null;
   $('#accDlgTitle').textContent = a ? 'Edit account' : 'Add account';
@@ -2538,6 +2543,7 @@ function openAccDlg(a, preset){
   A('owner').value = a ? a.owner : (cap(usernameOf(state.user)) === 'Sulekha' ? 'Sulekha' : 'Anubhav'); A('notes').value = a ? (a.notes || '') : '';
   A('invType').value = a?.invType || 'equity'; A('valueMode').value = a?.valueMode || 'manual';
   A('returnPct').value = a?.returnPct ?? ''; A('target').value = a?.target ?? '';
+  A('inFire').checked = a ? a.inFire !== false : true;
   setAccType(a ? a.type : (typeof preset === 'string' ? preset : 'bank'));
   $('#accDel').hidden = !a; $('#accDel').classList.remove('armed'); $('#accDel').textContent = 'Delete account';
   $('#accErr').hidden = true; $('#accRenameNote').hidden = true;
@@ -2565,6 +2571,7 @@ $('#accForm').addEventListener('submit', async e => {
   const notes = A('notes').value.trim(); if (notes) rec.notes = notes;
   if (rec.type === 'investment'){
     rec.invType = A('invType').value; rec.valueMode = A('valueMode').value;
+    if (!A('inFire').checked) rec.inFire = false;
     const rp = parseFloat(A('returnPct').value), tg = parseFloat(A('target').value);
     if (A('returnPct').value.trim() !== ''){ if (!isFinite(rp) || rp < -50 || rp > 100){ err.textContent = 'Expected return should be a yearly percentage, like 7.'; err.hidden = false; return; } rec.returnPct = rp; }
     if (A('target').value.trim() !== ''){ if (!isFinite(tg) || tg < 0){ err.textContent = 'Target per month can’t be negative.'; err.hidden = false; return; } rec.target = tg; }
@@ -2701,7 +2708,7 @@ function invRows(a){
     const expected = prev === null ? null : (prev + inv) * (1 + r);
     const value = typed ? +s.value : prev === null ? inv : auto ? prev * (1 + r) + inv : prev + inv;
     out.push({ s, month: s.month, inv, value, expected, diff: expected ? value / expected - 1 : null,
-      modelled: auto && !typed && prev !== null, missing: !auto && !typed, base: prev === null });
+      modelled: auto && !typed && prev !== null, missing: !auto && !typed, base: prev === null, opening: prev === null && !!s.opening });
     prev = value;
   }
   return out;
@@ -2744,7 +2751,8 @@ function portfolio(){
   for (const x of withData){
     const byM = Object.fromEntries(x.rows.map(r => [r.month, r]));
     let v = null; x.vals = []; x.invs = [];
-    for (const m of months){ const r = byM[m]; if (r) v = r.value; x.vals.push(v); x.invs.push(r ? r.inv : 0); }
+    x.fresh = []; x.rec = [];
+    for (const m of months){ const r = byM[m]; if (r) v = r.value; x.vals.push(v); x.invs.push(r ? r.inv : 0); x.fresh.push(r && !r.opening ? r.inv : 0); x.rec.push(!!r); }
     x.last = x.rows[x.rows.length-1];
     x.invested = x.rows.reduce((s,r) => s + r.inv, 0);
     x.value = x.last.value;
@@ -2757,17 +2765,18 @@ function portfolio(){
   accs.forEach(x => { if (!x.color) x.color = 'var(--s8)'; });
   let cum = 0;
   res.tl = months.map((m, i) => {
-    let tv = 0, inv = 0, profit = 0, base = 0, has = false;
+    let tv = 0, inv = 0, fresh = 0, profit = 0, base = 0, has = false;
     const parts = [];
     for (const x of withData){
       const v = x.vals[i]; if (v === null){ parts.push(0); continue; }
       const rt = monthRate(x.cur, m);
-      tv += v * rt; inv += x.invs[i] * rt; parts.push(v * rt);
+      tv += v * rt; inv += x.invs[i] * rt; fresh += x.fresh[i] * rt; parts.push(v * rt);
       // Market return: change in value minus money put in, both at this month's rate (currency moves left out).
-      if (i > 0 && x.vals[i-1] !== null){ profit += (v - x.vals[i-1] - x.invs[i]) * rt; base += x.vals[i-1] * rt; has = true; }
+      if (i > 0 && x.vals[i-1] !== null){ profit += (v - x.vals[i-1] - x.invs[i]) * rt; base += x.vals[i-1] * rt; if (x.rec[i]) has = true; }
     }
     cum += inv;
-    return { m, tv, inv, cum, profit, pct: base > 0 ? profit / base : null, has, parts };
+    // inv: all money in (for XIRR and the put-in line); fresh: leaves out opening balances (for monthly figures).
+    return { m, tv, inv, fresh, cum, profit, pct: base > 0 ? profit / base : null, has, parts };
   });
   res.value = withData.reduce((s,x) => s + x.valueEur, 0);
   res.cost = withData.reduce((s,x) => s + x.cost, 0);
@@ -2775,8 +2784,11 @@ function portfolio(){
   res.net = res.value - res.cost; res.fx = res.net - res.market;
   const end = Math.min(mTime(addMonth(last, 1)), Date.now());
   res.xirr = xirr([...res.tl.filter(t => t.inv).map(t => ({ t: mTime(t.m), v: -t.inv })), { t: end, v: res.value }]);
-  const w = res.tl.slice(-12), wp = w.filter(t => t.has);
-  res.l12 = { invested: w.reduce((s,t) => s + t.inv, 0), profit: wp.reduce((s,t) => s + t.profit, 0), pos: wp.filter(t => t.profit > 0).length, n: wp.length, months: w.length };
+  // A month counts once some account with history has a value for it; a month holding only a new account's
+  // opening balance (or nothing yet) doesn't move the 12-month window.
+  let lastReal = res.tl.length - 1; while (lastReal > 0 && !res.tl[lastReal].has) lastReal--;
+  const w = res.tl.slice(Math.max(0, lastReal - 11), lastReal + 1), wp = w.filter(t => t.has);
+  res.l12 = { invested: w.reduce((s,t) => s + t.fresh, 0), profit: wp.reduce((s,t) => s + t.profit, 0), pos: wp.filter(t => t.profit > 0).length, n: wp.length, months: w.length };
   res.last = last;
   return pfCache = res;
 }
@@ -2784,9 +2796,9 @@ function portfolio(){
 function investedIn(period){
   if (!state.snaps.length) return null;
   const pf = portfolio(); if (!pf.withData.length) return null;
-  if (period === 'all') return pf.cost;
+  if (period === 'all') return pf.tl.reduce((s,t) => s + t.fresh, 0);
   const t = pf.tl.find(t => t.m === period);
-  return t ? t.inv : null;
+  return t ? t.fresh : null;
 }
 // Net transfers into an account during a month, in the account's currency.
 function ledgerInv(a, m){
@@ -2841,7 +2853,7 @@ function renderInvestments(pf){
     const a = x.a, n = x.rows.length;
     const g = n && x.invested > 0 ? (x.value - x.invested) / x.invested : null;
     return `<button type="button" class="r" data-acc="${esc(a.id)}"><span class="dot" style="background:${x.color}"></span>
-      <span><span class="nm">${esc(a.name)}</span>${x.modelled ? '<span class="modelled" title="Value grows by the expected return; not from a statement">modelled</span>' : ''}<br>
+      <span><span class="nm">${esc(a.name)}</span>${x.modelled ? '<span class="modelled" title="Value grows by the expected return; not from a statement">modelled</span>' : ''}${a.inFire === false ? '<span class="tag" title="Not counted in FIRE">not in FIRE</span>' : ''}<br>
         <span class="meta">${INV_TYPE[a.invType] || 'Investment'}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''} · ${n ? 'updated ' + monthLabel(x.last.month) : 'no values yet'}</span></span>
       <span class="v">${n ? fmtW(a, x.value) : '—'}<small>${n ? (x.cur !== 'EUR' ? '≈ ' + eur0.format(x.valueEur) + ' · ' : '') + (g === null ? '' : `<span class="${g >= 0 ? 'pos' : 'neg'}">${pct(g)}</span>`) : 'Add month'}</small></span></button>`;
   }).join('') + (pf.withData.length > 1 ? `<div class="r tot"><span></span><span>Total</span><span class="v">${eur0.format(pf.value)}<small>${pct(pf.cost > 0 ? pf.net / pf.cost : 0)} in euros</small></span></div>` : '')
@@ -2883,7 +2895,7 @@ function renderMonthly(pf){
   const tl = pf.tl.filter(t => state.im === 'invested' || t.has).slice(-24), n = tl.length, narrow = innerWidth <= 640;
   if (!n){ $('#invMonthly').innerHTML = '<div class="empty">Needs at least two months.</div>'; return; }
   const W = wideW(), H = narrow ? 200 : 230, L = narrow ? 70 : 52, R = 8, T = 12, B = 26;
-  const val = t => state.im === 'profit' ? (t.pct || 0) : t.inv;
+  const val = t => state.im === 'profit' ? (t.pct || 0) : t.fresh;
   const vs = tl.map(val), hi = Math.max(0, ...vs), lo = Math.min(0, ...vs);
   const span = niceMax(Math.max(hi - lo, 1e-9)), step = span / 4;
   const top = Math.ceil(hi / step) * step || step, bot = Math.floor(lo / step) * step;
@@ -2896,7 +2908,7 @@ function renderMonthly(pf){
     const v = vs[i], cx = L + i*bw + bw/2, y0 = y(0), y1 = y(v);
     const color = state.im === 'invested' ? 'var(--c-inc)' : v >= 0 ? 'var(--good)' : 'var(--danger)';
     s += `<rect x="${cx - w/2}" y="${Math.min(y0, y1)}" width="${w}" height="${Math.max(1, Math.abs(y1 - y0))}" rx="2" fill="${color}"/>`;
-    s += `<rect x="${L + i*bw}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(t.m)} · ${state.im === 'profit' ? `return ${signed(t.profit)} (${t.pct === null ? '—' : pct(t.pct)})` : `put in ${eur0.format(t.inv)}`}"/>`;
+    s += `<rect x="${L + i*bw}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(t.m)} · ${state.im === 'profit' ? `return ${signed(t.profit)} (${t.pct === null ? '—' : pct(t.pct)})` : `put in ${eur0.format(t.fresh)}${t.inv - t.fresh >= 1 ? ` (plus ${eur0.format(t.inv - t.fresh)} opening balance)` : ''}`}"/>`;
     if (tick(i, n, every)) s += `<text x="${i === n-1 ? W-R : cx}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : 'middle'}">${mShort(t.m)}</text>`;
   });
   s += `<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/></svg>`;
@@ -2921,7 +2933,7 @@ function renderInvDetail(a){
     </div>
     ${rows.length ? `<section class="kpis w">
       <div class="kpi"><span class="lbl">Value</span><span class="val">${fmtW(a, value)}</span><span class="sub">${monthLabel(last.month)}${fx ? ' · ≈ ' + eur0.format(value * fx) + ' today' : ''}</span></div>
-      <div class="kpi"><span class="lbl">Invested</span><span class="val">${fmtW(a, invested)}</span><span class="sub">since ${monthLabel(rows[0].month)}${rows[0].value > rows[0].inv ? ', first month includes earlier money' : ''}</span></div>
+      <div class="kpi"><span class="lbl">Invested</span><span class="val">${fmtW(a, invested)}</span><span class="sub">since ${monthLabel(rows[0].month)}${rows[0].opening ? ', from an opening balance' : rows[0].value > rows[0].inv ? ', first month includes earlier money' : ''}</span></div>
       <div class="kpi"><span class="lbl">Gain</span><span class="val ${value - invested < 0 ? 'neg' : ''}">${value - invested >= 0 ? '+' : '−'}${fmtW(a, Math.abs(value - invested))}</span><span class="sub">${g === null ? '' : pct(g) + ' in ' + cur}</span></div>
     </section>
     <section class="panel"><header><h2>Value and money put in</h2><button class="btn ghost" type="button" data-pred aria-pressed="${state.showPred}">${state.showPred ? 'Hide' : 'Show'} 5-year projection</button></header>
@@ -2931,7 +2943,7 @@ function renderInvDetail(a){
     <section class="panel"><header><h2>Monthly values</h2><span class="hint">Expected = last value plus this month’s money, grown by one month of the expected return</span></header>
       <div class="tscroll"><table class="snaps"><thead><tr><th>Month</th><th class="num">Put in</th><th class="num">Value</th><th class="num">Expected</th><th class="num">Diff</th></tr></thead>
       <tbody>${pred.slice(0, 12).reverse().map(p => `<tr class="pred"><td>${monthLabel(p.month)}</td><td class="num">${fmtW(a, p.inv)}</td><td class="num">${fmtW(a, p.value)}</td><td class="num"></td><td class="num">—</td></tr>`).join('')}
-      ${rows.slice().reverse().map(r => `<tr class="row" data-editsnap="${esc(r.s.id)}" tabindex="0"><td>${monthLabel(r.month)}${r.modelled ? '<span class="modelled">modelled</span>' : ''}${r.missing ? '<span class="modelled">no value</span>' : ''}</td><td class="num">${fmtW(a, r.inv)}</td><td class="num">${fmtW(a, r.value)}</td>
+      ${rows.slice().reverse().map(r => `<tr class="row" data-editsnap="${esc(r.s.id)}" tabindex="0"><td>${monthLabel(r.month)}${r.opening ? '<span class="tag">opening balance</span>' : ''}${r.modelled ? '<span class="modelled">modelled</span>' : ''}${r.missing ? '<span class="modelled">no value</span>' : ''}</td><td class="num">${fmtW(a, r.inv)}</td><td class="num">${fmtW(a, r.value)}</td>
         <td class="num">${r.expected === null ? '—' : fmtW(a, r.expected)}</td><td class="num ${r.diff === null || r.modelled ? '' : r.diff >= 0 ? 'pos' : 'neg'}">${r.diff === null || r.base ? '—' : pct(r.diff, 2)}</td></tr>`).join('')}</tbody></table></div>
     </section>` : `<div class="panel"><p class="empty" style="margin:0">No monthly values yet. Use “+ Add month” to enter${a.valueMode === 'auto' ? ' the first value; later months are modelled from the return rate' : ' what you put in and what it was worth'}.</p></div>`}`;
   if (rows.length) renderAccChart(a, rows, pred);
@@ -2990,14 +3002,16 @@ function renderFire(pf){
   const f = state.fire || {}, led = ledgerAnnualSpend(), y0 = new Date().getFullYear();
   const ledSave = pf.l12 && pf.l12.months ? pf.l12.invested / pf.l12.months : null;
   const p = { exp: f.expenses ?? (led ? Math.round(led.v) : 0), inf: f.inflation ?? 3, year: f.fireYear ?? y0 + 20, wr: f.withdrawal ?? 4,
-    save: f.savings ?? (ledSave !== null ? Math.round(ledSave) : 0), ret: f.returnPct ?? 7, cur: pf.value };
+    save: f.savings ?? (ledSave !== null ? Math.round(ledSave) : 0), ret: f.returnPct ?? 7,
+    cur: pf.withData.filter(x => x.a.inFire !== false).reduce((s,x) => s + x.valueEur, 0) };
+  const left = pf.withData.filter(x => x.a.inFire === false);
   const c = fireCalc(p), prog = c.num > 0 ? p.cur / c.num : 0;
   const src = (key, val, label) => val === null ? '' : f[key] !== undefined && f[key] !== null
     ? `<span class="src">${label}: ${eur0.format(val)} · <button type="button" data-fireuse="${key}">use this</button></span>` : `<span class="src">From ${label.toLowerCase()}</span>`;
   $('#wv-fire').innerHTML = `
     <section class="kpis w">
       <div class="kpi"><span class="lbl">FIRE number</span><span class="val">${eur0.format(c.num)}</span><span class="sub">${eur0.format(c.fae)} a year in ${p.year}, at ${p.wr}% withdrawal</span></div>
-      <div class="kpi"><span class="lbl">Invested today</span><span class="val">${eur0.format(p.cur)}</span><span class="sub">${(prog * 100).toFixed(0)}% of the way</span><div class="progress" aria-hidden="true"><i style="width:${Math.min(100, prog * 100).toFixed(1)}%"></i></div></div>
+      <div class="kpi"><span class="lbl">Invested today</span><span class="val">${eur0.format(p.cur)}</span><span class="sub">${(prog * 100).toFixed(0)}% of the way${left.length ? ` · leaves out ${left.map(x => esc(x.a.name)).join(', ')} (${eur0.format(left.reduce((s,x) => s + x.valueEur, 0))})` : ''}</span><div class="progress" aria-hidden="true"><i style="width:${Math.min(100, prog * 100).toFixed(1)}%"></i></div></div>
       <div class="kpi"><span class="lbl">Projected in ${p.year}</span><span class="val">${eur0.format(c.proj)}</span><span class="sub"><span class="pill ${c.on ? 'ontrack' : 'over'}">${c.on ? 'On track' : 'Behind'}</span> ${c.num > 0 ? (c.proj / c.num * 100).toFixed(0) + '% of target' : ''}</span></div>
       <div class="kpi"><span class="lbl">Needed a month</span><span class="val">${c.need === null ? '—' : eur0.format(c.need)}</span><span class="sub">${c.reach ? 'At your pace: FIRE around ' + c.reach : 'Not reached within 60 years at this pace'}</span></div>
     </section>
@@ -3011,7 +3025,7 @@ function renderFire(pf){
         <label>Inflation (%)<input type="number" step="0.1" inputmode="decimal" data-fire="inflation" value="${p.inf}"></label>
         <label>Withdrawal rate (%)<input type="number" step="0.1" min="0.1" inputmode="decimal" data-fire="withdrawal" value="${p.wr}"></label>
       </div>
-      <p class="hint">Invested today is the live value of your investment accounts. Leave spending or monthly investing empty to follow your ledger.</p>
+      <p class="hint">Invested today is the live value of your investment accounts that count towards FIRE (set per account with Edit). Leave spending or monthly investing empty to follow your ledger.</p>
     </section>`;
   const yrs = Math.max(c.yrs, c.reach ? c.reach - y0 : 0, 5), r = p.ret / 100;
   const pts = []; for (let k = 0; k <= yrs; k++){ const g = Math.pow(1 + r, k); pts.push({ yr: y0 + k, v: p.cur * g + (r > 0 ? p.save * 12 * (g - 1) / r : p.save * 12 * k), t: p.wr > 0 ? p.exp * Math.pow(1 + p.inf / 100, k) / (p.wr / 100) : 0 }); }
@@ -3149,6 +3163,7 @@ function snapHint(){
   $('#lb-sinv').textContent = `Put in this month (${sym})`;
   $('#lb-sval').textContent = auto ? `Value from a statement (${sym}, optional)` : `Value at month end (${sym})`;
   S('val').placeholder = auto ? 'modelled: ' + fmtAcc(a, prev * (1 + rMonthly(a)) + inv) : '';
+  $('#snapOpenRow').hidden = prev !== null;
   const led = m ? ledgerInv(a, m) : 0;
   $('#snapHint').innerHTML = [led ? `Transfers into ${esc(a.name)} in ${monthLabel(m)}: <strong>${fmtAcc(a, led)}</strong>` : '',
     auto ? 'Leave the value empty to use the modelled value.' : prev === null && a.valueMode === 'auto' ? 'This is the first month: type its value, later months are modelled from it.' : ''].filter(Boolean).join('<br>');
@@ -3163,12 +3178,14 @@ function openSnap(a, snap){
   S('inv').value = snap ? snap.investment : led || '';
   S('inv').placeholder = a.target ? String(a.target) : '0';
   S('val').value = snap && snap.value !== undefined && snap.value !== null ? snap.value : '';
+  S('open').checked = snap ? !!snap.opening : rows.length === 0;
   $('#snapDel').hidden = !snap; $('#snapDel').classList.remove('armed'); $('#snapDel').textContent = 'Delete month';
   $('#snapErr').hidden = true; snapHint();
   sdlg.showModal(); S(snap ? 'val' : 'inv').focus();
 }
 S('month').addEventListener('change', () => { const a = state.accounts.find(x => x.id === state.snapAcc); if (a && !state.editingSnap){ const led = ledgerInv(a, S('month').value); if (led) S('inv').value = led; } snapHint(); });
 S('inv').addEventListener('input', snapHint);
+S('val').addEventListener('change', () => { if (S('open').checked && !$('#snapOpenRow').hidden && S('inv').value.trim() === '') S('inv').value = S('val').value; });
 $('#snapCancel').addEventListener('click', () => sdlg.close());
 $('#snapForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -3185,6 +3202,7 @@ $('#snapForm').addEventListener('submit', async e => {
   const old = state.editingSnap && state.snaps.find(x => x.id === state.editingSnap), me = usernameOf(state.user);
   const d = { accountId: a.id, month: m, investment: Math.round(inv * 100) / 100, createdAt: old?.createdAt || new Date().toISOString(), createdBy: old?.createdBy || me, updatedBy: me };
   if (vraw !== '') d.value = Math.round(val * 100) / 100;
+  if (prev === null && S('open').checked) d.opening = true;
   $('#snapSave').disabled = true;
   try {
     const b = writeBatch(fs);
@@ -3240,6 +3258,7 @@ $('#umForm').addEventListener('submit', async e => {
     const ex = state.snaps.find(x => x.id === snapId(a.id, m));
     const d = { accountId: a.id, month: m, investment: Math.round(inv * 100) / 100, createdAt: ex?.createdAt || now, createdBy: ex?.createdBy || me, updatedBy: me };
     if (vv !== '') d.value = Math.round(val * 100) / 100;
+    if (prev === null && (ex ? ex.opening : !invRows(a).length)) d.opening = true;  // an account's first month is its opening balance
     out.push([snapId(a.id, m), d]);
   }
   if (!out.length){ err.textContent = 'Nothing to save yet.'; err.hidden = false; return; }
@@ -3326,6 +3345,7 @@ $('#itForm').addEventListener('submit', async e => {
     if (isFinite(+a.expectedAnnualReturnPct)) rec.returnPct = +a.expectedAnnualReturnPct;
     if (+a.targetMonthlyInvestment > 0) rec.target = +a.targetMonthlyInvestment;
     if (old?.notes) rec.notes = old.notes;
+    if (old?.inFire === false) rec.inFire = false;
     writes.push(['accounts', id, rec]);
   }
   for (const s of ex.snapshots){

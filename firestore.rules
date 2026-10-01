@@ -127,7 +127,7 @@ service cloud.firestore {
     function validAccount() {
       let d = request.resource.data;
       return d.keys().hasOnly(['name','type','currency','owner','notes','createdAt','createdBy','updatedBy',
-                               'invType','valueMode','returnPct','target'])
+                               'invType','valueMode','returnPct','target','inFire'])
         && d.keys().hasAll(['name','type','currency','owner'])
         && str(d.name, 60) && d.name.size() > 0
         && d.type in ['bank','card','cash','investment']
@@ -137,7 +137,8 @@ service cloud.firestore {
         && (!('invType' in d) || d.invType in ['equity','ulip','pension','deposit','no_growth','other'])
         && (!('valueMode' in d) || d.valueMode in ['manual','auto'])
         && (!('returnPct' in d) || (d.returnPct is number && d.returnPct >= -50 && d.returnPct <= 100))
-        && (!('target' in d) || (d.target is number && d.target >= 0));
+        && (!('target' in d) || (d.target is number && d.target >= 0))
+        && (!('inFire' in d) || d.inFire is bool);
     }
 
     match /accounts/{id} {
@@ -164,12 +165,13 @@ service cloud.firestore {
     // (value left out on modelled months). Document id is <accountId>_<YYYY-MM>.
     function validSnapshot() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['accountId','month','investment','value','note','createdAt','createdBy','updatedBy'])
+      return d.keys().hasOnly(['accountId','month','investment','value','opening','note','createdAt','createdBy','updatedBy'])
         && d.keys().hasAll(['accountId','month','investment'])
         && str(d.accountId, 60)
         && d.month is string && d.month.matches('^[0-9]{4}-[0-9]{2}$')
         && d.investment is number && d.investment > -1000000000 && d.investment < 1000000000
         && (!('value' in d) || (d.value is number && d.value >= 0 && d.value < 10000000000))
+        && (!('opening' in d) || d.opening is bool)
         && (!('note' in d) || str(d.note, 500));
     }
 
