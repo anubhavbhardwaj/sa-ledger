@@ -255,6 +255,13 @@ table.mini .num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text
 table.mini th.num{font-family:var(--f-body)}
 .neg{color:var(--danger)}
 .mmeta{display:none;font-size:12px;color:var(--muted);margin-top:1px}
+/* send to India */
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);cursor:pointer;font:inherit;font-weight:500}
+.linkbtn:hover{text-decoration:underline}
+.chk{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink-2)}
+.sirow{display:grid;grid-template-columns:minmax(0,1fr) 130px 32px;gap:8px;align-items:center}
+.sirow input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+.sirow .combo{display:block}
 /* wealth */
 .ilist{display:grid}
 .ilist .r{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:4px 12px;padding:11px 4px;border-bottom:1px solid var(--line);cursor:pointer;align-items:center;text-align:left;background:none;border-left:0;border-right:0;border-top:0;color:var(--ink);font:inherit;width:100%}
@@ -298,6 +305,7 @@ table.snaps tr.row:hover td{background:var(--sunk)}
 @media (max-width:640px){
   .umrow{grid-template-columns:minmax(0,1fr) 92px 104px}
   #wSeg{width:100%}#wSeg button{flex:1;padding:6px 8px}
+  .sirow{grid-template-columns:minmax(0,1fr) 96px 28px}
   .kpis.w .val{font-size:18px;white-space:nowrap}
   table.snaps{font-size:13px}
   table.snaps th:nth-child(4),table.snaps td:nth-child(4){display:none}
@@ -610,7 +618,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 
         <div id="wv-cash" class="wview" hidden>
           <div class="pagehead" style="align-items:center"><p style="margin:0">Check in a real balance now and then; the app keeps an estimate in between.</p>
-            <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="newAcc" type="button">+ Account</button><button class="btn primary" id="checkinAll" type="button">Check in balances</button></div></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="newAcc" type="button">+ Account</button><button class="btn" type="button" data-sendindia>Send to India</button><button class="btn primary" id="checkinAll" type="button">Check in balances</button></div></div>
           <div class="banner" id="accSetup" hidden></div>
           <section class="kpis" id="accKpis" aria-label="Cash and cards"></section>
           <section class="panel" id="nwPanel" hidden><header><h2>Cash &amp; cards over time</h2><span class="hint">Month-end estimates from your check-ins</span></header><div id="nwChart"></div></section>
@@ -758,6 +766,31 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   </form>
 </dialog>
 
+<dialog id="sendDlg">
+  <form id="sendForm" novalidate style="display:grid;gap:14px;padding:20px">
+    <h3>Send to India</h3>
+    <p class="muted" style="margin:0;font-size:13px">Logs every hop as a transfer in one go, so nothing counts as spending. Only the conversion cost can be logged as an expense.</p>
+    <div class="fields">
+      <label class="f">Date<input id="si-date" type="date"></label>
+      <label class="f">Sent (€)<input id="si-sent" type="number" step="0.01" min="0" inputmode="decimal"></label>
+      <label class="f">From<input id="si-from" data-list="dl-account" autocomplete="off"></label>
+      <label class="f">Via<input id="si-via" data-list="dl-account" autocomplete="off"></label>
+      <label class="f">Arrives in<input id="si-to" data-list="dl-account" autocomplete="off"></label>
+      <label class="f">Received (₹)<input id="si-recv" type="number" step="0.01" min="0" inputmode="decimal"></label>
+    </div>
+    <p class="fxline" id="siRate" style="margin:0"></p>
+    <label class="chk" id="siFeeRow" hidden><input type="checkbox" id="si-fee" checked> <span id="siFeeText"></span></label>
+    <div style="display:grid;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><strong style="font-size:13.5px">Then on to (optional)</strong><span class="anote" id="siLeft"></span></div>
+      <div id="siSplits" style="display:grid;gap:8px"></div>
+      <div><button class="btn small" type="button" id="siAdd">+ RD or policy</button></div>
+    </div>
+    <p class="muted" id="siNote" style="margin:0;font-size:12.5px" hidden></p>
+    <p class="err" id="siErr" hidden></p>
+    <div class="dlg-actions"><div class="right"><button class="btn" id="siCancel" type="button">Cancel</button><button class="btn primary" id="siSave" type="submit">Save</button></div></div>
+  </form>
+</dialog>
+
 <dialog id="snapDlg">
   <form id="snapForm" novalidate style="display:grid;gap:14px;padding:20px">
     <h3 id="snapTitle">Month</h3>
@@ -812,6 +845,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <label class="f"><span id="lb-account">Account / card</span><input id="f-account" data-list="dl-account" autocomplete="off" required></label>
       <label class="f tr-only" hidden><span>To account</span><input id="f-to" data-list="dl-account" autocomplete="off"></label>
       <p class="f full tr-only muted" id="trHint" hidden style="margin:0;font-size:12.5px"></p>
+      <p class="f full tr-only" hidden style="margin:0;font-size:12.5px"><button type="button" class="linkbtn" data-sendindia>Sending money to India? Log the whole chain at once →</button></p>
       <button type="button" class="morebtn" id="moreBtn" aria-expanded="false" aria-controls="moreBox"><span>More details <span class="chev" aria-hidden="true">▾</span></span><span class="msum" id="moreSum"></span></button>
       <div class="more" id="moreBox" hidden>
         <div class="fields">
@@ -2991,6 +3025,98 @@ document.addEventListener('change', e => {
   saveFire({ [k]: k === 'fireYear' ? Math.round(v) : v });
 });
 
+
+// ---------- send to India: one form for Deutsche Bank → Wise → Axis NRE (→ RDs / policies) ----------
+const sidlg = $('#sendDlg'), SI = k => $('#si-' + k);
+let siRateVal = null, siSeq = 0;
+function siMemory(){ try { return JSON.parse(localStorage.getItem('sendChain') || 'null'); } catch { return null; } }
+function siGuess(re, cur){ const a = state.accounts.find(x => re.test(x.name) && (!cur || (x.currency || 'EUR') === cur)) || state.accounts.find(x => re.test(x.name)); return a ? a.name : ''; }
+function siRow(to = '', amt = ''){
+  const d = document.createElement('div'); d.className = 'sirow';
+  d.innerHTML = `<input data-list="dl-account" data-si="to" autocomplete="off" placeholder="e.g. ULIP Maxlife" value="${esc(to)}" aria-label="Account"><input type="number" step="0.01" min="0" inputmode="decimal" data-si="amt" placeholder="₹" value="${esc(amt)}" aria-label="Amount in rupees"><button class="unlink" type="button" data-sirm aria-label="Remove">×</button>`;
+  $('#siSplits').appendChild(d); attachCombo(d.querySelector('[data-si="to"]'));
+  return d;
+}
+const siSplits = () => $$('#siSplits .sirow').map(r => ({ to: r.querySelector('[data-si="to"]').value.trim(), raw: r.querySelector('[data-si="amt"]').value.trim() })).filter(x => x.to || x.raw);
+function siFee(){
+  const sent = parseFloat(SI('sent').value), recv = parseFloat(SI('recv').value);
+  return sent > 0 && recv > 0 && siRateVal ? Math.round((sent - recv * siRateVal) * 100) / 100 : null;
+}
+function siShow(){
+  const sent = parseFloat(SI('sent').value), recv = parseFloat(SI('recv').value), fee = siFee();
+  $('#siRate').innerHTML = !siRateVal ? (state.siRateNote || 'Getting the ECB rate…')
+    : `ECB: ₹1 = €${siRateVal.toFixed(6)}${recv > 0 ? ` · ₹${recv.toLocaleString('en-IN')} is worth ${eur.format(recv * siRateVal)}` : ''}${sent > 0 && recv > 0 ? ` · you got ₹${(recv / sent).toFixed(2)} per €` : ''}`;
+  const show = fee !== null && Math.abs(fee) >= 0.01;
+  $('#siFeeRow').hidden = !show || fee < 0;
+  $('#siFeeText').textContent = show && fee > 0 ? `Log the conversion cost of ${eur.format(fee)} (${(fee / sent * 100).toFixed(1)}%) as a “Bank fees” expense on ${SI('via').value.trim() || 'Wise'}` : '';
+  if (show && fee < 0) $('#siRate').innerHTML += ` · better than ECB by ${eur.format(-fee)}`;
+  const used = siSplits().reduce((s, x) => s + (parseFloat(x.raw) || 0), 0);
+  $('#siLeft').textContent = recv > 0 && used > 0 ? (used > recv ? `₹${(used - recv).toLocaleString('en-IN')} more than received` : `₹${(recv - used).toLocaleString('en-IN')} stays in ${SI('to').value.trim() || 'the account'}`) : '';
+  const names = [SI('from').value, SI('via').value, SI('to').value, ...siSplits().map(x => x.to)].map(v => v.trim()).filter(Boolean);
+  const missing = [...new Set(names.filter(n => !accOf(n)))];
+  const toAcc = accOf(SI('to').value.trim());
+  const notes = [];
+  if (missing.length) notes.push(`Not set up as accounts yet: ${missing.map(esc).join(', ')}. The transfers still save; add them in Wealth → Cash &amp; cards to track balances.`);
+  if (toAcc && (toAcc.currency || 'EUR') !== 'INR') notes.push(`${esc(toAcc.name)} is set to ${toAcc.currency}; set it to INR so its balance shows in rupees.`);
+  $('#siNote').innerHTML = notes.join('<br>'); $('#siNote').hidden = !notes.length;
+}
+async function siRefresh(){
+  const my = ++siSeq; siRateVal = null; state.siRateNote = 'Getting the ECB rate…'; siShow();
+  try { const r = await getRate('INR', SI('date').value); if (my !== siSeq) return; siRateVal = typeof r === 'number' ? r : r.rate; }
+  catch { if (my !== siSeq) return; state.siRateNote = 'Couldn’t fetch the ECB rate; the transfers will use your own rate (sent ÷ received).'; }
+  siShow();
+}
+function openSendIndia(){
+  const m = siMemory() || {};
+  SI('date').value = today(); SI('sent').value = ''; SI('recv').value = '';
+  SI('from').value = m.from || siGuess(/deutsche/i, 'EUR');
+  SI('via').value = m.via || siGuess(/wise/i);
+  SI('to').value = m.to || siGuess(/nre/i, 'INR') || siGuess(/axis/i, 'INR');
+  $('#siSplits').innerHTML = ''; (m.splits || []).forEach(x => siRow(x.to, x.amt));
+  SI('fee').checked = m.fee !== false;
+  $('#siErr').hidden = true;
+  if ($('#dlg').open) $('#dlg').close();
+  sidlg.showModal(); SI('sent').focus(); siRefresh();
+}
+SI('date').addEventListener('change', siRefresh);
+['sent','recv','from','via','to'].forEach(k => SI(k).addEventListener('input', siShow));
+$('#siSplits').addEventListener('input', siShow);
+$('#siSplits').addEventListener('click', e => { const b = e.target.closest('[data-sirm]'); if (b){ b.closest('.sirow').remove(); siShow(); } });
+$('#siAdd').addEventListener('click', () => siRow().querySelector('input').focus());
+$('#siCancel').addEventListener('click', () => sidlg.close());
+document.addEventListener('click', e => { if (e.target.closest('[data-sendindia]')) openSendIndia(); });
+$('#sendForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = $('#siErr'), fail = m => { err.textContent = m; err.hidden = false; }; err.hidden = true;
+  const date = SI('date').value, sent = Math.round(parseFloat(SI('sent').value) * 100) / 100, recv = Math.round(parseFloat(SI('recv').value) * 100) / 100;
+  const from = SI('from').value.trim(), via = SI('via').value.trim(), to = SI('to').value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail('Pick a date.');
+  if (!(sent > 0)) return fail('Enter the euros you sent.');
+  if (!(recv > 0)) return fail('Enter the rupees that arrived.');
+  if (!from || !via || !to) return fail('Fill in From, Via and Arrives in.');
+  if (new Set([from, via, to].map(x => x.toLowerCase())).size < 3) return fail('From, Via and Arrives in must be three different accounts.');
+  const splits = siSplits();
+  if (splits.some(x => !x.to || !(parseFloat(x.raw) > 0))) return fail('Each RD or policy row needs an account and a rupee amount.');
+  const used = splits.reduce((s, x) => s + parseFloat(x.raw), 0);
+  if (used > recv + 0.005) return fail('The onward amounts add up to more than what arrived.');
+  const fee = siFee(), logFee = fee !== null && fee >= 0.01 && SI('fee').checked;
+  // Euros per rupee for the rupee legs: the ECB rate when the cost is logged separately, otherwise your own rate.
+  const rate = logFee ? siRateVal : sent / recv, now = new Date().toISOString(), me = usernameOf(state.user), comment = 'Send to India';
+  const r2 = v => Math.round(v * 100) / 100;
+  const docs = [['transfers', { amount: sent, date, from, to: via, comment, createdAt: now, createdBy: me }]];
+  if (logFee) docs.push(['expenses', { amount: fee, date, store: via, category: 'Bank fees', account: via, spender: cap(me) === 'Sulekha' ? 'Sulekha' : 'Anubhav', comment: 'Conversion cost, send to India', createdAt: now, createdBy: me }]);
+  docs.push(['transfers', { amount: logFee ? r2(sent - fee) : sent, date, from: via, to, currency: 'INR', origAmount: recv, fxRate: rate, comment, createdAt: now, createdBy: me }]);
+  splits.forEach(x => { const inr = r2(parseFloat(x.raw)); docs.push(['transfers', { amount: Math.max(0.01, r2(inr * rate)), date, from: to, to: x.to, currency: 'INR', origAmount: inr, fxRate: rate, comment, createdAt: now, createdBy: me }]); });
+  $('#siSave').disabled = true;
+  try {
+    const b = writeBatch(fs); docs.forEach(([c, d]) => b.set(doc(collection(fs, c)), d)); await b.commit();
+    try { localStorage.setItem('sendChain', JSON.stringify({ from, via, to, fee: SI('fee').checked, splits: splits.map(x => ({ to: x.to, amt: x.raw })) })); } catch {}
+    sidlg.close();
+    toast(`Saved ${docs.length - (logFee ? 1 : 0)} transfers${logFee ? ' and the ' + eur.format(fee) + ' cost' : ''}`);
+  } catch (x){ fail(writeError(x)); }
+  finally { $('#siSave').disabled = false; }
+});
+
 // ---------- one month for one account ----------
 const sdlg = $('#snapDlg'), S = k => $('#s-' + k);
 function prevValue(a, m){ const r = invRows(a).filter(x => x.month < m); return r.length ? r[r.length-1].value : null; }
@@ -3278,7 +3404,7 @@ function attachCombo(input){
   box.addEventListener('click', e => { const o = e.target.closest('.copt'); if (o) pick(o.dataset.v); });
   input.addEventListener('blur', () => setTimeout(close, 120));
 }
-$$('#dlg input[data-list]').forEach(attachCombo);
+$$('#dlg input[data-list], #sendDlg input[data-list]').forEach(attachCombo);
 
 // ---------- + form: "More details" ----------
 function setMore(open){ $('#moreBox').hidden = !open; $('#moreBtn').setAttribute('aria-expanded', open); moreSummary(); }
