@@ -2336,12 +2336,19 @@ const toEur = (acc, v) => (acc.currency || 'EUR') === 'EUR' ? v : (state.fxLates
 const fmtAcc = (acc, v) => money(v, acc.currency || 'EUR');
 const checkinsOf = acc => state.checkins.filter(c => c.accountId === acc.id).sort((a,b) => a.date.localeCompare(b.date) || String(a.createdAt).localeCompare(String(b.createdAt)));
 // Money in and out of an account between two dates (after `from`, up to and including `to`).
-function flows(acc, from, to){
-  const n = acc.name.toLowerCase(), inR = d => d > from && d <= to;
-  const out = state.items.filter(i => inR(i.date) && String(i.account).toLowerCase() === n).reduce((a,i) => a + inAccCur(acc, i), 0);
-  const inc = state.income.filter(i => inR(i.date) && String(i.account).toLowerCase() === n).reduce((a,i) => a + inAccCur(acc, i), 0);
-  const tOut = state.transfers.filter(t => inR(t.date) && String(t.from).toLowerCase() === n).reduce((a,t) => a + inAccCur(acc, t), 0);
-  const tIn = state.transfers.filter(t => inR(t.date) && String(t.to).toLowerCase() === n).reduce((a,t) => a + inAccCur(acc, t), 0);
+// On the check-in days themselves, the order things were entered decides: an entry made after the
+// check-in at `from` counts on top of it, one made before the check-in at `to` is part of that balance.
+function flows(acc, from, to, after, before){
+  const n = acc.name.toLowerCase();
+  const inR = x => { const d = x.date, t = String(x.createdAt || '');
+    if (d < from || d > to) return false;
+    if (d === from && !(after && t > after)) return false;
+    if (d === to && before && t > before) return false;
+    return true; };
+  const out = state.items.filter(i => inR(i) && String(i.account).toLowerCase() === n).reduce((a,i) => a + inAccCur(acc, i), 0);
+  const inc = state.income.filter(i => inR(i) && String(i.account).toLowerCase() === n).reduce((a,i) => a + inAccCur(acc, i), 0);
+  const tOut = state.transfers.filter(t => inR(t) && String(t.from).toLowerCase() === n).reduce((a,t) => a + inAccCur(acc, t), 0);
+  const tIn = state.transfers.filter(t => inR(t) && String(t.to).toLowerCase() === n).reduce((a,t) => a + inAccCur(acc, t), 0);
   return { spent:out, income:inc, tOut, tIn, net: inc + tIn - out - tOut };
 }
 // Estimated balance on a date: last check-in on or before it, plus everything recorded since.
@@ -2355,21 +2362,21 @@ function estimate(acc, asOf = today()){
     const d = new Date(added + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 1);
     base = { balance: 0, date: d.toISOString().slice(0, 10), virtual: true, added };
   }
-  const f = flows(acc, base.date, asOf);
+  const f = flows(acc, base.date, asOf, base.createdAt);
   return { balance: base.balance + f.net, base, f };
 }
 function gapsOf(acc){
   const cks = checkinsOf(acc);
   return cks.map((c, i) => {
     if (!i) return { c, gap:null };
-    const prev = cks[i-1], expected = prev.balance + flows(acc, prev.date, c.date).net;
+    const prev = cks[i-1], expected = prev.balance + flows(acc, prev.date, c.date, prev.createdAt, c.createdAt).net;
     return { c, gap: c.balance - expected, expected };
   });
 }
 function investInfo(acc){
   const cks = checkinsOf(acc); if (!cks.length) return null;
   const first = cks[0], last = cks[cks.length - 1];
-  const contrib = flows(acc, first.date, last.date);
+  const contrib = flows(acc, first.date, last.date, first.createdAt, last.createdAt);
   const put = first.balance + contrib.tIn - contrib.tOut;
   const gain = last.balance - put;
   return { gain, pct: put > 0 ? gain / put * 100 : 0, since: first.date };
@@ -2481,10 +2488,10 @@ function renderAccDetail(a){
   const est = estimate(a), isCard = a.type === 'card', inv = a.type === 'investment' ? investInfo(a) : null;
   const n = a.name.toLowerCase(), since = (() => { const d = new Date(); d.setDate(d.getDate() - 60); return d.toISOString().slice(0,10); })();
   const moves = [
-    ...state.items.filter(i => String(i.account).toLowerCase() === n).map(i => ({ d:i.date, t:i.store, m:i.category, v:-inAccCur(a, i), id:i.id, k:'expense' })),
-    ...state.income.filter(i => String(i.account).toLowerCase() === n).map(i => ({ d:i.date, t:i.source, m:'Income', v:inAccCur(a, i), id:i.id, k:'income' })),
-    ...state.transfers.filter(t => String(t.from).toLowerCase() === n).map(t => ({ d:t.date, t:'To ' + t.to, m:transferType(t), v:-inAccCur(a, t), id:t.id, k:'transfer' })),
-    ...state.transfers.filter(t => String(t.to).toLowerCase() === n).map(t => ({ d:t.date, t:'From ' + t.from, m:transferType(t), v:inAccCur(a, t), id:t.id, k:'transfer' })),
+    ...state.items.filter(i => String(i.account).toLowerCase() === n).map(i => ({ d:i.date, t:i.store, m:i.category, v:-inAccCur(a, i), id:i.id, k:'expense', c:i.createdAt })),
+    ...state.income.filter(i => String(i.account).toLowerCase() === n).map(i => ({ d:i.date, t:i.source, m:'Income', v:inAccCur(a, i), id:i.id, k:'income', c:i.createdAt })),
+    ...state.transfers.filter(t => String(t.from).toLowerCase() === n).map(t => ({ d:t.date, t:'To ' + t.to, m:transferType(t), v:-inAccCur(a, t), id:t.id, k:'transfer', c:t.createdAt })),
+    ...state.transfers.filter(t => String(t.to).toLowerCase() === n).map(t => ({ d:t.date, t:'From ' + t.from, m:transferType(t), v:inAccCur(a, t), id:t.id, k:'transfer', c:t.createdAt })),
   ].filter(x => x.d >= since).sort((x,y) => y.d.localeCompare(x.d));
   const gaps = gapsOf(a).reverse();
   const shown = est ? (isCard ? -est.balance : est.balance) : null;
@@ -2511,7 +2518,7 @@ function renderAccDetail(a){
         ${gaps.some(g => g.gap !== null && Math.abs(g.gap) >= 1) && a.type !== 'investment' ? '<p class="anote" style="margin:0">A gap usually means a payment, fee or transfer that wasn’t logged.</p>' : ''}
       </section>
       <section class="panel span-7"><header><h2>Last 60 days</h2><span class="hint">Entries on this account</span></header>
-        <div class="recent">${moves.length ? moves.slice(0, 60).map(x => `<div class="r" data-edit="${esc(x.id)}" data-kind="${x.k}" tabindex="0" role="button"><span class="d">${shortDate(x.d)}</span><span><span class="store">${esc(x.t)}</span><br><span class="meta">${esc(x.m)}</span></span><span class="a ${x.v > 0 ? 'inc-amt' : ''}">${x.v > 0 ? '+' : '−'}${fmtAcc(a, Math.abs(x.v))}</span></div>`).join('') : '<div class="empty">Nothing recorded on this account in the last 60 days.</div>'}</div>
+        <div class="recent">${moves.length ? moves.slice(0, 60).map(x => `<div class="r" data-edit="${esc(x.id)}" data-kind="${x.k}" tabindex="0" role="button"><span class="d">${shortDate(x.d)}</span><span><span class="store">${esc(x.t)}</span><br><span class="meta">${esc(x.m)}${est && !est.base.virtual && x.d === est.base.date && !(String(x.c || '') > String(est.base.createdAt || '')) ? ' · <span title="Entered before the check-in on the same day, so it is already part of that balance">in the check-in balance</span>' : ''}</span></span><span class="a ${x.v > 0 ? 'inc-amt' : ''}">${x.v > 0 ? '+' : '−'}${fmtAcc(a, Math.abs(x.v))}</span></div>`).join('') : '<div class="empty">Nothing recorded on this account in the last 60 days.</div>'}</div>
       </section>
     </div>`;
 }
