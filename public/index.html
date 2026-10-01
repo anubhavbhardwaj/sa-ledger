@@ -135,6 +135,16 @@ a{color:var(--accent)}
 .unlink{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;border-radius:6px;width:28px;height:28px}
 .unlink:hover{background:var(--danger-soft);color:var(--danger)}
 .muted{color:var(--muted)}
+/* dropdown fields (combobox) */
+.combo{position:relative;display:block}
+label.f .combo > input{padding-right:30px!important;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.cbox{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);max-height:240px;overflow:auto;padding:4px;display:grid}
+.cbox[hidden]{display:none!important}
+.copt{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:14px;color:var(--ink)}
+.copt small{color:var(--muted);font-size:11.5px}
+.copt[aria-selected="true"],.copt:hover{background:var(--sunk)}
+.copt.cur{font-weight:600}
+.cnew{font-size:12px;color:var(--muted);padding:6px 10px}
 /* inbox */
 .inboxbtn{position:relative;gap:6px}
 .inboxbtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:var(--surface);font-size:11px;line-height:18px;text-align:center;font-weight:700}
@@ -576,12 +586,12 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <label class="f">Amount<span class="amtrow"><input class="amount-in" id="f-amount" type="number" step="0.01" min="0" inputmode="decimal" required><select id="f-cur" aria-label="Currency"></select></span></label>
       <label class="f">Date<input id="f-date" type="date" required></label>
       <div class="fxline" id="fxLine" hidden><span id="fxText"></span><label>Rate: 1 <span id="fxCur"></span> = €<input id="f-rate" type="number" step="any" min="0" inputmode="decimal" aria-label="Exchange rate in euros"></label></div>
-      <label class="f full"><span id="lb-store">Store</span><input id="f-store" list="dl-store" autocomplete="off" required></label>
-      <label class="f"><span>Category</span><input id="f-category" list="dl-category" autocomplete="off" required></label>
-      <label class="f exp-only">Sub category<input id="f-subcategory" list="dl-subcategory" autocomplete="off" placeholder="e.g. Flight, Taxi"></label>
-      <label class="f"><span id="lb-account">Account / card</span><input id="f-account" list="dl-account" autocomplete="off" required></label>
+      <label class="f full"><span id="lb-store">Store</span><input id="f-store" data-list="dl-store" autocomplete="off" required></label>
+      <label class="f"><span>Category</span><input id="f-category" data-list="dl-category" autocomplete="off" required></label>
+      <label class="f exp-only">Sub category<input id="f-subcategory" data-list="dl-subcategory" autocomplete="off" placeholder="e.g. Flight, Taxi"></label>
+      <label class="f"><span id="lb-account">Account / card</span><input id="f-account" data-list="dl-account" autocomplete="off" required></label>
       <label class="f"><span id="lb-spender">Spender</span><select id="f-spender"><option>Anubhav</option><option>Sulekha</option></select></label>
-      <label class="f exp-only">Country<input id="f-country" list="dl-country" autocomplete="off"></label>
+      <label class="f exp-only">Country<input id="f-country" data-list="dl-country" autocomplete="off"></label>
       <label class="f full exp-only">Trip<select id="f-trip"></select></label>
       <label class="f full">Comment<input id="f-comment" autocomplete="off"></label>
     </div>
@@ -1243,8 +1253,8 @@ function setKind(kind, locked){
   $('#lb-store').textContent = inc ? 'Source (e.g. PAYBACK salary)' : 'Store';
   $('#lb-account').textContent = inc ? 'Received in' : 'Account / card';
   $('#lb-spender').textContent = inc ? 'Earned by' : 'Spender';
-  F('store').setAttribute('list', inc ? 'dl-isource' : 'dl-store');
-  F('category').setAttribute('list', inc ? 'dl-icategory' : 'dl-category');
+  F('store').dataset.list = inc ? 'dl-isource' : 'dl-store';
+  F('category').dataset.list = inc ? 'dl-icategory' : 'dl-category';
   $$('#dlg .exp-only').forEach(el => el.hidden = inc);
 }
 function fillTripSelect(cur){
@@ -1892,6 +1902,47 @@ document.addEventListener('click', e => {
   const bc = e.target.closest('[data-budgetcat]');
   if (bc){ for (const x of DIMS) state.filters[x] = null; state.q = ''; state.filters.category = bc.dataset.budgetcat; state.filters.tripKind = 'Daily life'; state.txKind = 'expense'; location.hash = 'transactions'; }
 });
+
+// ---------- dropdown fields ----------
+// Replaces the browser's suggestion lists, which only offer options matching what is already typed.
+// Opening a field shows every option; typing narrows the list; any new value can still be typed.
+function attachCombo(input){
+  const wrap = document.createElement('span'); wrap.className = 'combo';
+  input.parentNode.insertBefore(wrap, input); wrap.appendChild(input);
+  const box = document.createElement('div'); box.className = 'cbox'; box.hidden = true; box.setAttribute('role', 'listbox');
+  wrap.appendChild(box);
+  input.setAttribute('role', 'combobox'); input.setAttribute('aria-autocomplete', 'list'); input.setAttribute('aria-expanded', 'false');
+  let typed = false, active = -1, opts = [];
+  const options = () => [...(document.getElementById(input.dataset.list)?.options || [])].map(o => o.value).filter(Boolean);
+  function draw(){
+    const q = typed ? input.value.trim().toLowerCase() : '';
+    const all = options();
+    opts = q ? [...all.filter(v => v.toLowerCase().startsWith(q)), ...all.filter(v => !v.toLowerCase().startsWith(q) && v.toLowerCase().includes(q))] : all;
+    if (!opts.length){ box.innerHTML = q ? `<div class="cnew">New: “${esc(input.value.trim())}”</div>` : ''; box.hidden = !q; return; }
+    active = Math.min(active, opts.length - 1);
+    box.innerHTML = opts.map((v, i) => `<button type="button" class="copt ${v === input.value ? 'cur' : ''}" role="option" data-v="${esc(v)}" aria-selected="${i === active}" tabindex="-1">${esc(v)}${v === input.value ? '<small>current</small>' : ''}</button>`).join('');
+    box.hidden = false;
+    box.querySelector('[aria-selected="true"]')?.scrollIntoView({ block:'nearest' });
+  }
+  function open(){ if (!box.hidden) return; typed = false; active = -1; draw(); input.setAttribute('aria-expanded', 'true');
+    const cur = box.querySelector('.cur'); if (cur) cur.scrollIntoView({ block:'nearest' }); }
+  function close(){ box.hidden = true; input.setAttribute('aria-expanded', 'false'); }
+  function pick(v){ input.value = v; close(); input.dispatchEvent(new Event('input', { bubbles:true })); input.dispatchEvent(new Event('change', { bubbles:true })); }
+  input.addEventListener('focus', open);
+  input.addEventListener('click', open);
+  input.addEventListener('input', e => { if (!e.isTrusted) return; typed = true; active = 0; draw(); });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); if (box.hidden){ open(); return; }
+      active = (active + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % Math.max(opts.length, 1); draw(); }
+    else if (e.key === 'Enter' && !box.hidden && active >= 0 && opts[active]){ e.preventDefault(); pick(opts[active]); }
+    else if (e.key === 'Escape' && !box.hidden){ e.preventDefault(); e.stopPropagation(); close(); }
+    else if (e.key === 'Tab') close();
+  });
+  box.addEventListener('mousedown', e => e.preventDefault()); // keep focus in the field
+  box.addEventListener('click', e => { const o = e.target.closest('.copt'); if (o) pick(o.dataset.v); });
+  input.addEventListener('blur', () => setTimeout(close, 120));
+}
+$$('#dlg input[data-list]').forEach(attachCombo);
 
 // ---------- captured payments inbox ----------
 const localDate = iso => { const d = new Date(iso); return isNaN(d) ? today() : d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
