@@ -1694,6 +1694,7 @@ function setCur(cur, rate){
 }
 
 function openAdd(kind, tripId){
+  state.editKind = null;
   if (typeof kind !== 'string') kind = (state.page === 'transactions' && state.txKind === 'income') ? 'income' : 'expense';
   state.editing = null; state.fromInbox = null;
   const mine = arr => arr.find(i => i.createdBy === usernameOf(state.user)) || arr[0] || {};
@@ -1732,20 +1733,28 @@ function openEdit(id, kind = 'expense'){
   { const me = cap(usernameOf(state.user));
     setMore(!!(it.tripId || it.subcategory || it.comment
       || (kind === 'expense' && it.spender && it.spender !== me) || (kind === 'income' && it.earner && it.earner !== me))); }
-  setKind(kind, true);
+  state.editKind = kind;
+  setKind(kind, false);
   $('#delBtn').hidden = false; resetDel(); $('#formErr').hidden = true;
   dlg.showModal();
 }
 $('#kindSeg').addEventListener('click', e => {
-  const b = e.target.closest('[data-kind]'); if (!b || b.disabled || state.editing) return;
+  const b = e.target.closest('[data-kind]'); if (!b || b.disabled) return;
   const k = b.dataset.kind; if (k === state.kind) return;
   // Swap in sensible defaults when switching while adding.
-  if (state.lastAccount && (!F('account').value || F('account').value === state.lastAccount[state.kind])) F('account').value = state.lastAccount[k];
+  if (!state.editing && state.lastAccount && (!F('account').value || F('account').value === state.lastAccount[state.kind])) F('account').value = state.lastAccount[k];
   if (k === 'income' && !F('category').value) F('category').value = 'Salary';
   else if (k !== 'income' && F('category').value === 'Salary') F('category').value = '';
   if (k === 'transfer' && !F('account').value){ const lt = state.transfers[0]; if (lt) F('account').value = lt.from; }
   setKind(k, false);
 });
+// Editing can change an entry's type (say an expense that was really a transfer): it then moves collection.
+const KIND_COL = { expense:'expenses', income:'income', transfer:'transfers' };
+const editOld = () => (state.editKind === 'income' ? state.income : state.editKind === 'transfer' ? state.transfers : state.items).find(i => i.id === state.editing) || {};
+async function putEdit(col, data){
+  if (KIND_COL[state.editKind] === col) return setDoc(doc(fs, col, state.editing), data);
+  const b = writeBatch(fs); b.set(doc(collection(fs, col)), data); b.delete(doc(fs, KIND_COL[state.editKind], state.editing)); return b.commit();
+}
 function resetDel(){ const b = $('#delBtn'); b.classList.remove('armed'); b.textContent = 'Delete'; }
 $('#addBtn').addEventListener('click', () => openAdd());
 $('#fab').addEventListener('click', () => openAdd());
@@ -1772,9 +1781,9 @@ $('#form').addEventListener('submit', async e => {
     if (!rec.comment) delete rec.comment;
     try {
       if (state.editing){
-        const old = state.transfers.find(i => i.id === state.editing) || {};
-        await setDoc(doc(fs, 'transfers', state.editing), { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
-        toast('Saved changes');
+        const old = editOld();
+        await putEdit('transfers', { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
+        toast(state.editKind !== state.kind ? 'Changed to ' + state.kind : 'Saved changes');
       } else {
         await addDoc(transfersCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
         if (state.period !== 'all') state.period = date.slice(0,7);
@@ -1789,9 +1798,9 @@ $('#form').addEventListener('submit', async e => {
     const rec = { amount, date, source:need.store, category:need.category, account:need.account, earner:F('spender').value, comment:F('comment').value.trim(), ...fx };
     try {
       if (state.editing){
-        const old = state.income.find(i => i.id === state.editing) || {};
-        await setDoc(doc(fs, 'income', state.editing), { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
-        toast('Saved changes');
+        const old = editOld();
+        await putEdit('income', { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
+        toast(state.editKind !== state.kind ? 'Changed to ' + state.kind : 'Saved changes');
       } else {
         await addDoc(incomeCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
         if (state.period !== 'all') state.period = date.slice(0,7);
@@ -1806,9 +1815,9 @@ $('#form').addEventListener('submit', async e => {
   if (F('trip').value) rec.tripId = F('trip').value;
   try {
     if (state.editing){
-      const old = state.items.find(i => i.id === state.editing) || {};
-      await setDoc(doc(fs, 'expenses', state.editing), { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
-      toast('Saved changes');
+      const old = editOld();
+      await putEdit('expenses', { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
+      toast(state.editKind !== state.kind ? 'Changed to ' + state.kind : 'Saved changes');
     } else {
       await addDoc(expensesCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
       if (state.period !== 'all') state.period = date.slice(0,7);
@@ -1823,7 +1832,7 @@ $('#delBtn').addEventListener('click', async () => {
   const b = $('#delBtn');
   if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'Confirm delete'; return; }
   b.disabled = true;
-  try { await deleteDoc(doc(fs, state.kind === 'income' ? 'income' : state.kind === 'transfer' ? 'transfers' : 'expenses', state.editing)); dlg.close(); toast('Deleted'); }
+  try { await deleteDoc(doc(fs, KIND_COL[state.editKind] || 'expenses', state.editing)); dlg.close(); toast('Deleted'); }
   catch (x){ $('#formErr').textContent = writeError(x); $('#formErr').hidden = false; }
   finally { b.disabled = false; }
 });
@@ -2338,8 +2347,14 @@ function flows(acc, from, to){
 // Estimated balance on a date: last check-in on or before it, plus everything recorded since.
 function estimate(acc, asOf = today()){
   const cks = checkinsOf(acc).filter(c => c.date <= asOf);
-  const base = cks[cks.length - 1];
-  if (!base) return null;
+  let base = cks[cks.length - 1];
+  if (!base){
+    // No check-in yet: start from zero on the day the account was added, so moves into a new account show up.
+    const added = String(acc.createdAt || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(added) || added > asOf) return null;
+    const d = new Date(added + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 1);
+    base = { balance: 0, date: d.toISOString().slice(0, 10), virtual: true, added };
+  }
   const f = flows(acc, base.date, asOf);
   return { balance: base.balance + f.net, base, f };
 }
@@ -2394,7 +2409,7 @@ function accCard(a){
   const est = estimate(a);
   const isCard = a.type === 'card', inv = a.type === 'investment' ? investInfo(a) : null;
   const shown = est ? (isCard ? -est.balance : est.balance) : null;
-  const line = !est ? 'No check-in yet'
+  const line = !est ? 'No check-in yet' : est.base.virtual ? `No check-in yet · counting entries since ${shortDate(est.base.added, true)}`
     : `Checked in ${shortDate(est.base.date, true)}: ${fmtAcc(a, isCard ? -est.base.balance : est.base.balance)}${est.base.date < today() && (est.f.spent || est.f.income || est.f.tIn || est.f.tOut) ? ` · since then ${est.f.net >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(est.f.net))}` : ''}`;
   return `<button type="button" class="tcard" data-acc="${esc(a.id)}">
     <span class="top"><span class="ttype"><i style="background:${ACC_DOT[a.type]}"></i>${ACC_TYPE[a.type]}</span><span class="tmeta">${esc(a.owner)}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''}</span></span>
@@ -2484,8 +2499,8 @@ function renderAccDetail(a){
       </div>
     </div>
     <section class="kpis">
-      <div class="kpi"><span class="lbl">${isCard ? 'Owed now' : a.type === 'investment' ? 'Value now' : 'Balance now'} (estimate)</span><span class="val">${shown === null ? '—' : fmtAcc(a, shown)}</span><span class="sub">${est ? `Last check-in ${shortDate(est.base.date, true)}` : 'Check in to start tracking'}${est && a.currency && a.currency !== 'EUR' && state.fxLatest[a.currency] ? ` · ≈ ${eur.format(toEur(a, shown))} at today’s rate (1 ${a.currency} = €${state.fxLatest[a.currency].toFixed(5)})` : ''}</span></div>
-      ${est ? `<div class="kpi"><span class="lbl">Since last check-in</span><span class="val" style="font-size:18px">${est.f.net >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(est.f.net))}</span><span class="sub">${[est.f.spent ? 'spent ' + fmtAcc(a, est.f.spent) : '', est.f.income ? 'income ' + fmtAcc(a, est.f.income) : '', est.f.tIn ? 'in ' + fmtAcc(a, est.f.tIn) : '', est.f.tOut ? 'out ' + fmtAcc(a, est.f.tOut) : ''].filter(Boolean).join(' · ') || 'Nothing recorded'}</span></div>` : ''}
+      <div class="kpi"><span class="lbl">${isCard ? 'Owed now' : a.type === 'investment' ? 'Value now' : 'Balance now'} (estimate)</span><span class="val">${shown === null ? '—' : fmtAcc(a, shown)}</span><span class="sub">${est ? (est.base.virtual ? `No check-in yet, entries since ${shortDate(est.base.added, true)}` : `Last check-in ${shortDate(est.base.date, true)}`) : 'Check in to start tracking'}${est && a.currency && a.currency !== 'EUR' && state.fxLatest[a.currency] ? ` · ≈ ${eur.format(toEur(a, shown))} at today’s rate (1 ${a.currency} = €${state.fxLatest[a.currency].toFixed(5)})` : ''}</span></div>
+      ${est ? `<div class="kpi"><span class="lbl">${est.base.virtual ? 'Since added' : 'Since last check-in'}</span><span class="val" style="font-size:18px">${est.f.net >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(est.f.net))}</span><span class="sub">${[est.f.spent ? 'spent ' + fmtAcc(a, est.f.spent) : '', est.f.income ? 'income ' + fmtAcc(a, est.f.income) : '', est.f.tIn ? 'in ' + fmtAcc(a, est.f.tIn) : '', est.f.tOut ? 'out ' + fmtAcc(a, est.f.tOut) : ''].filter(Boolean).join(' · ') || 'Nothing recorded'}</span></div>` : ''}
       ${inv ? `<div class="kpi"><span class="lbl">Gain since tracking</span><span class="val ${inv.gain<0?'neg':''}">${inv.gain >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(inv.gain))}</span><span class="sub">${inv.pct >= 0 ? '+' : ''}${inv.pct.toFixed(1)}% since ${shortDate(inv.since, true)}</span></div>` : ''}
     </section>
     <div class="grid">
@@ -2608,7 +2623,7 @@ $('#ckForm').addEventListener('submit', async e => {
   });
   if (!rows.length){ err.textContent = 'Enter at least one balance.'; err.hidden = false; return; }
   if (rows.some(r => !r.valid)){ err.textContent = 'One of the amounts isn’t a number.'; err.hidden = false; return; }
-  const notes = rows.map(r => { const prev = estimate(r.a, date); return prev ? { a:r.a, gap: r.balance - prev.balance } : null; }).filter(x => x && Math.abs(x.gap) >= 1 && x.a.type !== 'investment');
+  const notes = rows.map(r => { const prev = estimate(r.a, date); return prev && !prev.base.virtual ? { a:r.a, gap: r.balance - prev.balance } : null; }).filter(x => x && Math.abs(x.gap) >= 1 && x.a.type !== 'investment');
   $('#ckSave').disabled = true;
   try {
     const b = writeBatch(fs), now = new Date().toISOString(), me = usernameOf(state.user);
