@@ -155,6 +155,7 @@ a{color:var(--accent)}
 .morebtn{all:unset;box-sizing:border-box;grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border:1px dashed var(--line);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2)}
 .morebtn:hover,.morebtn:focus-visible{border-color:var(--muted)}
 .morebtn .msum{font-weight:400;color:var(--muted);font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.morebtn > span:first-child{white-space:nowrap}
 .morebtn .chev{transition:transform .15s}
 .morebtn[aria-expanded="true"] .chev{transform:rotate(180deg)}
 .more{grid-column:1/-1}
@@ -171,7 +172,10 @@ a{color:var(--accent)}
 .ckrow:last-child{border-bottom:0}
 .ckrow .nm{font-weight:500}
 .ckrow .hint{font-size:11.5px;color:var(--muted)}
-.ckrow input{width:100%;border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:7px 9px;font-family:var(--f-mono);text-align:right}
+.ckin{display:flex;align-items:center;border:1px solid var(--line);background:var(--ground);border-radius:8px;padding-left:9px}
+.ckin .sym{color:var(--muted);font-family:var(--f-mono);font-size:13px}
+.ckrow .ckin input{width:100%;min-width:0;border:0;background:transparent;padding:7px 9px;font-family:var(--f-mono);text-align:right}
+.ckin:focus-within{outline:2px solid var(--accent);outline-offset:1px}
 .hist{display:grid}
 .hist .h{display:grid;grid-template-columns:90px minmax(0,1fr) auto;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line);align-items:center}
 .hist .h:last-child{border-bottom:0}
@@ -684,7 +688,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <h3 id="dlgTitle">Add expense</h3>
     <div class="seg" role="radiogroup" aria-label="Entry type" id="kindSeg"><button type="button" role="radio" data-kind="expense" aria-checked="true">Expense</button><button type="button" role="radio" data-kind="income" aria-checked="false">Income</button><button type="button" role="radio" data-kind="transfer" aria-checked="false">Transfer</button></div>
     <div class="fields">
-      <label class="f"><span id="lb-amount">Amount (€)</span><input class="amount-in" id="f-amount" type="number" step="0.01" min="0" inputmode="decimal" required></label>
+      <label class="f"><span id="lb-amount">Amount</span><span class="amtrow"><input class="amount-in" id="f-amount" type="number" step="0.01" min="0" inputmode="decimal" required><select id="f-cur" aria-label="Currency"></select></span></label>
       <label class="f">Date<input id="f-date" type="date" required></label>
       <div class="fxline" id="fxLine" hidden><span id="fxText"></span><label>Rate: 1 <span id="fxCur"></span> = €<input id="f-rate" type="number" step="any" min="0" inputmode="decimal" aria-label="Exchange rate in euros"></label></div>
       <label class="f full not-tr"><span id="lb-store">Store</span><input id="f-store" data-list="dl-store" autocomplete="off" required></label>
@@ -695,7 +699,6 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <button type="button" class="morebtn" id="moreBtn" aria-expanded="false" aria-controls="moreBox"><span>More details <span class="chev" aria-hidden="true">▾</span></span><span class="msum" id="moreSum"></span></button>
       <div class="more" id="moreBox" hidden>
         <div class="fields">
-          <label class="f">Currency<select id="f-cur"></select></label>
           <label class="f not-tr"><span id="lb-spender">Spender</span><select id="f-spender"><option>Anubhav</option><option>Sulekha</option></select></label>
           <label class="f exp-only">Sub category<input id="f-subcategory" data-list="dl-subcategory" autocomplete="off" placeholder="e.g. Flight, Taxi"></label>
           <label class="f exp-only">Country<input id="f-country" data-list="dl-country" autocomplete="off"></label>
@@ -760,7 +763,8 @@ const TRIP_DOT = { visit:'var(--s1)', holiday:'var(--s2)', other:'var(--s3)', of
 const EXP_KEYS = ['amount','date','store','category','subcategory','account','spender','country','comment','createdAt','createdBy','updatedBy','tripId','currency','origAmount','fxRate'];
 const CURRENCIES = ['EUR','INR','CHF','USD','GBP','CZK','PLN','HUF','DKK','SEK','NOK','TRY','JPY','CAD','AUD','SGD','THB'];
 const FIXED_GUESS = /^(rent|insurance|phone\/internet|subscriptions|fitness)$/i;
-const money = (v, c = 'EUR') => { try { return new Intl.NumberFormat('en-IE', {style:'currency', currency:c}).format(v); } catch { return c + ' ' + (+v).toFixed(2); } };
+const money = (v, c = 'EUR') => { try { return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en-IE', {style:'currency', currency:c}).format(v); } catch { return c + ' ' + (+v).toFixed(2); } };
+const curSym = c => { try { return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en-IE', {style:'currency', currency:c}).formatToParts(0).find(p => p.type === 'currency').value; } catch { return c; } };
 const origHtml = r => r.currency && r.currency !== 'EUR' && r.origAmount ? `<span class="orig">${money(r.origAmount, r.currency)}</span>` : '';
 const settingsCol = collection(fs, "settings");
 const INCOME_CATS = ['Salary','Bonus','Refund','Interest','Gift','Other'];
@@ -1475,13 +1479,13 @@ async function getRate(cur, date){
   if (d !== 'latest'){ fxCache[key] = rate; try { localStorage.setItem('fxRates', JSON.stringify(fxCache)); } catch {} }
   return { rate, day: j.date };
 }
-F('cur').innerHTML = CURRENCIES.map(c => `<option>${c}</option>`).join('');
+F('cur').innerHTML = CURRENCIES.map(c => `<option value="${c}">${c === 'EUR' || c === 'INR' ? curSym(c) + ' ' : ''}${c}</option>`).join('');
 $('#t-currency').innerHTML = CURRENCIES.map(c => `<option>${c}</option>`).join('');
 let fxSeq = 0;
 function fxShow(){
   const cur = F('cur').value, rate = parseFloat(F('rate').value), amt = parseFloat(F('amount').value);
   $('#fxLine').hidden = cur === 'EUR';
-  $('#lb-amount').textContent = 'Amount (' + (cur === 'EUR' ? '€' : cur) + ')';
+  $('#lb-amount').textContent = 'Amount (' + curSym(cur) + ')';
   $('#fxCur').textContent = cur;
   if (cur === 'EUR') return;
   $('#fxText').innerHTML = rate > 0 && amt > 0 ? `= <strong>${eur.format(Math.round(amt * rate * 100) / 100)}</strong>${state.fxNote ? ' · ' + state.fxNote : ''}`
@@ -1507,7 +1511,16 @@ F('cur').addEventListener('change', () => { state.fxAuto = true; fxRefresh(); })
 F('date').addEventListener('change', () => { if (F('cur').value !== 'EUR' && state.fxAuto !== false) { state.fxAuto = true; fxRefresh(); } });
 F('rate').addEventListener('input', () => { state.fxAuto = false; state.fxNote = 'Your rate'; fxShow(); });
 F('amount').addEventListener('input', fxShow);
-F('account').addEventListener('change', trHint); F('to').addEventListener('change', trHint);
+F('account').addEventListener('change', trHint);
+function curFromAccount(){
+  if (state.editing) return;
+  const a = state.accByName[F('account').value.trim().toLowerCase()];
+  const want = a && a.currency ? a.currency : null;
+  if (want && want !== F('cur').value){ setCur(want); }
+  else if (!want && F('cur').value !== 'EUR' && state.curAuto){ setCur('EUR'); }
+  state.curAuto = !!want && want !== 'EUR';
+}
+F('account').addEventListener('change', curFromAccount); F('to').addEventListener('change', trHint);
 F('account').addEventListener('input', trHint); F('to').addEventListener('input', trHint);
 F('trip').addEventListener('change', () => {
   const t = state.tripMap[F('trip').value];
@@ -1539,6 +1552,8 @@ function openAdd(kind, tripId){
   const tr = tripId && state.tripMap[tripId];
   setCur(tr && tr.currency ? tr.currency : 'EUR');
   setMore(!!tripId);
+  state.curAuto = false;
+  if (!(tr && tr.currency)) curFromAccount();
   setKind(kind, false);
   $('#delBtn').hidden = true; resetDel(); $('#formErr').hidden = true;
   dlg.showModal(); F('amount').focus();
@@ -1555,7 +1570,7 @@ function openEdit(id, kind = 'expense'){
   if (it.currency && it.currency !== 'EUR' && it.origAmount){ F('amount').value = it.origAmount; setCur(it.currency, it.fxRate); }
   else setCur('EUR');
   { const me = cap(usernameOf(state.user));
-    setMore(!!((it.currency && it.currency !== 'EUR') || it.tripId || it.subcategory || it.comment
+    setMore(!!(it.tripId || it.subcategory || it.comment
       || (kind === 'expense' && it.spender && it.spender !== me) || (kind === 'income' && it.earner && it.earner !== me))); }
   setKind(kind, true);
   $('#delBtn').hidden = false; resetDel(); $('#formErr').hidden = true;
@@ -2225,6 +2240,7 @@ function accCard(a){
     <span class="tname">${esc(a.name)}</span>
     <span class="tmeta">${isCard ? 'Owed now (estimate)' : a.type === 'investment' ? 'Value (estimate)' : 'Balance now (estimate)'}</span>
     <span class="abal ${shown !== null && !isCard && shown < 0 ? 'neg' : ''}">${shown === null ? '—' : fmtAcc(a, shown)}</span>
+    ${shown !== null && a.currency && a.currency !== 'EUR' ? `<span class="anote">${state.fxLatest[a.currency] ? '≈ ' + eur.format(toEur(a, shown)) + ' at today’s rate' : 'Euro value: waiting for today’s rate'}</span>` : ''}
     <span class="anote">${line}</span>
     ${inv ? `<span class="anote">Gain since ${shortDate(inv.since, true)}: <strong style="color:var(${inv.gain >= 0 ? '--good' : '--danger'})">${inv.gain >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(inv.gain))} (${inv.pct >= 0 ? '+' : ''}${inv.pct.toFixed(1)}%)</strong></span>` : ''}
   </button>`;
@@ -2279,7 +2295,7 @@ function renderAccounts(){
   const nw = sumT(['bank','cash','investment','card']);
   $('#accKpis').hidden = !state.accounts.length;
   $('#accKpis').innerHTML = `
-    <div class="kpi"><span class="lbl">Net worth</span><span class="val ${nw<0?'neg':''}">${nw<0?'−':''}${eur.format(Math.abs(nw))}</span><span class="sub">${missing.length ? missing.length + ' account' + (missing.length===1?'':'s') + ' not checked in yet' : 'Estimated from your check-ins'}</span></div>
+    <div class="kpi"><span class="lbl">Net worth</span><span class="val ${nw<0?'neg':''}">${nw<0?'−':''}${eur.format(Math.abs(nw))}</span><span class="sub">${missing.length ? missing.length + ' account' + (missing.length===1?'':'s') + ' not checked in yet' : 'Estimated from your check-ins'}${(() => { const need = [...new Set(state.accounts.map(a => a.currency).filter(c => c && c !== 'EUR'))]; const miss = need.filter(c => !state.fxLatest[c]); return need.length ? (miss.length ? ' · waiting for ' + miss.join(', ') + ' rate' : ' · ' + need.join(', ') + ' at today’s rate') : ''; })()}</span></div>
     <div class="kpi"><span class="lbl">Bank & cash</span><span class="val">${eur.format(sumT(['bank','cash']))}</span><span class="sub">${state.accounts.filter(a => a.type==='bank'||a.type==='cash').length} accounts</span></div>
     <div class="kpi"><span class="lbl">Investments</span><span class="val">${eur.format(sumT(['investment']))}</span><span class="sub">${invs.length ? `Gain ${gain >= 0 ? '+' : '−'}${eur0.format(Math.abs(gain))} since tracking` : 'Add an investment account'}</span></div>
     <div class="kpi"><span class="lbl">Cards owed</span><span class="val">${eur.format(Math.max(0, -sumT(['card'])))}</span><span class="sub">${state.accounts.filter(a => a.type==='card').length} card${state.accounts.filter(a => a.type==='card').length===1?'':'s'}</span></div>`;
@@ -2311,7 +2327,7 @@ function renderAccDetail(a){
       </div>
     </div>
     <section class="kpis">
-      <div class="kpi"><span class="lbl">${isCard ? 'Owed now' : a.type === 'investment' ? 'Value now' : 'Balance now'} (estimate)</span><span class="val">${shown === null ? '—' : fmtAcc(a, shown)}</span><span class="sub">${est ? `Last check-in ${shortDate(est.base.date, true)}` : 'Check in to start tracking'}</span></div>
+      <div class="kpi"><span class="lbl">${isCard ? 'Owed now' : a.type === 'investment' ? 'Value now' : 'Balance now'} (estimate)</span><span class="val">${shown === null ? '—' : fmtAcc(a, shown)}</span><span class="sub">${est ? `Last check-in ${shortDate(est.base.date, true)}` : 'Check in to start tracking'}${est && a.currency && a.currency !== 'EUR' && state.fxLatest[a.currency] ? ` · ≈ ${eur.format(toEur(a, shown))} at today’s rate (1 ${a.currency} = €${state.fxLatest[a.currency].toFixed(5)})` : ''}</span></div>
       ${est ? `<div class="kpi"><span class="lbl">Since last check-in</span><span class="val" style="font-size:18px">${est.f.net >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(est.f.net))}</span><span class="sub">${[est.f.spent ? 'spent ' + fmtAcc(a, est.f.spent) : '', est.f.income ? 'income ' + fmtAcc(a, est.f.income) : '', est.f.tIn ? 'in ' + fmtAcc(a, est.f.tIn) : '', est.f.tOut ? 'out ' + fmtAcc(a, est.f.tOut) : ''].filter(Boolean).join(' · ') || 'Nothing recorded'}</span></div>` : ''}
       ${inv ? `<div class="kpi"><span class="lbl">Gain since tracking</span><span class="val ${inv.gain<0?'neg':''}">${inv.gain >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(inv.gain))}</span><span class="sub">${inv.pct >= 0 ? '+' : ''}${inv.pct.toFixed(1)}% since ${shortDate(inv.since, true)}</span></div>` : ''}
     </section>
@@ -2406,7 +2422,7 @@ function openCheckin(onlyId){
   $('#ck-date').value = today(); $('#ckErr').hidden = true;
   $('#ckList').innerHTML = list.map(a => { const e = estimate(a), isCard = a.type === 'card';
     return `<div class="ckrow"><span><span class="nm">${esc(a.name)}</span><br><span class="hint">${isCard ? 'Amount owed' : a.type === 'investment' ? 'Current value' : 'Balance'} in ${a.currency || 'EUR'}${e ? ' · estimate ' + fmtAcc(a, isCard ? -e.balance : e.balance) : ''}</span></span>
-      <input type="number" step="0.01" inputmode="decimal" data-ckacc="${esc(a.id)}" placeholder="${e ? (isCard ? -e.balance : e.balance).toFixed(2) : ''}" aria-label="${esc(a.name)}"></div>`; }).join('');
+      <span class="ckin"><span class="sym">${esc(curSym(a.currency || 'EUR'))}</span><input type="number" step="0.01" inputmode="decimal" data-ckacc="${esc(a.id)}" placeholder="${e ? (isCard ? -e.balance : e.balance).toFixed(2) : ''}" aria-label="${esc(a.name)} in ${a.currency || 'EUR'}"></span></div>`; }).join('');
   ckdlg.showModal();
   $('#ckList input')?.focus();
 }
@@ -2499,13 +2515,12 @@ $$('#dlg input[data-list]').forEach(attachCombo);
 function setMore(open){ $('#moreBox').hidden = !open; $('#moreBtn').setAttribute('aria-expanded', open); moreSummary(); }
 function moreSummary(){
   const parts = [], k = state.kind, me = cap(usernameOf(state.user));
-  if (F('cur').value !== 'EUR') parts.push(F('cur').value);
   if (k === 'expense' && F('trip').value && state.tripMap[F('trip').value]) parts.push(state.tripMap[F('trip').value].name);
   if (k === 'expense' && F('subcategory').value.trim()) parts.push(F('subcategory').value.trim());
   if (k !== 'transfer' && F('spender').value !== me && ['Anubhav','Sulekha'].includes(me)) parts.push((k === 'income' ? 'earned by ' : 'paid by ') + F('spender').value);
   if (k === 'expense' && F('country').value.trim() && F('country').value.trim() !== 'Germany') parts.push(F('country').value.trim());
   if (F('comment').value.trim()) parts.push('“' + F('comment').value.trim().slice(0, 24) + (F('comment').value.trim().length > 24 ? '…' : '') + '”');
-  $('#moreSum').textContent = $('#moreBox').hidden ? (parts.join(' · ') || (k === 'transfer' ? 'currency, comment' : k === 'income' ? 'currency, earned by, comment' : 'currency, trip, who paid, comment…')) : '';
+  $('#moreSum').textContent = $('#moreBox').hidden ? (parts.join(' · ') || (k === 'transfer' ? 'comment' : k === 'income' ? 'earned by, comment' : 'trip, who paid, sub category, comment…')) : '';
   return parts.length;
 }
 $('#moreBtn').addEventListener('click', () => setMore($('#moreBox').hidden));
@@ -2557,7 +2572,7 @@ function addFromInbox(id){
   if (it.account && (!h || !h.account)) F('account').value = it.account;
   if (kind === 'income' && !F('category').value) F('category').value = 'Salary';
   setCur(it.currency || 'EUR');
-  setMore(!!(it.currency && it.currency !== 'EUR'));
+  setMore(false);
   (F('category').value ? $('#saveBtn') : F('category')).focus();
 }
 async function doneInbox(){
