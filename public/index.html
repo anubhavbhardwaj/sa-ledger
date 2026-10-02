@@ -1028,7 +1028,8 @@ onAuthStateChanged(auth, user => {
     state.backup = bk ? bk.data() : null;
     // Merge per month and per currency, so a rate fetched here never drops one stored for another currency.
     const stored = fx ? fx.data().months || {} : {}, merged = {};
-    for (const src of [stored, state.fxMonthsLocal]) for (const [m, r] of Object.entries(src || {})) merged[m] = { ...(merged[m] || {}), ...r };
+    // Shared rates win; ones fetched on this device only fill gaps until they're saved.
+    for (const src of [state.fxMonthsLocal, stored]) for (const [m, r] of Object.entries(src || {})) merged[m] = { ...(merged[m] || {}), ...r };
     state.fxMonths = merged;
     state.fire = fire ? fire.data() : {};
     pfCache = null; render();
@@ -2765,25 +2766,29 @@ function portfolio(){
   withData.forEach(x => { x.pendM = pendingByMonth(x.a, x.rows[x.rows.length-1].month); });
   const endM = [last, ...withData.flatMap(x => Object.keys(x.pendM))].sort().pop();
   const months = monthsBetween(first, endM);
+  // Tracking starts at each account's first monthly VALUE. Whatever it had gained before that (value minus what
+  // was paid in earlier) happened over unknown years, so it is kept out of the gain and the yearly return.
   for (const x of withData){
     const byM = Object.fromEntries(x.rows.map(r => [r.month, r])), lastM = x.rows[x.rows.length-1].month;
+    const r0 = x.rows[0];
+    x.m0 = r0.month; x.startVal = r0.value; x.earlier = r0.value - r0.inv; x.earlierEur = x.earlier * openRate(x.cur, r0.month);
     let v = null, cumP = 0; x.vals = []; x.invs = [];
     x.fresh = []; x.rec = [];
     for (const m of months){
       const r = byM[m]; if (r) v = r.value;
       const extra = m > lastM ? (x.pendM[m] || 0) : 0; cumP += extra;
-      x.vals.push(v === null ? null : v + cumP); x.invs.push((r ? r.inv : 0) + extra); x.fresh.push((r && !r.opening ? r.inv : 0) + extra); x.rec.push(!!r);
+      x.vals.push(v === null ? null : v + cumP); x.invs.push((r ? (r === r0 ? r0.value : r.inv) : 0) + extra); x.fresh.push((r && !r.opening ? r.inv : 0) + extra); x.rec.push(!!r);
     }
     x.last = x.rows[x.rows.length-1];
-    x.invested = x.rows.reduce((s,r) => s + r.inv, 0);
+    x.invested = r0.value + x.rows.slice(1).reduce((s,r) => s + r.inv, 0);
     // Transfers after the last monthly value aren't in it yet: count them at face value (no gain, no currency
     // effect) until that month's value is added. Otherwise the money leaves the bank and vanishes from net worth.
     x.pending = pendingIn(x.a, x.last.month);
     x.value = x.last.value + x.pending;
     x.invested += x.pending;
     x.valueEur = x.value * latestRate(x.cur);
-    x.cost = x.rows.reduce((s,r) => s + r.inv * (r.opening ? openRate(x.cur, r.month) : monthRate(x.cur, r.month)), 0) + x.pending * latestRate(x.cur);
-    x.openIdx = x.rows[0].opening ? months.indexOf(x.rows[0].month) : -1;
+    x.cost = r0.value * openRate(x.cur, r0.month) + x.rows.slice(1).reduce((s,r) => s + r.inv * monthRate(x.cur, r.month), 0) + x.pending * latestRate(x.cur);
+    x.openIdx = months.indexOf(r0.month);
     x.market = (x.value - x.invested) * latestRate(x.cur);
     x.modelled = x.a.valueMode === 'auto';
   }
@@ -2808,8 +2813,25 @@ function portfolio(){
   res.cost = withData.reduce((s,x) => s + x.cost, 0);
   res.market = withData.reduce((s,x) => s + x.market, 0);
   res.net = res.value - res.cost; res.fx = res.net - res.market;
+  // Cash flows per account: the starting value at the end of its first month, money added later in the month it
+  // went in, and today's value at the end. In euros (each amount at its own month's rate), and again with every
+  // amount at today's rate, which leaves out what the currencies did.
   const end = Math.min(mTime(addMonth(endM, 1)), Date.now());
-  res.xirr = xirr([...res.tl.filter(t => t.inv).map(t => ({ t: mTime(t.m), v: -t.inv })), { t: end, v: res.value }]);
+  const flowsAt = local => {
+    const f = [];
+    for (const x of withData){
+      const r = m => local ? latestRate(x.cur) : monthRate(x.cur, m);
+      f.push({ t: Math.min(mTime(addMonth(x.m0, 1)), end), v: -x.startVal * (local ? latestRate(x.cur) : openRate(x.cur, x.m0)) });
+      x.rows.slice(1).forEach(row => { if (row.inv) f.push({ t: mTime(row.month), v: -row.inv * r(row.month) }); });
+      Object.entries(x.pendM).forEach(([m, p]) => f.push({ t: mTime(m), v: -p * latestRate(x.cur) }));
+    }
+    f.push({ t: end, v: res.value });
+    return f;
+  };
+  res.xirr = xirr(flowsAt(false));
+  res.xirrLocal = xirr(flowsAt(true));
+  res.earlier = withData.reduce((s,x) => s + (Math.abs(x.earlier) >= 1 ? x.earlierEur : 0), 0);
+  res.since = first;
   // A month counts once some account with history has a value for it; a month holding only a new account's
   // opening balance (or nothing yet) doesn't move the 12-month window.
   let lastReal = res.tl.length - 1; while (lastReal > 0 && !res.tl[lastReal].has) lastReal--;
@@ -2936,9 +2958,9 @@ function renderInvestments(pf){
   if (has){
     const l = pf.l12, gp = pf.cost > 0 ? pf.net / pf.cost : 0;
     $('#invKpis').innerHTML = `
-      <div class="kpi"><span class="lbl">Value</span><span class="val">${eur0.format(pf.value)}</span><span class="sub">${eur0.format(pf.cost)} invested · at today’s rates</span></div>
-      <div class="kpi"><span class="lbl">Net gain</span><span class="val ${pf.net < 0 ? 'neg' : ''}">${signed(pf.net)}</span><span class="split"><span>Market <b class="${pf.market >= 0 ? 'pos' : 'neg'}">${signed(pf.market, eurK)}</b></span><span>Currency <b class="${pf.fx >= 0 ? 'pos' : 'neg'}">${signed(pf.fx, eurK)}</b></span></span></div>
-      <div class="kpi"><span class="lbl">Return a year (XIRR)</span><span class="val">${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + '%'}</span><span class="sub">${pct(gp)} overall, in euros</span></div>
+      <div class="kpi"><span class="lbl">Value</span><span class="val">${eur0.format(pf.value)}</span><span class="sub">at today’s rates · ${eur0.format(pf.cost)} in since tracking began</span></div>
+      <div class="kpi"><span class="lbl">Gain since ${MON[+pf.since.slice(5,7)-1]} '${pf.since.slice(2,4)}</span><span class="val ${pf.net < 0 ? 'neg' : ''}">${signed(pf.net)}</span><span class="split"><span>Market <b class="${pf.market >= 0 ? 'pos' : 'neg'}">${signed(pf.market, eurK)}</b></span><span>Currency <b class="${pf.fx >= 0 ? 'pos' : 'neg'}">${signed(pf.fx, eurK)}</b></span></span></div>
+      <div class="kpi"><span class="lbl">Return a year (XIRR)</span><span class="val">${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + '%'}</span><span class="sub">in euros · ${pf.xirrLocal === null ? '' : `<b>${(pf.xirrLocal * 100).toFixed(1)}%</b> without currency moves`}</span></div>
       <div class="kpi"><span class="lbl">Last 12 months</span><span class="val ${l.profit < 0 ? 'neg' : ''}">${signed(l.profit)}</span><span class="sub">market return · ${l.n ? l.pos + ' of ' + l.n + ' months up' : 'not enough months'} · ${eurK.format(l.invested)} put in</span></div>`;
     $('#invGrowthHint').textContent = 'Each month at that month’s exchange rate';
     renderGrowth(pf);
@@ -2958,7 +2980,7 @@ function renderInvestments(pf){
   }).join('') + (pf.withData.length > 1 ? `<div class="r tot"><span></span><span>Total</span><span class="v">${eur0.format(pf.value)}<small>${pct(pf.cost > 0 ? pf.net / pf.cost : 0)} in euros</small></span></div>` : '')
     : `<p class="empty" style="margin:0">${state.accountsReady ? 'No investment accounts yet.' : 'Loading…'}</p>`;
   $('#updMonth').hidden = !rows.length;
-  $('#invFoot').innerHTML = rows.length ? `Gain per account is in its own currency, so it leaves out exchange-rate moves. <a href="#" data-itimport>Import from InvestTrack</a>` : '';
+  $('#invFoot').innerHTML = rows.length ? `Gains count from each account’s first monthly value${Math.abs(pf.earlier || 0) >= 50 ? `; what they had gained before that (${signed(pf.earlier)}) is left out, since it built up over earlier years` : ''}. Gain per account is in its own currency. <a href="#" data-itimport>Import from InvestTrack</a>` : '';
 }
 
 // Stacked value by account, with the money put in as a dashed line.
@@ -3018,7 +3040,8 @@ function renderMonthly(pf){
 function renderInvDetail(a){
   const rows = invRows(a), cur = a.currency || 'EUR';
   const last = rows[rows.length-1], pend = last ? pendingIn(a, last.month) : 0;
-  const invested = rows.reduce((s,r) => s + r.inv, 0) + pend;
+  const invested = rows.length ? rows[0].value + rows.slice(1).reduce((s,r) => s + r.inv, 0) + pend : 0;
+  const before = rows.length ? rows[0].value - rows[0].inv : 0;
   const value = last ? last.value + pend : null, g = last && invested > 0 ? (value - invested) / invested : null;
   const pred = state.showPred ? predict(a, rows, 60) : [];
   const fx = cur !== 'EUR' && value !== null ? latestRate(cur) : 0;
@@ -3034,8 +3057,8 @@ function renderInvDetail(a){
     </div>
     ${rows.length ? `<section class="kpis w">
       <div class="kpi"><span class="lbl">Value</span><span class="val">${fmtW(a, value)}</span><span class="sub">${pend ? `${monthLabel(last.month)} value ${fmtW(a, last.value)} ${pend > 0 ? '+' : '−'} ${fmtW(a, Math.abs(pend))} moved since` : monthLabel(last.month)}${fx ? ' · ≈ ' + eur0.format(value * fx) + ' today' : ''}</span></div>
-      <div class="kpi"><span class="lbl">Invested</span><span class="val">${fmtW(a, invested)}</span><span class="sub">since ${monthLabel(rows[0].month)}${rows[0].opening ? ', from an opening balance' : rows[0].value > rows[0].inv ? ', first month includes earlier money' : ''}</span></div>
-      <div class="kpi"><span class="lbl">Gain</span><span class="val ${value - invested < 0 ? 'neg' : ''}">${value - invested >= 0 ? '+' : '−'}${fmtW(a, Math.abs(value - invested))}</span><span class="sub">${g === null ? '' : pct(g) + ' in ' + cur}</span></div>
+      <div class="kpi"><span class="lbl">In since tracking</span><span class="val">${fmtW(a, invested)}</span><span class="sub">its ${monthLabel(rows[0].month)} value plus money added since${Math.abs(before) >= 1 && rows[0].inv > 0 ? ` · before that: paid ${fmtW(a, rows[0].inv)}, worth ${fmtW(a, rows[0].value)} (${pct(before / rows[0].inv)})` : ''}</span></div>
+      <div class="kpi"><span class="lbl">Gain since tracking</span><span class="val ${value - invested < 0 ? 'neg' : ''}">${value - invested >= 0 ? '+' : '−'}${fmtW(a, Math.abs(value - invested))}</span><span class="sub">${g === null ? '' : pct(g) + ' in ' + cur}</span></div>
     </section>
     ${pend ? `<div class="banner"><span class="left"><span>${pend > 0 ? '+' : '−'}${fmtW(a, Math.abs(pend))} moved ${pend > 0 ? 'in' : 'out'} after ${monthLabel(last.month)}. It counts at face value for now; add the month’s value once it ends to include how it grew.</span></span><button class="btn small" type="button" data-addsnap="${esc(a.id)}">+ Add month</button></div>` : ''}
     <section class="panel"><header><h2>Value and money put in</h2><button class="btn ghost" type="button" data-pred aria-pressed="${state.showPred}">${state.showPred ? 'Hide' : 'Show'} 5-year projection</button></header>
@@ -3129,7 +3152,7 @@ function renderFire(pf){
         <label>Yearly spending today (€)<input type="number" step="100" min="0" inputmode="decimal" data-fire="expenses" value="${f.expenses ?? ''}" placeholder="${led ? Math.round(led.v) : 'e.g. 30000'}">${src('expenses', led ? led.v : null, led ? `Ledger, ${led.n} month${led.n===1?'':'s'}` : 'Ledger')}${led && (f.expenses === undefined || f.expenses === null) ? `<span class="src">Average of ${led.n} month${led.n===1?'':'s'} × 12</span>` : ''}</label>
         <label>Invested per month (€)<input type="number" step="10" min="0" inputmode="decimal" data-fire="savings" value="${f.savings ?? ''}" placeholder="${ledSave !== null ? Math.round(ledSave) : ''}">${src('savings', ledSave, 'Last 12 months')}</label>
         <label>FIRE year<input type="number" step="1" min="${y0}" max="${y0 + 60}" inputmode="numeric" data-fire="fireYear" value="${p.year}"><span class="src">${c.yrs} year${c.yrs===1?'':'s'} from now</span></label>
-        <label>Return a year (%)<input type="number" step="0.1" inputmode="decimal" data-fire="returnPct" value="${p.ret}"><span class="src">Your XIRR so far: ${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + '%'}</span></label>
+        <label>Return a year (%)<input type="number" step="0.1" inputmode="decimal" data-fire="returnPct" value="${p.ret}"><span class="src">Yours so far: ${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + '% in euros'}${pf.xirrLocal === null ? '' : ', ' + (pf.xirrLocal * 100).toFixed(1) + '% without currency'}</span></label>
         <label>Inflation (%)<input type="number" step="0.1" inputmode="decimal" data-fire="inflation" value="${p.inf}"></label>
         <label>Withdrawal rate (%)<input type="number" step="0.1" min="0.1" inputmode="decimal" data-fire="withdrawal" value="${p.wr}"></label>
       </div>
@@ -3456,9 +3479,11 @@ $('#itForm').addEventListener('submit', async e => {
     if (old?.inFire === false) rec.inFire = false;
     writes.push(['accounts', id, rec]);
   }
+  const firstM = {}; ex.snapshots.forEach(s => { if (!firstM[s.accountId] || s.month < firstM[s.accountId]) firstM[s.accountId] = s.month; });
   for (const s of ex.snapshots){
     const accId = ids[s.accountId]; if (!accId) continue;
     const d = { accountId: accId, month: s.month, investment: +s.investment || 0, createdAt: s.createdAt || now, createdBy: me, updatedBy: me };
+    if (firstM[s.accountId] === s.month) d.opening = true;
     if (!s.valueIsAuto) d.value = +s.value;
     writes.push(['invSnapshots', snapId(accId, s.month), d]);
   }
