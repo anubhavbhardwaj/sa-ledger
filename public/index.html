@@ -997,7 +997,7 @@ onAuthStateChanged(auth, user => {
   }, onErr('the ledger')));
   unsubs.push(onSnapshot(transfersCol, snap => {
     state.transfers = snap.docs.map(d => ({ ...d.data(), id: d.id, kind:'transfer' })).sort(byDate);
-    render();
+    pfCache = null; render();
   }, onErr('transfers')));
   unsubs.push(onSnapshot(accountsCol, snap => {
     state.accounts = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => a.name.localeCompare(b.name));
@@ -1274,7 +1274,9 @@ function renderTransactions(){
   if (isTr) return renderTransferTable();
   const rows = filtered();
   $('#txTitle').textContent = 'Transactions · ' + periodName();
-  $('#txSub').textContent = `${rows.length} transaction${rows.length===1?'':'s'} · ${eur.format(sum(rows))}`;
+  { const nt = state.transfers.filter(inPeriod).length, ni = state.income.filter(inPeriod).length;
+    const more = [ni ? `<button class="linkbtn" type="button" data-txgo="income">${ni} income</button>` : '', nt ? `<button class="linkbtn" type="button" data-txgo="transfer">${nt} transfer${nt===1?'':'s'}</button>` : ''].filter(Boolean);
+    $('#txSub').innerHTML = `${rows.length} expense${rows.length===1?'':'s'} · ${eur.format(sum(rows))}${more.length ? ' · also ' + more.join(' and ') : ''}`; }
   for (const k of DIMS){
     const pool = state.items.filter(i => inPeriod(i) && passFilters(i, k) && passSearch(i));
     const g = group(pool, k);
@@ -1825,6 +1827,7 @@ $('#form').addEventListener('submit', async e => {
       } else {
         await addDoc(transfersCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
         if (state.period !== 'all') state.period = date.slice(0,7);
+        state.txKind = 'transfer'; render();
         toast(`${transferType(rec)}: ${eur.format(amount)} from ${rec.from} to ${rec.to}`);
       }
       doneInbox(); dlg.close();
@@ -1842,6 +1845,7 @@ $('#form').addEventListener('submit', async e => {
       } else {
         await addDoc(incomeCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
         if (state.period !== 'all') state.period = date.slice(0,7);
+        state.txKind = 'income'; render();
         toast('Added income ' + eur.format(amount) + ' from ' + rec.source);
       }
       doneInbox(); dlg.close();
@@ -1859,6 +1863,7 @@ $('#form').addEventListener('submit', async e => {
     } else {
       await addDoc(expensesCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
       if (state.period !== 'all') state.period = date.slice(0,7);
+      state.txKind = 'expense'; render();
       toast('Added ' + eur.format(amount) + ' at ' + rec.store);
     }
     doneInbox(); dlg.close();
@@ -2762,9 +2767,13 @@ function portfolio(){
     for (const m of months){ const r = byM[m]; if (r) v = r.value; x.vals.push(v); x.invs.push(r ? r.inv : 0); x.fresh.push(r && !r.opening ? r.inv : 0); x.rec.push(!!r); }
     x.last = x.rows[x.rows.length-1];
     x.invested = x.rows.reduce((s,r) => s + r.inv, 0);
-    x.value = x.last.value;
+    // Transfers after the last monthly value aren't in it yet: count them at face value (no gain, no currency
+    // effect) until that month's value is added. Otherwise the money leaves the bank and vanishes from net worth.
+    x.pending = pendingIn(x.a, x.last.month);
+    x.value = x.last.value + x.pending;
+    x.invested += x.pending;
     x.valueEur = x.value * latestRate(x.cur);
-    x.cost = x.rows.reduce((s,r) => s + r.inv * (r.opening ? openRate(x.cur, r.month) : monthRate(x.cur, r.month)), 0);
+    x.cost = x.rows.reduce((s,r) => s + r.inv * (r.opening ? openRate(x.cur, r.month) : monthRate(x.cur, r.month)), 0) + x.pending * latestRate(x.cur);
     x.openIdx = x.rows[0].opening ? months.indexOf(x.rows[0].month) : -1;
     x.market = (x.value - x.invested) * latestRate(x.cur);
     x.modelled = x.a.valueMode === 'auto';
@@ -2791,7 +2800,8 @@ function portfolio(){
   res.market = withData.reduce((s,x) => s + x.market, 0);
   res.net = res.value - res.cost; res.fx = res.net - res.market;
   const end = Math.min(mTime(addMonth(last, 1)), Date.now());
-  res.xirr = xirr([...res.tl.filter(t => t.inv).map(t => ({ t: mTime(t.m), v: -t.inv })), { t: end, v: res.value }]);
+  const pendEur = withData.reduce((s,x) => s + x.pending * latestRate(x.cur), 0);
+  res.xirr = xirr([...res.tl.filter(t => t.inv).map(t => ({ t: mTime(t.m), v: -t.inv })), { t: end, v: res.value - pendEur }]);
   // A month counts once some account with history has a value for it; a month holding only a new account's
   // opening balance (or nothing yet) doesn't move the 12-month window.
   let lastReal = res.tl.length - 1; while (lastReal > 0 && !res.tl[lastReal].has) lastReal--;
@@ -2807,6 +2817,13 @@ function investedIn(period){
   if (period === 'all') return pf.tl.reduce((s,t) => s + t.fresh, 0);
   const t = pf.tl.find(t => t.m === period);
   return t ? t.fresh : null;
+}
+// Net transfers into an account dated after a given month (up to today), in the account's currency.
+function pendingIn(a, afterMonth){
+  const n = a.name.toLowerCase(), td = today();
+  const v = state.transfers.filter(t => t.date.slice(0,7) > afterMonth && t.date <= td)
+    .reduce((s,t) => s + (String(t.to).toLowerCase() === n ? inAccCur(a, t) : String(t.from).toLowerCase() === n ? -inAccCur(a, t) : 0), 0);
+  return Math.round(v * 100) / 100;
 }
 // Net transfers into an account during a month, in the account's currency.
 function ledgerInv(a, m){
@@ -2833,7 +2850,7 @@ function netWorthSeries(){
     let inv = 0;
     for (const x of pf.withData){
       const r = x.rows.filter(r => r.month <= m).pop(); if (!r) continue;
-      inv += r.value * (cur ? latestRate(x.cur) : monthRate(x.cur, addMonth(m, 1)));
+      inv += (r.value + (cur ? x.pending : 0)) * (cur ? latestRate(x.cur) : monthRate(x.cur, addMonth(m, 1)));
     }
     let cash = 0;
     for (const a of cashAccs){ const e = estimate(a, d); if (e) cash += toEur(a, e.balance); }
@@ -2919,7 +2936,7 @@ function renderInvestments(pf){
     const g = n && x.invested > 0 ? (x.value - x.invested) / x.invested : null;
     return `<button type="button" class="r" data-acc="${esc(a.id)}"><span class="dot" style="background:${x.color}"></span>
       <span><span class="nm">${esc(a.name)}</span>${x.modelled ? '<span class="modelled" title="Value grows by the expected return; not from a statement">modelled</span>' : ''}${a.inFire === false ? '<span class="tag" title="Not counted in FIRE">not in FIRE</span>' : ''}<br>
-        <span class="meta">${INV_TYPE[a.invType] || 'Investment'}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''} · ${n ? 'updated ' + monthLabel(x.last.month) : 'no values yet'}</span></span>
+        <span class="meta">${INV_TYPE[a.invType] || 'Investment'}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''} · ${n ? 'updated ' + monthLabel(x.last.month) : 'no values yet'}${n && x.pending ? ` · <span class="pos">${x.pending > 0 ? '+' : '−'}${fmtW(a, Math.abs(x.pending))} moved ${x.pending > 0 ? 'in' : 'out'} since</span>` : ''}</span></span>
       <span class="v">${n ? fmtW(a, x.value) : '—'}<small>${n ? (x.cur !== 'EUR' ? '≈ ' + eur0.format(x.valueEur) + ' · ' : '') + (g === null ? '' : `<span class="${g >= 0 ? 'pos' : 'neg'}">${pct(g)}</span>`) : 'Add month'}</small></span></button>`;
   }).join('') + (pf.withData.length > 1 ? `<div class="r tot"><span></span><span>Total</span><span class="v">${eur0.format(pf.value)}<small>${pct(pf.cost > 0 ? pf.net / pf.cost : 0)} in euros</small></span></div>` : '')
     : `<p class="empty" style="margin:0">${state.accountsReady ? 'No investment accounts yet.' : 'Loading…'}</p>`;
@@ -2982,8 +2999,9 @@ function renderMonthly(pf){
 
 function renderInvDetail(a){
   const rows = invRows(a), cur = a.currency || 'EUR';
-  const invested = rows.reduce((s,r) => s + r.inv, 0), last = rows[rows.length-1];
-  const value = last ? last.value : null, g = last && invested > 0 ? (value - invested) / invested : null;
+  const last = rows[rows.length-1], pend = last ? pendingIn(a, last.month) : 0;
+  const invested = rows.reduce((s,r) => s + r.inv, 0) + pend;
+  const value = last ? last.value + pend : null, g = last && invested > 0 ? (value - invested) / invested : null;
   const pred = state.showPred ? predict(a, rows, 60) : [];
   const fx = cur !== 'EUR' && value !== null ? latestRate(cur) : 0;
   $('#accDetail').innerHTML = `
@@ -2997,10 +3015,11 @@ function renderInvDetail(a){
       </div>
     </div>
     ${rows.length ? `<section class="kpis w">
-      <div class="kpi"><span class="lbl">Value</span><span class="val">${fmtW(a, value)}</span><span class="sub">${monthLabel(last.month)}${fx ? ' · ≈ ' + eur0.format(value * fx) + ' today' : ''}</span></div>
+      <div class="kpi"><span class="lbl">Value</span><span class="val">${fmtW(a, value)}</span><span class="sub">${pend ? `${monthLabel(last.month)} value ${fmtW(a, last.value)} ${pend > 0 ? '+' : '−'} ${fmtW(a, Math.abs(pend))} moved since` : monthLabel(last.month)}${fx ? ' · ≈ ' + eur0.format(value * fx) + ' today' : ''}</span></div>
       <div class="kpi"><span class="lbl">Invested</span><span class="val">${fmtW(a, invested)}</span><span class="sub">since ${monthLabel(rows[0].month)}${rows[0].opening ? ', from an opening balance' : rows[0].value > rows[0].inv ? ', first month includes earlier money' : ''}</span></div>
       <div class="kpi"><span class="lbl">Gain</span><span class="val ${value - invested < 0 ? 'neg' : ''}">${value - invested >= 0 ? '+' : '−'}${fmtW(a, Math.abs(value - invested))}</span><span class="sub">${g === null ? '' : pct(g) + ' in ' + cur}</span></div>
     </section>
+    ${pend ? `<div class="banner"><span class="left"><span>${pend > 0 ? '+' : '−'}${fmtW(a, Math.abs(pend))} moved ${pend > 0 ? 'in' : 'out'} after ${monthLabel(last.month)}. It counts at face value for now; add the month’s value once it ends to include how it grew.</span></span><button class="btn small" type="button" data-addsnap="${esc(a.id)}">+ Add month</button></div>` : ''}
     <section class="panel"><header><h2>Value and money put in</h2><button class="btn ghost" type="button" data-pred aria-pressed="${state.showPred}">${state.showPred ? 'Hide' : 'Show'} 5-year projection</button></header>
       <div id="accChart"></div>
       <div class="legend"><span><i style="background:var(--bar)"></i>Value</span><span><i style="background:none;border-top:2px dashed var(--ink);height:0;border-radius:0;vertical-align:3px"></i>Put in</span>${state.showPred ? `<span><i style="background:var(--bar-dim)"></i>Projection at ${a.returnPct || 0}% with ${fmtW(a, a.target || 0)} a month</span>` : ''}</div>
@@ -3443,6 +3462,7 @@ $('#itForm').addEventListener('submit', async e => {
 document.addEventListener('click', e => {
   const t = e.target;
   const wv = t.closest('#wSeg [data-wv]'); if (wv){ state.wv = wv.dataset.wv; render(); return; }
+  const tg = t.closest('[data-txgo]'); if (tg){ state.txKind = tg.dataset.txgo; render(); return; }
   const im = t.closest('#invMSeg [data-im]'); if (im){ state.im = im.dataset.im; render(); return; }
   if (t.closest('[data-itimport]')){ e.preventDefault(); $('#itFile').click(); return; }
   if (t.closest('[data-pred]')){ state.showPred = !state.showPred; render(); return; }
