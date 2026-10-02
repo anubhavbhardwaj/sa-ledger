@@ -79,7 +79,7 @@ service cloud.firestore {
       allow create, update: if isMember() && validTrip();
     }
 
-    // Shared settings: 'budgets', 'fire' (FIRE plan) and 'fx' (exchange rate on the 1st of each month).
+    // Shared settings: 'budgets', 'fire' and 'fireInr' (FIRE plans in euros and rupees) and 'fx' (rate on the 1st of each month).
     function validBudgets() {
       let d = request.resource.data;
       return d.keys().hasOnly(['items','total','updatedAt','updatedBy'])
@@ -102,7 +102,7 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if isMember() && (
            (id == 'budgets' && validBudgets())
-        || (id == 'fire' && validFire())
+        || ((id == 'fire' || id == 'fireInr') && validFire())
         || (id == 'fx' && validFxMonths()));
     }
 

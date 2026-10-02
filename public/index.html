@@ -621,7 +621,8 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <div id="accListView" style="display:grid;gap:16px">
         <div class="pagehead">
           <div><h1>Wealth</h1><p id="wSub">Investments, cash and your FIRE plan</p></div>
-          <div class="seg" role="radiogroup" aria-label="Show" id="wSeg"><button type="button" role="radio" data-wv="inv">Investments</button><button type="button" role="radio" data-wv="cash">Cash &amp; cards</button><button type="button" role="radio" data-wv="fire">FIRE</button></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><div class="seg" role="radiogroup" aria-label="Show amounts in" id="homeSeg"><button type="button" role="radio" data-home="EUR" title="Show in euros">€</button><button type="button" role="radio" data-home="INR" title="Show in rupees">₹</button></div>
+          <div class="seg" role="radiogroup" aria-label="Show" id="wSeg"><button type="button" role="radio" data-wv="inv">Investments</button><button type="button" role="radio" data-wv="cash">Cash &amp; cards</button><button type="button" role="radio" data-wv="fire">FIRE</button></div></div>
         </div>
 
         <section class="panel" id="nwAllP" hidden><header><h2>Net worth</h2><span class="hint" id="nwAllHint"></span></header><div id="nwAll"></div>
@@ -968,7 +969,7 @@ const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' +
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -1032,6 +1033,7 @@ onAuthStateChanged(auth, user => {
     for (const src of [state.fxMonthsLocal, stored]) for (const [m, r] of Object.entries(src || {})) merged[m] = { ...(merged[m] || {}), ...r };
     state.fxMonths = merged;
     state.fire = fire ? fire.data() : {};
+    const fi = snap.docs.find(x => x.id === 'fireInr'); state.fireInr = fi ? fi.data() : {};
     pfCache = null; render();
   }, onErr('budgets')));
   unsubs.push(onSnapshot(tripsCol, snap => {
@@ -1202,7 +1204,7 @@ function renderOverview(ms){
     <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
     <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' : ''}</span></div>
     <div class="kpi"><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
-    + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${eur0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : `<span class="${nw.delta >= 0 ? 'pos' : 'neg'}">${signed(nw.delta)}</span> since end of ${MON[+nw.prevM.slice(5,7)-1]}`} · Wealth →</span></a>` : ''; })();
+    + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${hm0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : `<span class="${nw.delta >= 0 ? 'pos' : 'neg'}">${signed(nw.delta)}</span> since end of ${MON[+nw.prevM.slice(5,7)-1]}`} · Wealth →</span></a>` : ''; })();
   renderBudgets();
   renderIncomeVsSpend($('#ovTrend'));
   renderBars('category', $('#ovCats'), {max:6, filtered:false, goto:'transactions'});
@@ -2427,7 +2429,7 @@ function investInfo(acc){
   return { gain, pct: put > 0 ? gain / put * 100 : 0, since: first.date };
 }
 async function loadRates(){
-  const curs = [...new Set(state.accounts.map(a => a.currency).filter(c => c && c !== 'EUR'))].filter(c => !state.fxLatest[c]);
+  const curs = [...new Set([...state.accounts.map(a => a.currency), ...(state.home === 'INR' ? ['INR'] : [])].filter(c => c && c !== 'EUR'))].filter(c => !state.fxLatest[c]);
   for (const c of curs){ try { const r = await getRate(c, today()); state.fxLatest[c] = typeof r === 'number' ? r : r.rate; } catch {} }
   if (curs.length){ pfCache = null; if (state.page === 'wealth' || state.page === 'overview') render(); }
 }
@@ -2665,7 +2667,7 @@ $('#ckForm').addEventListener('submit', async e => {
 // value at today's rate, so the gain can be split into what the market did and what the currency did.
 const eurK = new Intl.NumberFormat('en-IE', { style:'currency', currency:'EUR', notation:'compact', maximumFractionDigits:1 });
 const pct = (v, d = 1) => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(d) + '%';
-const signed = (v, f = eur0) => (v >= 0 ? '+' : '−') + f.format(Math.abs(v));
+const signed = (v, f = hm0) => (v >= 0 ? '+' : '−') + f.format(Math.abs(v));
 const addMonth = (m, k) => { const d = new Date(Date.UTC(+m.slice(0,4), +m.slice(5,7) - 1 + k, 1)); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2,'0'); };
 const monthsBetween = (a, b) => { const out = []; for (let m = a; m <= b && out.length < 600; m = addMonth(m, 1)) out.push(m); return out; };
 const mShort = m => MON[+m.slice(5,7)-1] + " '" + m.slice(2,4);
@@ -2690,6 +2692,17 @@ function monthRate(cur, m){
 // An opening balance is a value, so it's priced like one: at the rate when its month ends (today, while that
 // month is still running). That way a new account starts at exactly zero gain instead of a fake currency move.
 const openRate = (cur, m) => m >= thisMonth() ? latestRate(cur) : monthRate(cur, addMonth(m, 1));
+// Home currency for Wealth: euros, or rupees for planning a life in India. Rates are stored EUR-based, so a
+// rupee figure is the euro figure divided by the rupee's euro rate at the same moment.
+const HOME = () => state.home === 'INR' ? 'INR' : 'EUR';
+const viaHome = (r, d) => HOME() === 'EUR' ? r : (d > 0 ? r / d : 0);
+const mRH = (cur, m) => viaHome(monthRate(cur, m), monthRate('INR', m));
+const lRH = cur => viaHome(latestRate(cur), latestRate('INR'));
+const oRH = (cur, m) => viaHome(openRate(cur, m), openRate('INR', m));
+const eurToHome = v => HOME() === 'EUR' ? v : v / (latestRate('INR') || NaN);
+const hFmt = (opt = {}) => new Intl.NumberFormat(HOME() === 'INR' ? 'en-IN' : 'en-IE', { style:'currency', currency: HOME(), ...opt });
+const hm0 = { format: v => hFmt({ maximumFractionDigits: 0 }).format(Math.abs(v) < 0.5 ? 0 : v) };
+const hmK = { format: v => hFmt({ notation:'compact', maximumFractionDigits: 1 }).format(v) };
 const latestRate = cur => !cur || cur === 'EUR' ? 1 : (state.fxLatest[cur] || monthRate(cur, thisMonth()));
 async function fillMonthRates(){
   if (fxBusy || !needFx.size) return;
@@ -2771,7 +2784,7 @@ function portfolio(){
   for (const x of withData){
     const byM = Object.fromEntries(x.rows.map(r => [r.month, r])), lastM = x.rows[x.rows.length-1].month;
     const r0 = x.rows[0];
-    x.m0 = r0.month; x.startVal = r0.value; x.earlier = r0.value - r0.inv; x.earlierEur = x.earlier * openRate(x.cur, r0.month);
+    x.m0 = r0.month; x.startVal = r0.value; x.earlier = r0.value - r0.inv; x.earlierEur = x.earlier * oRH(x.cur, r0.month);
     let v = null, cumP = 0; x.vals = []; x.invs = [];
     x.fresh = []; x.rec = [];
     for (const m of months){
@@ -2786,10 +2799,10 @@ function portfolio(){
     x.pending = pendingIn(x.a, x.last.month);
     x.value = x.last.value + x.pending;
     x.invested += x.pending;
-    x.valueEur = x.value * latestRate(x.cur);
-    x.cost = r0.value * openRate(x.cur, r0.month) + x.rows.slice(1).reduce((s,r) => s + r.inv * monthRate(x.cur, r.month), 0) + x.pending * latestRate(x.cur);
+    x.valueEur = x.value * lRH(x.cur);
+    x.cost = r0.value * oRH(x.cur, r0.month) + x.rows.slice(1).reduce((s,r) => s + r.inv * mRH(x.cur, r.month), 0) + x.pending * lRH(x.cur);
     x.openIdx = months.indexOf(r0.month);
-    x.market = (x.value - x.invested) * latestRate(x.cur);
+    x.market = (x.value - x.invested) * lRH(x.cur);
     x.modelled = x.a.valueMode === 'auto';
   }
   withData.sort((p,q) => q.valueEur - p.valueEur).forEach((x, i) => x.color = `var(${PAL[Math.min(i, PAL.length - 1)]})`);
@@ -2800,8 +2813,8 @@ function portfolio(){
     const parts = [];
     for (const x of withData){
       const v = x.vals[i]; if (v === null){ parts.push(0); continue; }
-      const rt = monthRate(x.cur, m);
-      tv += v * rt; inv += x.invs[i] * (i === x.openIdx ? openRate(x.cur, m) : rt); fresh += x.fresh[i] * rt; parts.push(v * rt);
+      const rt = mRH(x.cur, m);
+      tv += v * rt; inv += x.invs[i] * (i === x.openIdx ? oRH(x.cur, m) : rt); fresh += x.fresh[i] * rt; parts.push(v * rt);
       // Market return: change in value minus money put in, both at this month's rate (currency moves left out).
       if (i > 0 && x.vals[i-1] !== null){ profit += (v - x.vals[i-1] - x.invs[i]) * rt; base += x.vals[i-1] * rt; if (x.rec[i]) has = true; }
     }
@@ -2820,10 +2833,10 @@ function portfolio(){
   const flowsAt = local => {
     const f = [];
     for (const x of withData){
-      const r = m => local ? latestRate(x.cur) : monthRate(x.cur, m);
-      f.push({ t: Math.min(mTime(addMonth(x.m0, 1)), end), v: -x.startVal * (local ? latestRate(x.cur) : openRate(x.cur, x.m0)) });
+      const r = m => local ? lRH(x.cur) : mRH(x.cur, m);
+      f.push({ t: Math.min(mTime(addMonth(x.m0, 1)), end), v: -x.startVal * (local ? lRH(x.cur) : oRH(x.cur, x.m0)) });
       x.rows.slice(1).forEach(row => { if (row.inv) f.push({ t: mTime(row.month), v: -row.inv * r(row.month) }); });
-      Object.entries(x.pendM).forEach(([m, p]) => f.push({ t: mTime(m), v: -p * latestRate(x.cur) }));
+      Object.entries(x.pendM).forEach(([m, p]) => f.push({ t: mTime(m), v: -p * lRH(x.cur) }));
     }
     f.push({ t: end, v: res.value });
     return f;
@@ -2889,10 +2902,10 @@ function netWorthSeries(){
     let inv = 0;
     for (const x of pf.withData){
       const r = x.rows.filter(r => r.month <= m).pop(); if (!r) continue;
-      inv += (r.value + (cur ? x.pending : 0)) * (cur ? latestRate(x.cur) : monthRate(x.cur, addMonth(m, 1)));
+      inv += (r.value + (cur ? x.pending : 0)) * (cur ? lRH(x.cur) : mRH(x.cur, addMonth(m, 1)));
     }
     let cash = 0;
-    for (const a of cashAccs){ const e = estimate(a, d); if (e) cash += toEur(a, e.balance); }
+    for (const a of cashAccs){ const e = estimate(a, d); if (e) cash += eurToHome(toEur(a, e.balance)); }
     return { m, inv, cash, total: inv + cash };
   }).filter((p, i, arr) => p.inv || p.cash || arr.slice(0, i).some(q => q.inv || q.cash));
 }
@@ -2905,22 +2918,22 @@ function renderNetWorthAll(){
   let lo = Math.min(0, ...pts.map(p => Math.min(p.cash, p.total)));
   if (lo > -0.03 * hi) lo = 0; else lo = -niceMax(-lo);
   const top = niceMax(hi - lo) + lo, y = v => T + (H-T-B) * (top - v) / (top - lo || 1);
-  const bw = (W-L-R) / n, w = Math.min(26, bw * 0.62), every = Math.max(1, Math.ceil(n / (narrow ? 4 : 12)));
+  const bw = (W-L-R) / n, w = Math.min(26, bw * 0.62), every = Math.max(1, Math.ceil(n / (narrow ? 3 : 12)));
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Net worth by month">`;
-  for (let k = 0; k <= 4; k++){ const v = lo + (top - lo) * k / 4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${eurK.format(v)}</text>`; }
+  for (let k = 0; k <= 4; k++){ const v = lo + (top - lo) * k / 4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${hmK.format(v)}</text>`; }
   pts.forEach((p, i) => {
     const cx = L + i*bw + bw/2, x0 = cx - w/2;
     const invTop = y(p.inv), zero = y(0);
     s += `<rect x="${x0}" y="${Math.min(invTop, zero)}" width="${w}" height="${Math.max(0, zero - invTop)}" fill="var(--bar)"/>`;
     if (p.cash >= 0) s += `<rect x="${x0}" y="${y(p.inv + p.cash)}" width="${w}" height="${Math.max(0, invTop - y(p.inv + p.cash))}" fill="var(--c-inc)"/>`;
     else s += `<rect x="${x0}" y="${zero}" width="${w}" height="${Math.max(0, Math.min(H - B, y(p.cash)) - zero)}" fill="var(--c-inc)" fill-opacity=".6"/>`;
-    s += `<rect x="${L + i*bw}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(p.m)}${p.m === thisMonth() ? ' (today)' : ''} · net worth ${eur0.format(p.total)} · investments ${eur0.format(p.inv)} · cash &amp; cards ${eur0.format(p.cash)}"/>`;
+    s += `<rect x="${L + i*bw}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(p.m)}${p.m === thisMonth() ? ' (today)' : ''} · net worth ${hm0.format(p.total)} · investments ${hm0.format(p.inv)} · cash &amp; cards ${hm0.format(p.cash)}"/>`;
     if (tick(i, n, every)) s += `<text x="${i === n-1 ? W-R : cx}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : 'middle'}">${mShort(p.m)}</text>`;
   });
   s += `<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/></svg>`;
   $('#nwAll').innerHTML = s;
   const a = pts[n-1], b = pts[n-2], dlt = a.total - b.total;
-  $('#nwAllHint').innerHTML = `${eur0.format(a.total)} today · <span class="${dlt >= 0 ? 'pos' : 'neg'}">${signed(dlt)}</span> since end of ${MON[+b.m.slice(5,7)-1]}`;
+  $('#nwAllHint').innerHTML = `${hm0.format(a.total)} today · <span class="${dlt >= 0 ? 'pos' : 'neg'}">${signed(dlt)}</span> since end of ${MON[+b.m.slice(5,7)-1]}`;
 }
 function netWorthNow(){
   const pts = netWorthSeries(); if (!pts.length) return null;
@@ -2935,12 +2948,13 @@ function renderWealth(){
   $('#accListView').hidden = !!open; $('#accDetail').hidden = !open;
   if (open){ open.type === 'investment' ? renderInvDetail(open) : renderAccDetail(open); fillMonthRates(); return; }
   $$('#wSeg [data-wv]').forEach(b => b.setAttribute('aria-checked', b.dataset.wv === state.wv));
+  $$('#homeSeg [data-home]').forEach(b => b.setAttribute('aria-checked', b.dataset.home === HOME()));
   ['inv','cash','fire'].forEach(v => $('#wv-' + v).hidden = v !== state.wv);
   const pf = portfolio();
-  const cash = state.accounts.filter(a => a.type !== 'investment').reduce((x,a) => { const e = estimate(a); return x + (e ? toEur(a, e.balance) : 0); }, 0);
+  const cash = state.accounts.filter(a => a.type !== 'investment').reduce((x,a) => { const e = estimate(a); return x + (e ? eurToHome(toEur(a, e.balance)) : 0); }, 0);
   const nw = pf.value + cash;
   $('#wSub').innerHTML = pf.withData.length || state.checkins.length
-    ? `Net worth ≈ <strong>${eur0.format(nw)}</strong> · investments ${eur0.format(pf.value)} · ${state.checkins.length ? 'cash &amp; cards ' + (cash < 0 ? '−' : '') + eur0.format(Math.abs(cash)) : 'cash &amp; cards not checked in yet'}`
+    ? `Net worth ≈ <strong>${hm0.format(nw)}</strong> · investments ${hm0.format(pf.value)} · ${state.checkins.length ? 'cash &amp; cards ' + (cash < 0 ? '−' : '') + hm0.format(Math.abs(cash)) : 'cash &amp; cards not checked in yet'}`
     : 'Investments, cash and your FIRE plan';
   renderNetWorthAll();
   if (state.wv === 'inv') renderInvestments(pf);
@@ -2958,10 +2972,10 @@ function renderInvestments(pf){
   if (has){
     const l = pf.l12, gp = pf.cost > 0 ? pf.net / pf.cost : 0;
     $('#invKpis').innerHTML = `
-      <div class="kpi"><span class="lbl">Value</span><span class="val">${eur0.format(pf.value)}</span><span class="sub">at today’s rates · ${eur0.format(pf.cost)} in since tracking began</span></div>
-      <div class="kpi"><span class="lbl">Gain since ${MON[+pf.since.slice(5,7)-1]} '${pf.since.slice(2,4)}</span><span class="val ${pf.net < 0 ? 'neg' : ''}">${signed(pf.net)}</span><span class="split"><span>Market <b class="${pf.market >= 0 ? 'pos' : 'neg'}">${signed(pf.market, eurK)}</b></span><span>Currency <b class="${pf.fx >= 0 ? 'pos' : 'neg'}">${signed(pf.fx, eurK)}</b></span></span></div>
-      <div class="kpi"><span class="lbl">Return a year (XIRR)</span><span class="val">${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + '%'}</span><span class="sub">in euros · ${pf.xirrLocal === null ? '' : `<b>${(pf.xirrLocal * 100).toFixed(1)}%</b> without currency moves`}</span></div>
-      <div class="kpi"><span class="lbl">Last 12 months</span><span class="val ${l.profit < 0 ? 'neg' : ''}">${signed(l.profit)}</span><span class="sub">market return · ${l.n ? l.pos + ' of ' + l.n + ' months up' : 'not enough months'} · ${eurK.format(l.invested)} put in</span></div>`;
+      <div class="kpi"><span class="lbl">Value</span><span class="val">${hm0.format(pf.value)}</span><span class="sub">at today’s rates · ${hm0.format(pf.cost)} in since tracking began</span></div>
+      <div class="kpi"><span class="lbl">Gain since ${MON[+pf.since.slice(5,7)-1]} '${pf.since.slice(2,4)}</span><span class="val ${pf.net < 0 ? 'neg' : ''}">${signed(pf.net)}</span><span class="split"><span>Market <b class="${pf.market >= 0 ? 'pos' : 'neg'}">${signed(pf.market, hmK)}</b></span><span>Currency <b class="${pf.fx >= 0 ? 'pos' : 'neg'}">${signed(pf.fx, hmK)}</b></span></span></div>
+      <div class="kpi"><span class="lbl">Return a year (XIRR)</span><span class="val">${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + '%'}</span><span class="sub">${HOME() === 'INR' ? 'in rupees' : 'in euros'} · ${pf.xirrLocal === null ? '' : `<b>${(pf.xirrLocal * 100).toFixed(1)}%</b> without currency moves`}</span></div>
+      <div class="kpi"><span class="lbl">Last 12 months</span><span class="val ${l.profit < 0 ? 'neg' : ''}">${signed(l.profit)}</span><span class="sub">market return · ${l.n ? l.pos + ' of ' + l.n + ' months up' : 'not enough months'} · ${hmK.format(l.invested)} put in</span></div>`;
     $('#invGrowthHint').textContent = 'Each month at that month’s exchange rate';
     renderGrowth(pf);
     $$('#invMSeg [data-im]').forEach(b => b.setAttribute('aria-checked', b.dataset.im === state.im));
@@ -2976,8 +2990,8 @@ function renderInvestments(pf){
     return `<button type="button" class="r" data-acc="${esc(a.id)}"><span class="dot" style="background:${x.color}"></span>
       <span><span class="nm">${esc(a.name)}</span>${x.modelled ? '<span class="modelled" title="Value grows by the expected return; not from a statement">modelled</span>' : ''}${a.inFire === false ? '<span class="tag" title="Not counted in FIRE">not in FIRE</span>' : ''}<br>
         <span class="meta">${INV_TYPE[a.invType] || 'Investment'}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''} · ${n ? 'updated ' + monthLabel(x.last.month) : 'no values yet'}${n && x.pending ? ` · <span class="pos">${x.pending > 0 ? '+' : '−'}${fmtW(a, Math.abs(x.pending))} moved ${x.pending > 0 ? 'in' : 'out'} since</span>` : ''}</span></span>
-      <span class="v">${n ? fmtW(a, x.value) : '—'}<small>${n ? (x.cur !== 'EUR' ? '≈ ' + eur0.format(x.valueEur) + ' · ' : '') + (g === null ? '' : `<span class="${g >= 0 ? 'pos' : 'neg'}">${pct(g)}</span>`) : 'Add month'}</small></span></button>`;
-  }).join('') + (pf.withData.length > 1 ? `<div class="r tot"><span></span><span>Total</span><span class="v">${eur0.format(pf.value)}<small>${pct(pf.cost > 0 ? pf.net / pf.cost : 0)} in euros</small></span></div>` : '')
+      <span class="v">${n ? fmtW(a, x.value) : '—'}<small>${n ? (x.cur !== HOME() ? '≈ ' + hm0.format(x.valueEur) + ' · ' : '') + (g === null ? '' : `<span class="${g >= 0 ? 'pos' : 'neg'}">${pct(g)}</span>`) : 'Add month'}</small></span></button>`;
+  }).join('') + (pf.withData.length > 1 ? `<div class="r tot"><span></span><span>Total</span><span class="v">${hm0.format(pf.value)}<small>${pct(pf.cost > 0 ? pf.net / pf.cost : 0)} in euros</small></span></div>` : '')
     : `<p class="empty" style="margin:0">${state.accountsReady ? 'No investment accounts yet.' : 'Loading…'}</p>`;
   $('#updMonth').hidden = !rows.length;
   $('#invFoot').innerHTML = rows.length ? `Gains count from each account’s first monthly value${Math.abs(pf.earlier || 0) >= 50 ? `; what they had gained before that (${signed(pf.earlier)}) is left out, since it built up over earlier years` : ''}. Gain per account is in its own currency. <a href="#" data-itimport>Import from InvestTrack</a>` : '';
@@ -2990,7 +3004,7 @@ function renderGrowth(pf){
   const max = niceMax(Math.max(...tl.map(t => Math.max(t.tv, t.cum))));
   const x = i => L + (W-L-R) * (n === 1 ? 0.5 : i / (n-1)), y = v => T + (H-T-B) * (1 - v / max);
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Portfolio value by month, stacked by account">`;
-  for (let k = 0; k <= 4; k++){ const v = max * k / 4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${eurK.format(v)}</text>`; }
+  for (let k = 0; k <= 4; k++){ const v = max * k / 4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${hmK.format(v)}</text>`; }
   const accs = pf.withData;
   const base = tl.map(() => 0);
   accs.slice().reverse().forEach((xa) => {
@@ -3004,7 +3018,7 @@ function renderGrowth(pf){
   const every = Math.max(1, Math.ceil(n / (narrow ? 4 : 10)));
   tl.forEach((t, i) => {
     const bw = (W-L-R) / Math.max(1, n-1);
-    s += `<rect x="${x(i) - bw/2}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(t.m)}${t.m > pf.last ? ' so far' : ''} · value ${eur0.format(t.tv)} · put in so far ${eur0.format(t.cum)}"/>`;
+    s += `<rect x="${x(i) - bw/2}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(t.m)}${t.m > pf.last ? ' so far' : ''} · value ${hm0.format(t.tv)} · put in so far ${hm0.format(t.cum)}"/>`;
     if (tick(i, n, every)) s += `<text x="${x(i)}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : 'middle'}">${mShort(t.m)}</text>`;
   });
   s += `</svg>`;
@@ -3022,7 +3036,7 @@ function renderMonthly(pf){
   const span = niceMax(Math.max(hi - lo, 1e-9)), step = span / 4;
   const top = Math.ceil(hi / step) * step || step, bot = Math.floor(lo / step) * step;
   const y = v => T + (H-T-B) * (top - v) / (top - bot || 1);
-  const fmt = v => state.im === 'profit' ? (v * 100).toFixed(Math.abs(step) < 0.01 ? 1 : 0) + '%' : eurK.format(v);
+  const fmt = v => state.im === 'profit' ? (v * 100).toFixed(Math.abs(step) < 0.01 ? 1 : 0) + '%' : hmK.format(v);
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${state.im === 'profit' ? 'Monthly market return' : 'Monthly investment'}">`;
   for (let v = bot; v <= top + step / 2; v += step) s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${fmt(Math.abs(v) < step / 1e6 ? 0 : v)}</text>`;
   const bw = (W-L-R) / n, w = Math.min(18, bw * 0.62), every = Math.max(1, Math.ceil(n / (narrow ? 3 : 8)));
@@ -3030,7 +3044,7 @@ function renderMonthly(pf){
     const v = vs[i], cx = L + i*bw + bw/2, y0 = y(0), y1 = y(v);
     const color = state.im === 'invested' ? 'var(--c-inc)' : v >= 0 ? 'var(--good)' : 'var(--danger)';
     s += `<rect x="${cx - w/2}" y="${Math.min(y0, y1)}" width="${w}" height="${Math.max(1, Math.abs(y1 - y0))}" rx="2" fill="${color}"/>`;
-    s += `<rect x="${L + i*bw}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(t.m)} · ${state.im === 'profit' ? `return ${signed(t.profit)} (${t.pct === null ? '—' : pct(t.pct)})` : `put in ${eur0.format(t.fresh)}${t.inv - t.fresh >= 1 ? ` (plus ${eur0.format(t.inv - t.fresh)} opening balance)` : ''}`}"/>`;
+    s += `<rect x="${L + i*bw}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(t.m)} · ${state.im === 'profit' ? `return ${signed(t.profit)} (${t.pct === null ? '—' : pct(t.pct)})` : `put in ${hm0.format(t.fresh)}${t.inv - t.fresh >= 1 ? ` (plus ${hm0.format(t.inv - t.fresh)} opening balance)` : ''}`}"/>`;
     if (tick(i, n, every)) s += `<text x="${i === n-1 ? W-R : cx}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : 'middle'}">${mShort(t.m)}</text>`;
   });
   s += `<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/></svg>`;
@@ -3044,7 +3058,7 @@ function renderInvDetail(a){
   const before = rows.length ? rows[0].value - rows[0].inv : 0;
   const value = last ? last.value + pend : null, g = last && invested > 0 ? (value - invested) / invested : null;
   const pred = state.showPred ? predict(a, rows, 60) : [];
-  const fx = cur !== 'EUR' && value !== null ? latestRate(cur) : 0;
+  const fx = cur !== HOME() && value !== null ? lRH(cur) : 0;
   $('#accDetail').innerHTML = `
     <div><button class="btn ghost" type="button" data-backaccs>← Wealth</button></div>
     <div class="tdhead">
@@ -3056,7 +3070,7 @@ function renderInvDetail(a){
       </div>
     </div>
     ${rows.length ? `<section class="kpis w">
-      <div class="kpi"><span class="lbl">Value</span><span class="val">${fmtW(a, value)}</span><span class="sub">${pend ? `${monthLabel(last.month)} value ${fmtW(a, last.value)} ${pend > 0 ? '+' : '−'} ${fmtW(a, Math.abs(pend))} moved since` : monthLabel(last.month)}${fx ? ' · ≈ ' + eur0.format(value * fx) + ' today' : ''}</span></div>
+      <div class="kpi"><span class="lbl">Value</span><span class="val">${fmtW(a, value)}</span><span class="sub">${pend ? `${monthLabel(last.month)} value ${fmtW(a, last.value)} ${pend > 0 ? '+' : '−'} ${fmtW(a, Math.abs(pend))} moved since` : monthLabel(last.month)}${fx ? ' · ≈ ' + hm0.format(value * fx) + ' today' : ''}</span></div>
       <div class="kpi"><span class="lbl">In since tracking</span><span class="val">${fmtW(a, invested)}</span><span class="sub">its ${monthLabel(rows[0].month)} value plus money added since${Math.abs(before) >= 1 && rows[0].inv > 0 ? ` · before that: paid ${fmtW(a, rows[0].inv)}, worth ${fmtW(a, rows[0].value)} (${pct(before / rows[0].inv)})` : ''}</span></div>
       <div class="kpi"><span class="lbl">Gain since tracking</span><span class="val ${value - invested < 0 ? 'neg' : ''}">${value - invested >= 0 ? '+' : '−'}${fmtW(a, Math.abs(value - invested))}</span><span class="sub">${g === null ? '' : pct(g) + ' in ' + cur}</span></div>
     </section>
@@ -3130,33 +3144,36 @@ function fireCalc(p){
   return { yrs, fae, num, proj, need, reach, on: proj >= num };
 }
 function renderFire(pf){
-  const f = state.fire || {}, led = ledgerAnnualSpend(), y0 = new Date().getFullYear();
+  // Two separate plans: a euro one for life in Germany (spending from the ledger) and a rupee one for life in India.
+  const inr = HOME() === 'INR', sym = curSym(HOME());
+  const f = (inr ? state.fireInr : state.fire) || {}, led = inr ? null : ledgerAnnualSpend(), y0 = new Date().getFullYear();
   const ledSave = pf.l12 && pf.l12.months ? pf.l12.invested / pf.l12.months : null;
-  const p = { exp: f.expenses ?? (led ? Math.round(led.v) : 0), inf: f.inflation ?? 3, year: f.fireYear ?? y0 + 20, wr: f.withdrawal ?? 4,
-    save: f.savings ?? (ledSave !== null ? Math.round(ledSave) : 0), ret: f.returnPct ?? 7,
+  const p = { exp: f.expenses ?? (led ? Math.round(led.v) : 0), inf: f.inflation ?? (inr ? 6 : 3), year: f.fireYear ?? (inr ? (state.fire?.fireYear ?? y0 + 20) : y0 + 20), wr: f.withdrawal ?? (inr ? 3.5 : 4),
+    save: f.savings ?? (ledSave !== null ? Math.round(ledSave) : 0), ret: f.returnPct ?? (inr ? 10 : 7),
     cur: pf.withData.filter(x => x.a.inFire !== false).reduce((s,x) => s + x.valueEur, 0) };
   const left = pf.withData.filter(x => x.a.inFire === false);
-  const c = fireCalc(p), prog = c.num > 0 ? p.cur / c.num : 0;
+  const c = fireCalc(p), prog = c.num > 0 ? p.cur / c.num : 0, noExp = !(p.exp > 0);
   const src = (key, val, label) => val === null ? '' : f[key] !== undefined && f[key] !== null
-    ? `<span class="src">${label}: ${eur0.format(val)} · <button type="button" data-fireuse="${key}">use this</button></span>` : `<span class="src">From ${label.toLowerCase()}</span>`;
-  $('#wv-fire').innerHTML = `
-    <section class="kpis w">
-      <div class="kpi"><span class="lbl">FIRE number</span><span class="val">${eur0.format(c.num)}</span><span class="sub">${eur0.format(c.fae)} a year in ${p.year}, at ${p.wr}% withdrawal</span></div>
-      <div class="kpi"><span class="lbl">Invested today</span><span class="val">${eur0.format(p.cur)}</span><span class="sub">${(prog * 100).toFixed(0)}% of the way${left.length ? ` · leaves out ${left.map(x => esc(x.a.name)).join(', ')} (${eur0.format(left.reduce((s,x) => s + x.valueEur, 0))})` : ''}</span><div class="progress" aria-hidden="true"><i style="width:${Math.min(100, prog * 100).toFixed(1)}%"></i></div></div>
-      <div class="kpi"><span class="lbl">Projected in ${p.year}</span><span class="val">${eur0.format(c.proj)}</span><span class="sub"><span class="pill ${c.on ? 'ontrack' : 'over'}">${c.on ? 'On track' : 'Behind'}</span> ${c.num > 0 ? (c.proj / c.num * 100).toFixed(0) + '% of target' : ''}</span></div>
-      <div class="kpi"><span class="lbl">Needed a month</span><span class="val">${c.need === null ? '—' : eur0.format(c.need)}</span><span class="sub">${c.reach ? 'At your pace: FIRE around ' + c.reach : 'Not reached within 60 years at this pace'}</span></div>
+    ? `<span class="src">${label}: ${hm0.format(val)} · <button type="button" data-fireuse="${key}">use this</button></span>` : `<span class="src">From ${label.toLowerCase()}</span>`;
+  $('#wv-fire').innerHTML = `${inr ? `<div class="banner"><span class="left"><span><strong>Plan for life in India</strong> · in rupees, with its own spending, inflation and return. Your euro plan stays as it is; switch back with €.</span></span></div>` : ''}
+    ${noExp ? `<div class="panel"><p class="empty" style="margin:0">Enter your expected yearly spending${inr ? ' in India (in rupees, at today’s prices)' : ''} under Assumptions to see your FIRE number.</p></div>` : ''}
+    <section class="kpis w" ${noExp ? 'hidden' : ''}>
+      <div class="kpi"><span class="lbl">FIRE number</span><span class="val">${hm0.format(c.num)}</span><span class="sub">${hm0.format(c.fae)} a year in ${p.year}, at ${p.wr}% withdrawal</span></div>
+      <div class="kpi"><span class="lbl">Invested today</span><span class="val">${hm0.format(p.cur)}</span><span class="sub">${(prog * 100).toFixed(0)}% of the way${left.length ? ` · leaves out ${left.map(x => esc(x.a.name)).join(', ')} (${hm0.format(left.reduce((s,x) => s + x.valueEur, 0))})` : ''}</span><div class="progress" aria-hidden="true"><i style="width:${Math.min(100, prog * 100).toFixed(1)}%"></i></div></div>
+      <div class="kpi"><span class="lbl">Projected in ${p.year}</span><span class="val">${hm0.format(c.proj)}</span><span class="sub"><span class="pill ${c.on ? 'ontrack' : 'over'}">${c.on ? 'On track' : 'Behind'}</span> ${c.num > 0 ? (c.proj / c.num * 100).toFixed(0) + '% of target' : ''}</span></div>
+      <div class="kpi"><span class="lbl">Needed a month</span><span class="val">${c.need === null ? '—' : hm0.format(c.need)}</span><span class="sub">${c.reach ? 'At your pace: FIRE around ' + c.reach : 'Not reached within 60 years at this pace'}</span></div>
     </section>
-    <section class="panel"><header><h2>Path to FIRE</h2><span class="legend"><span><i style="background:var(--bar)"></i>Projected portfolio</span><span><i style="background:var(--s2)"></i>FIRE number that year</span></span></header><div id="fireChart"></div></section>
+    <section class="panel" ${noExp ? 'hidden' : ''}><header><h2>Path to FIRE</h2><span class="legend"><span><i style="background:var(--bar)"></i>Projected portfolio</span><span><i style="background:var(--s2)"></i>FIRE number that year</span></span></header><div id="fireChart"></div></section>
     <section class="panel"><header><h2>Assumptions</h2><span class="hint">Changes save for both of you</span></header>
       <div class="fire-grid">
-        <label>Yearly spending today (€)<input type="number" step="100" min="0" inputmode="decimal" data-fire="expenses" value="${f.expenses ?? ''}" placeholder="${led ? Math.round(led.v) : 'e.g. 30000'}">${src('expenses', led ? led.v : null, led ? `Ledger, ${led.n} month${led.n===1?'':'s'}` : 'Ledger')}${led && (f.expenses === undefined || f.expenses === null) ? `<span class="src">Average of ${led.n} month${led.n===1?'':'s'} × 12</span>` : ''}</label>
-        <label>Invested per month (€)<input type="number" step="10" min="0" inputmode="decimal" data-fire="savings" value="${f.savings ?? ''}" placeholder="${ledSave !== null ? Math.round(ledSave) : ''}">${src('savings', ledSave, 'Last 12 months')}</label>
+        <label>Yearly spending today (${sym})<input type="number" step="${inr ? 10000 : 100}" min="0" inputmode="decimal" data-fire="expenses" value="${f.expenses ?? ''}" placeholder="${led ? Math.round(led.v) : inr ? 'e.g. 1500000' : 'e.g. 30000'}">${src('expenses', led ? led.v : null, led ? `Ledger, ${led.n} month${led.n===1?'':'s'}` : 'Ledger')}${led && (f.expenses === undefined || f.expenses === null) ? `<span class="src">Average of ${led.n} month${led.n===1?'':'s'} × 12</span>` : ''}</label>
+        <label>Invested per month (${sym})<input type="number" step="10" min="0" inputmode="decimal" data-fire="savings" value="${f.savings ?? ''}" placeholder="${ledSave !== null ? Math.round(ledSave) : ''}">${src('savings', ledSave, 'Last 12 months')}</label>
         <label>FIRE year<input type="number" step="1" min="${y0}" max="${y0 + 60}" inputmode="numeric" data-fire="fireYear" value="${p.year}"><span class="src">${c.yrs} year${c.yrs===1?'':'s'} from now</span></label>
-        <label>Return a year (%)<input type="number" step="0.1" inputmode="decimal" data-fire="returnPct" value="${p.ret}"><span class="src">Yours so far: ${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + '% in euros'}${pf.xirrLocal === null ? '' : ', ' + (pf.xirrLocal * 100).toFixed(1) + '% without currency'}</span></label>
+        <label>Return a year (%)<input type="number" step="0.1" inputmode="decimal" data-fire="returnPct" value="${p.ret}"><span class="src">Yours so far: ${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + (inr ? '% in rupees' : '% in euros')}${pf.xirrLocal === null ? '' : ', ' + (pf.xirrLocal * 100).toFixed(1) + '% without currency'}</span></label>
         <label>Inflation (%)<input type="number" step="0.1" inputmode="decimal" data-fire="inflation" value="${p.inf}"></label>
         <label>Withdrawal rate (%)<input type="number" step="0.1" min="0.1" inputmode="decimal" data-fire="withdrawal" value="${p.wr}"></label>
       </div>
-      <p class="hint">Invested today is the live value of your investment accounts that count towards FIRE (set per account with Edit). Leave spending or monthly investing empty to follow your ledger.</p>
+      <p class="hint">Invested today is the live value of your investment accounts that count towards FIRE (set per account with Edit).${inr ? ' Monthly investing follows the last 12 months, in rupees, unless you type a figure.' : ' Leave spending or monthly investing empty to follow your ledger.'}</p>
     </section>`;
   const yrs = Math.max(c.yrs, c.reach ? c.reach - y0 : 0, 5), r = p.ret / 100;
   const pts = []; for (let k = 0; k <= yrs; k++){ const g = Math.pow(1 + r, k); pts.push({ yr: y0 + k, v: p.cur * g + (r > 0 ? p.save * 12 * (g - 1) / r : p.save * 12 * k), t: p.wr > 0 ? p.exp * Math.pow(1 + p.inf / 100, k) / (p.wr / 100) : 0 }); }
@@ -3164,23 +3181,24 @@ function renderFire(pf){
   const max = niceMax(Math.max(...pts.map(q => Math.max(q.v, q.t))));
   const x = i => L + (W-L-R) * i / Math.max(1, n-1), yy = v => T + (H-T-B) * (1 - v / max);
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Projected portfolio against the FIRE number by year">`;
-  for (let k = 0; k <= 4; k++){ const v = max * k / 4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${yy(v)}" y2="${yy(v)}"/><text x="${L-8}" y="${yy(v)+4}" text-anchor="end">${eurK.format(v)}</text>`; }
+  for (let k = 0; k <= 4; k++){ const v = max * k / 4; s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${yy(v)}" y2="${yy(v)}"/><text x="${L-8}" y="${yy(v)+4}" text-anchor="end">${hmK.format(v)}</text>`; }
   s += `<path d="${pts.map((q,i) => (i?'L':'M') + x(i).toFixed(1) + ',' + yy(q.t).toFixed(1)).join(' ')}" fill="none" stroke="var(--s2)" stroke-width="2" stroke-dasharray="6 4"/>`;
   s += `<path d="${pts.map((q,i) => (i?'L':'M') + x(i).toFixed(1) + ',' + yy(q.v).toFixed(1)).join(' ')}" fill="none" stroke="var(--bar)" stroke-width="2.4"/>`;
   const fi = pts.findIndex(q => q.yr === p.year);
   if (fi >= 0) s += `<line x1="${x(fi)}" x2="${x(fi)}" y1="${T}" y2="${H-B}" stroke="var(--muted)" stroke-dasharray="2 3"/><text x="${x(fi) - 4}" y="${T+10}" text-anchor="end" style="fill:var(--ink-2)">${p.year}</text>`;
   const every = Math.max(1, Math.ceil(n / (innerWidth <= 640 ? 4 : 10)));
-  pts.forEach((q, i) => { s += `<rect x="${x(i) - (W-L-R)/Math.max(1,n-1)/2}" y="${T}" width="${(W-L-R)/Math.max(1,n-1)}" height="${H-T-B}" fill="transparent" data-tip="${q.yr} · projected ${eur0.format(q.v)} · FIRE number ${eur0.format(q.t)}"/>`;
+  pts.forEach((q, i) => { s += `<rect x="${x(i) - (W-L-R)/Math.max(1,n-1)/2}" y="${T}" width="${(W-L-R)/Math.max(1,n-1)}" height="${H-T-B}" fill="transparent" data-tip="${q.yr} · projected ${hm0.format(q.v)} · FIRE number ${hm0.format(q.t)}"/>`;
     if (i % every === 0) s += `<text x="${x(i)}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : i === 0 ? 'start' : 'middle'}">${q.yr}</text>`; });
   $('#fireChart').innerHTML = s + '</svg>';
 }
 const FIRE_KEYS = ['expenses','inflation','fireYear','withdrawal','savings','returnPct'];
 async function saveFire(patch){
-  const next = { ...state.fire, ...patch }, o = {};
+  const inr = HOME() === 'INR', key = inr ? 'fireInr' : 'fire';
+  const next = { ...state[key], ...patch }, o = {};
   for (const k of FIRE_KEYS) if (typeof next[k] === 'number' && isFinite(next[k])) o[k] = next[k];
   o.updatedAt = new Date().toISOString(); o.updatedBy = usernameOf(state.user);
-  state.fire = o; render();
-  try { await setDoc(doc(fs, 'settings', 'fire'), o); } catch (x){ toast(writeError(x)); }
+  state[key] = o; render();
+  try { await setDoc(doc(fs, 'settings', key), o); } catch (x){ toast(writeError(x)); }
 }
 document.addEventListener('change', e => {
   const i = e.target.closest('[data-fire]'); if (!i) return;
@@ -3510,6 +3528,7 @@ $('#itForm').addEventListener('submit', async e => {
 document.addEventListener('click', e => {
   const t = e.target;
   const wv = t.closest('#wSeg [data-wv]'); if (wv){ state.wv = wv.dataset.wv; render(); return; }
+  const hs = t.closest('#homeSeg [data-home]'); if (hs){ state.home = hs.dataset.home; try { localStorage.setItem('homeCur', state.home); } catch {} pfCache = null; loadRates(); render(); return; }
   const tg = t.closest('[data-txgo]'); if (tg){ state.txKind = tg.dataset.txgo; render(); return; }
   const im = t.closest('#invMSeg [data-im]'); if (im){ state.im = im.dataset.im; render(); return; }
   const ir = t.closest('#invRSeg [data-ir]'); if (ir){ state.ir = ir.dataset.ir; render(); return; }
@@ -3767,6 +3786,7 @@ function backupData(){
   const settings = [];
   if ((state.budgets.items || []).length || state.budgets.total) settings.push({ id:'budgets', ...state.budgets });
   if (state.fire && Object.keys(state.fire).length) settings.push({ id:'fire', ...state.fire });
+  if (state.fireInr && Object.keys(state.fireInr).length) settings.push({ id:'fireInr', ...state.fireInr });
   if (Object.keys(state.fxMonths).length) settings.push({ id:'fx', months: state.fxMonths });
   collections.settings = settings;
   return { app:'S&A Ledger', version:1, exportedAt: new Date().toISOString(), collections };
@@ -3799,7 +3819,7 @@ $('#rsForm').addEventListener('submit', async e => {
   const writes = [];
   for (const [c, v] of Object.entries(data.collections)){
     if (!RS_LABEL[c] || !Array.isArray(v)) continue;
-    for (const d of v){ if (!d || !d.id) continue; if (c === 'settings' && !['budgets','fire','fx'].includes(d.id)) continue;
+    for (const d of v){ if (!d || !d.id) continue; if (c === 'settings' && !['budgets','fire','fireInr','fx'].includes(d.id)) continue;
       const { id, ...rest } = d; DERIVED.forEach(k => delete rest[k]); writes.push([c, id, rest]); }
   }
   $('#rsSave').disabled = true; $('#rsSave').textContent = 'Restoring…';
