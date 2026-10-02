@@ -318,6 +318,7 @@ table.snaps tr.row:hover td{background:var(--sunk)}
 @media (max-width:640px){
   .umrow{grid-template-columns:minmax(0,1fr) 92px 104px}
   #wSeg{width:100%}#wSeg button{flex:1;padding:6px 8px}
+  #invMonthlyP header .right .seg button{padding:5px 9px;font-size:13px}
   .sirow{grid-template-columns:minmax(0,1fr) 96px 28px}
   .kpis.w .val{font-size:18px;white-space:nowrap}
   .kpis .kpi:last-child:nth-child(odd){grid-column:1/-1;border-top:1px solid var(--line)}
@@ -630,7 +631,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
           <div class="banner" id="invEmpty" hidden></div>
           <section class="kpis w" id="invKpis" aria-label="Investments"></section>
           <section class="panel" id="invGrowthP"><header><h2>Portfolio value</h2><span class="hint" id="invGrowthHint"></span></header><div id="invGrowth"></div><div class="legend wrapleg" id="invLegend"></div></section>
-          <section class="panel" id="invMonthlyP"><header><h2 id="invMTitle">Monthly return</h2><div class="seg" role="radiogroup" aria-label="Monthly chart" id="invMSeg"><button type="button" role="radio" data-im="profit">Return</button><button type="button" role="radio" data-im="invested">Invested</button></div></header><div id="invMonthly"></div><p class="hint" id="invMHint"></p></section>
+          <section class="panel" id="invMonthlyP"><header><h2 id="invMTitle">Monthly return</h2><span class="right"><span class="seg" role="radiogroup" aria-label="Period" id="invRSeg"><button type="button" role="radio" data-ir="12">12 months</button><button type="button" role="radio" data-ir="all">All</button></span><span class="seg" role="radiogroup" aria-label="Monthly chart" id="invMSeg"><button type="button" role="radio" data-im="profit">Return</button><button type="button" role="radio" data-im="invested">Invested</button></span></span></header><div id="invMonthly"></div><p class="hint" id="invMHint"></p></section>
           <section class="panel">
             <header><h2>Investment accounts</h2><div class="right"><button class="btn" id="newInv" type="button">+ Account</button><button class="btn primary" id="updMonth" type="button">Update month</button></div></header>
             <div class="ilist" id="invList"></div>
@@ -2990,7 +2991,8 @@ function renderGrowth(pf){
 }
 
 function renderMonthly(pf){
-  const tl = pf.tl.filter(t => state.im === 'invested' || t.has).slice(-24), n = tl.length, narrow = innerWidth <= 640;
+  $$('#invRSeg [data-ir]').forEach(b => b.setAttribute('aria-checked', b.dataset.ir === (state.ir || '12')));
+  const tl = pf.tl.filter(t => state.im === 'invested' || t.has).slice(state.ir === 'all' ? 0 : -12), n = tl.length, narrow = innerWidth <= 640;
   if (!n){ $('#invMonthly').innerHTML = '<div class="empty">Needs at least two months.</div>'; return; }
   const W = wideW(), H = narrow ? 200 : 230, L = narrow ? 70 : 52, R = 8, T = 12, B = 26;
   const val = t => state.im === 'profit' ? (t.pct || 0) : t.fresh;
@@ -3001,7 +3003,7 @@ function renderMonthly(pf){
   const fmt = v => state.im === 'profit' ? (v * 100).toFixed(Math.abs(step) < 0.01 ? 1 : 0) + '%' : eurK.format(v);
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${state.im === 'profit' ? 'Monthly market return' : 'Monthly investment'}">`;
   for (let v = bot; v <= top + step / 2; v += step) s += `<line class="gridline" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${fmt(Math.abs(v) < step / 1e6 ? 0 : v)}</text>`;
-  const bw = (W-L-R) / n, w = Math.min(18, bw * 0.62), every = Math.max(1, Math.ceil(n / (narrow ? 4 : 12)));
+  const bw = (W-L-R) / n, w = Math.min(18, bw * 0.62), every = Math.max(1, Math.ceil(n / (narrow ? 3 : 8)));
   tl.forEach((t, i) => {
     const v = vs[i], cx = L + i*bw + bw/2, y0 = y(0), y1 = y(v);
     const color = state.im === 'invested' ? 'var(--c-inc)' : v >= 0 ? 'var(--good)' : 'var(--danger)';
@@ -3485,6 +3487,7 @@ document.addEventListener('click', e => {
   const wv = t.closest('#wSeg [data-wv]'); if (wv){ state.wv = wv.dataset.wv; render(); return; }
   const tg = t.closest('[data-txgo]'); if (tg){ state.txKind = tg.dataset.txgo; render(); return; }
   const im = t.closest('#invMSeg [data-im]'); if (im){ state.im = im.dataset.im; render(); return; }
+  const ir = t.closest('#invRSeg [data-ir]'); if (ir){ state.ir = ir.dataset.ir; render(); return; }
   if (t.closest('[data-itimport]')){ e.preventDefault(); $('#itFile').click(); return; }
   if (t.closest('[data-pred]')){ state.showPred = !state.showPred; render(); return; }
   const as = t.closest('[data-addsnap]'); if (as){ openSnap(state.accounts.find(a => a.id === as.dataset.addsnap), null); return; }
