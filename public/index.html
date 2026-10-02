@@ -2759,12 +2759,20 @@ function portfolio(){
   const res = { accs, withData, tl: [], value: 0, cost: 0, market: 0, fx: 0, net: 0, xirr: null, l12: null };
   if (!withData.length) return pfCache = res;
   const first = withData.map(x => x.rows[0].month).sort()[0], last = withData.map(x => x.rows[x.rows.length-1].month).sort().pop();
-  const months = monthsBetween(first, last);
+  // Money moved in after an account's last monthly value shows in the month it moved, at face value,
+  // so the charts run up to the current month instead of stopping at the last update.
+  withData.forEach(x => { x.pendM = pendingByMonth(x.a, x.rows[x.rows.length-1].month); });
+  const endM = [last, ...withData.flatMap(x => Object.keys(x.pendM))].sort().pop();
+  const months = monthsBetween(first, endM);
   for (const x of withData){
-    const byM = Object.fromEntries(x.rows.map(r => [r.month, r]));
-    let v = null; x.vals = []; x.invs = [];
+    const byM = Object.fromEntries(x.rows.map(r => [r.month, r])), lastM = x.rows[x.rows.length-1].month;
+    let v = null, cumP = 0; x.vals = []; x.invs = [];
     x.fresh = []; x.rec = [];
-    for (const m of months){ const r = byM[m]; if (r) v = r.value; x.vals.push(v); x.invs.push(r ? r.inv : 0); x.fresh.push(r && !r.opening ? r.inv : 0); x.rec.push(!!r); }
+    for (const m of months){
+      const r = byM[m]; if (r) v = r.value;
+      const extra = m > lastM ? (x.pendM[m] || 0) : 0; cumP += extra;
+      x.vals.push(v === null ? null : v + cumP); x.invs.push((r ? r.inv : 0) + extra); x.fresh.push((r && !r.opening ? r.inv : 0) + extra); x.rec.push(!!r);
+    }
     x.last = x.rows[x.rows.length-1];
     x.invested = x.rows.reduce((s,r) => s + r.inv, 0);
     // Transfers after the last monthly value aren't in it yet: count them at face value (no gain, no currency
@@ -2799,9 +2807,8 @@ function portfolio(){
   res.cost = withData.reduce((s,x) => s + x.cost, 0);
   res.market = withData.reduce((s,x) => s + x.market, 0);
   res.net = res.value - res.cost; res.fx = res.net - res.market;
-  const end = Math.min(mTime(addMonth(last, 1)), Date.now());
-  const pendEur = withData.reduce((s,x) => s + x.pending * latestRate(x.cur), 0);
-  res.xirr = xirr([...res.tl.filter(t => t.inv).map(t => ({ t: mTime(t.m), v: -t.inv })), { t: end, v: res.value - pendEur }]);
+  const end = Math.min(mTime(addMonth(endM, 1)), Date.now());
+  res.xirr = xirr([...res.tl.filter(t => t.inv).map(t => ({ t: mTime(t.m), v: -t.inv })), { t: end, v: res.value }]);
   // A month counts once some account with history has a value for it; a month holding only a new account's
   // opening balance (or nothing yet) doesn't move the 12-month window.
   let lastReal = res.tl.length - 1; while (lastReal > 0 && !res.tl[lastReal].has) lastReal--;
@@ -2817,6 +2824,15 @@ function investedIn(period){
   if (period === 'all') return pf.tl.reduce((s,t) => s + t.fresh, 0);
   const t = pf.tl.find(t => t.m === period);
   return t ? t.fresh : null;
+}
+function pendingByMonth(a, afterMonth){
+  const n = a.name.toLowerCase(), td = today(), out = {};
+  for (const t of state.transfers){
+    const m = t.date.slice(0,7); if (m <= afterMonth || t.date > td) continue;
+    const v = String(t.to).toLowerCase() === n ? inAccCur(a, t) : String(t.from).toLowerCase() === n ? -inAccCur(a, t) : 0;
+    if (v) out[m] = Math.round(((out[m] || 0) + v) * 100) / 100;
+  }
+  return out;
 }
 // Net transfers into an account dated after a given month (up to today), in the account's currency.
 function pendingIn(a, afterMonth){
@@ -2965,7 +2981,7 @@ function renderGrowth(pf){
   const every = Math.max(1, Math.ceil(n / (narrow ? 4 : 10)));
   tl.forEach((t, i) => {
     const bw = (W-L-R) / Math.max(1, n-1);
-    s += `<rect x="${x(i) - bw/2}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(t.m)} · value ${eur0.format(t.tv)} · put in so far ${eur0.format(t.cum)}"/>`;
+    s += `<rect x="${x(i) - bw/2}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(t.m)}${t.m > pf.last ? ' so far' : ''} · value ${eur0.format(t.tv)} · put in so far ${eur0.format(t.cum)}"/>`;
     if (tick(i, n, every)) s += `<text x="${x(i)}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : 'middle'}">${mShort(t.m)}</text>`;
   });
   s += `</svg>`;
@@ -3030,12 +3046,17 @@ function renderInvDetail(a){
       ${rows.slice().reverse().map(r => `<tr class="row" data-editsnap="${esc(r.s.id)}" tabindex="0"><td>${monthLabel(r.month)}${r.opening ? '<span class="tag">opening balance</span>' : ''}${r.modelled ? '<span class="modelled">modelled</span>' : ''}${r.missing ? '<span class="modelled">no value</span>' : ''}</td><td class="num">${fmtW(a, r.inv)}</td><td class="num">${fmtW(a, r.value)}</td>
         <td class="num">${r.expected === null ? '—' : fmtW(a, r.expected)}</td><td class="num ${r.diff === null || r.modelled ? '' : r.diff >= 0 ? 'pos' : 'neg'}">${r.diff === null || r.base ? '—' : pct(r.diff, 2)}</td></tr>`).join('')}</tbody></table></div>
     </section>` : `<div class="panel"><p class="empty" style="margin:0">No monthly values yet. Use “+ Add month” to enter${a.valueMode === 'auto' ? ' the first value; later months are modelled from the return rate' : ' what you put in and what it was worth'}.</p></div>`}`;
-  if (rows.length) renderAccChart(a, rows, pred);
+  if (rows.length){
+    let cv = last.value, ci = 0;
+    const extra = Object.entries(pendingByMonth(a, last.month)).sort().map(([m, v]) => { cv += v; ci += v; return { month: m, value: cv, inv: v, moved: true }; });
+    renderAccChart(a, rows.concat(extra), pred);
+  }
 }
 
 function renderAccChart(a, rows, pred){
+  pred = pred.filter(p => p.month > rows[rows.length-1].month);
   let cum = 0;
-  const pts = rows.map(r => ({ m: r.month, v: r.value, c: (cum += r.inv) })).concat(pred.map(p => ({ m: p.month, v: p.value, c: p.invested, p: true })));
+  const pts = rows.map(r => ({ m: r.month, v: r.value, c: (cum += r.inv), moved: r.moved })).concat(pred.map(p => ({ m: p.month, v: p.value, c: p.invested, p: true })));
   const n = pts.length, narrow = innerWidth <= 640;
   const W = wideW(), H = narrow ? 220 : 260, L = narrow ? 92 : 70, R = 10, T = 12, B = 26;
   const max = niceMax(Math.max(...pts.map(p => Math.max(p.v, p.c))));
@@ -3057,7 +3078,7 @@ function renderAccChart(a, rows, pred){
   const every = Math.max(1, Math.ceil(n / (narrow ? 3 : 10)));
   pts.forEach((p, i) => {
     const bw = (W-L-R) / Math.max(1, n-1);
-    s += `<rect x="${x(i) - bw/2}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(p.m)}${p.p ? ' (projected)' : ''} · value ${fmtW(a, p.v)} · put in ${fmtW(a, p.c)}"/>`;
+    s += `<rect x="${x(i) - bw/2}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-tip="${monthLabel(p.m)}${p.p ? ' (projected)' : p.moved ? ' so far (money moved in, month not updated yet)' : ''} · value ${fmtW(a, p.v)} · put in ${fmtW(a, p.c)}"/>`;
     if (tick(i, n, every)) s += `<text x="${x(i)}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : 'middle'}">${mShort(p.m)}</text>`;
   });
   $('#accChart').innerHTML = s + '</svg>';
