@@ -255,6 +255,42 @@ table.mini .num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text
 table.mini th.num{font-family:var(--f-body)}
 .neg{color:var(--danger)}
 .mmeta{display:none;font-size:12px;color:var(--muted);margin-top:1px}
+/* ask AI */
+.aibtn{position:fixed;right:24px;bottom:24px;z-index:16;display:inline-flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:11px 16px;background:var(--ink);color:var(--ground);font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(21,32,28,.25)}
+.aibtn:hover{filter:brightness(1.1)}
+#app[hidden] ~ .aibtn{display:none}
+.aidlg{padding:0;border:0;max-width:none;max-height:none;margin:0 0 0 auto;height:100dvh;width:min(460px,100vw);border-radius:0;background:var(--surface);color:var(--ink);box-shadow:-8px 0 30px rgba(0,0,0,.18)}
+.aidlg::backdrop{background:rgba(10,15,13,.35)}
+.aiwrap{display:grid;grid-template-rows:auto 1fr auto auto;height:100%}
+.aihead{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+.aihead h3{margin:0;font:700 17px/1 var(--f-display)}
+.aihead .right{display:flex;gap:6px}
+.aimsgs{overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.aim{max-width:92%;font-size:14.5px;line-height:1.5}
+.aim.u{align-self:flex-end;background:var(--accent);color:var(--accent-ink);padding:9px 13px;border-radius:14px 14px 4px 14px;white-space:pre-wrap}
+.aim.a{align-self:flex-start;background:var(--sunk);padding:10px 14px;border-radius:14px 14px 14px 4px}
+.aim.a p{margin:0 0 8px}.aim.a p:last-child{margin:0}
+.aim.a ul,.aim.a ol{margin:4px 0 8px;padding-left:20px}.aim.a li{margin:2px 0}
+.aim.a h4{margin:10px 0 4px;font:700 14px/1.3 var(--f-display)}
+.aim.a code{font-family:var(--f-mono);font-size:13px}
+.aim.a table{min-width:0;width:100%;border-collapse:collapse;margin:6px 0;font-size:13px}
+.aim.a th,.aim.a td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;font-weight:400}
+.aim.a th{font-weight:600;text-transform:none;letter-spacing:0;color:var(--ink-2)}
+.aim.err{align-self:stretch;background:var(--danger-soft);color:var(--danger);padding:10px 14px;border-radius:10px}
+.aim.typing::after{content:"▍";animation:aiblink 1s steps(2) infinite;margin-left:2px}
+@keyframes aiblink{50%{opacity:0}}
+.aisug{display:grid;gap:8px}
+.aisug p{margin:0 0 4px;color:var(--muted);font-size:13.5px}
+.aisug button{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;cursor:pointer;color:var(--ink);font:inherit;font-size:14px}
+.aisug button:hover{border-color:var(--muted)}
+.aiform{display:flex;gap:8px;padding:12px 16px 6px;border-top:1px solid var(--line);align-items:flex-end}
+.aiform textarea{flex:1;resize:none;border:1px solid var(--line);background:var(--ground);border-radius:10px;padding:10px 12px;font:inherit;max-height:140px;color:var(--ink)}
+.ainote{margin:0;padding:0 16px 12px;font-size:11.5px;color:var(--muted)}
+@media (max-width:640px){
+  .aibtn{left:16px;right:auto;bottom:calc(76px + env(safe-area-inset-bottom,0px));padding:10px 14px}
+  .aidlg{width:100vw;height:100dvh}
+  .aiwrap{padding-bottom:env(safe-area-inset-bottom,0px)}
+}
 /* send to India */
 .linkbtn{border:0;background:none;padding:0;color:var(--accent);cursor:pointer;font:inherit;font-weight:500}
 .linkbtn:hover{text-decoration:underline}
@@ -701,6 +737,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   <a class="btab" href="#wealth" data-page="wealth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg><span>Wealth</span></a>
 </nav>
 <button class="fab" id="fab" type="button" aria-label="Add expense">+</button>
+<button class="aibtn" id="aiBtn" type="button" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z"/></svg><span>Ask AI</span></button>
 </div>
 
 <dialog id="tripDlg">
@@ -861,6 +898,15 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <p class="err" id="rsErr" hidden></p>
     <div class="dlg-actions"><div class="right"><button class="btn" id="rsCancel" type="button">Cancel</button><button class="btn primary" id="rsSave" type="submit">Restore</button></div></div>
   </form>
+</dialog>
+
+<dialog id="aiDlg" class="aidlg" aria-labelledby="aiTitle">
+  <div class="aiwrap">
+    <header class="aihead"><h3 id="aiTitle">Ask AI</h3><span class="right"><button class="btn small" type="button" id="aiNew">New chat</button><button class="btn small" type="button" id="aiClose" aria-label="Close">✕</button></span></header>
+    <div class="aimsgs" id="aiMsgs" aria-live="polite"></div>
+    <form class="aiform" id="aiForm"><textarea id="aiInput" rows="1" placeholder="Ask about your money…" aria-label="Your question"></textarea><button class="btn primary" type="submit" id="aiSend">Ask</button></form>
+    <p class="ainote">Each question sends a summary of your ledger, accounts and investments to Groq. Answers can be wrong; not financial advice.</p>
+  </div>
 </dialog>
 
 <div id="tip" hidden></div>
@@ -3775,6 +3821,138 @@ document.addEventListener('click', e => {
   const td = t.closest('[data-todo]'); if (td){ if (td.dataset.todo === 'inv') openUpdateMonth(td.dataset.m); else openCheckin(null); return; }
   if (t.closest('[data-closehide]')){ lsSet('closeHidden', thisMonth()); render(); }
 });
+
+
+// ---------- Ask AI ----------
+// A compact, plain-text picture of the finances for the model: monthly totals, this month against budgets, merchants,
+// repeats, trips, balances, investments (in euros and rupees) and both FIRE plans, plus recent entries.
+function aiContext(){
+  const L = [], f0 = v => (Math.round(v) || 0).toLocaleString('en-IE'), td = today(), cm = thisMonth();
+  const months = monthsBetween(addMonth(cm, -11), cm);
+  L.push(`Today ${td}. Ledger amounts are in EUR (foreign spending converted at the day's ECB rate).`);
+  L.push('\n## Monthly ledger, last 12 months (EUR): spent | income | invested | daily life | trips | top categories');
+  for (const m of months){
+    const ex = state.items.filter(i => i.date.startsWith(m)); if (!ex.length && !state.income.some(i => i.date.startsWith(m))) continue;
+    const spent = sum(ex), inc = sum(state.income.filter(i => i.date.startsWith(m))), inv = investedIn(m);
+    const trips = sum(ex.filter(i => i.tripId)), cats = group(ex, 'category').slice(0, 5).map(g => `${g.key} ${f0(g.total)}`).join(', ');
+    L.push(`${m}${m === cm ? ' (so far)' : ''}: ${f0(spent)} | ${f0(inc)} | ${inv === null ? '-' : f0(inv)} | ${f0(spent - trips)} | ${f0(trips)} | ${cats}`);
+  }
+  const bm = budgetMap();
+  if (Object.keys(bm).length){
+    const b = budgetStatus(cm);
+    L.push(`\n## Budgets for ${cm} (daily life only; status as of today)`);
+    b.rows.forEach(r => L.push(`${r.cat}: budget ${f0(r.budget)}, spent ${f0(r.spent)}, projected ${f0(r.projected)}${r.fixed ? ', fixed bill' : ''}, ${r.status}`));
+    if (b.unbudgeted?.length) L.push('No budget: ' + b.unbudgeted.slice(0, 6).map(u => `${u.cat} ${f0(u.spent)}`).join(', '));
+  } else L.push('\n## Budgets: none set.');
+  const since90 = addDays(td, -90), recent = state.items.filter(i => i.date >= since90);
+  L.push('\n## Top merchants, last 90 days (EUR): merchant: total (count)');
+  L.push(group(recent, 'store').slice(0, 15).map(g => `${g.key}: ${f0(g.total)} (${recent.filter(i => i.store === g.key).length})`).join('; '));
+  L.push('Spending by person, last 90 days: ' + group(recent, 'spender').map(g => `${g.key} ${f0(g.total)}`).join(', '));
+  const due = dueRecurring();
+  if (due.length) L.push('Repeats due now: ' + due.map(r => `${r.kind === 'transfer' ? r.last.from + ' to ' + r.last.to : r.last.store || r.last.source} ${f0(r.last.amount)}`).join('; '));
+  if (state.trips.length){
+    L.push('\n## Trips: name | type | dates | budget | spent');
+    state.trips.slice().sort((a,b) => String(b.start || '').localeCompare(String(a.start || ''))).slice(0, 10)
+      .forEach(t => L.push(`${t.name} | ${t.type} | ${t.start || '?'} to ${t.end || '?'} | ${t.budget ? f0(t.budget) : '-'} | ${f0(sum(tripExpenses(t.id)))}`));
+  }
+  const cash = state.accounts.filter(a => a.type !== 'investment');
+  if (cash.length){
+    L.push('\n## Bank, cash and cards (estimates from check-ins and entries; card amounts are owed)');
+    cash.forEach(a => { const e = estimate(a); L.push(`${a.name} (${a.type}, ${a.owner}, ${a.currency || 'EUR'}): ${!e || (e.base.virtual && Math.abs(e.balance) < 0.5) ? 'balance unknown (no check-in yet)' : f0(a.type === 'card' ? -e.balance : e.balance) + ' ' + (a.currency || 'EUR') + (e.base.virtual ? ' (moves since added; no check-in yet)' : ', checked in ' + e.base.date)}`); });
+  }
+  // Investments in both currencies: compute each view, then put the user's view back.
+  const keep = state.home, views = {};
+  for (const h of ['EUR','INR']){ state.home = h; pfCache = null; views[h] = portfolio(); }
+  state.home = keep; pfCache = null;
+  const pe = views.EUR, pi = views.INR, x100 = v => v === null || v === undefined ? '-' : (v * 100).toFixed(1) + '%';
+  if (pe.withData.length){
+    L.push(`\n## Investments (tracking since ${pe.since}; returns count from each account's first value)`);
+    L.push(`Total value EUR ${f0(pe.value)} (INR ${f0(pi.value)}). Put in since tracking EUR ${f0(pe.cost)}. Gain since tracking EUR ${f0(pe.net)} = market ${f0(pe.market)} + currency ${f0(pe.fx)}.`);
+    L.push(`XIRR: ${x100(pe.xirr)} in EUR, ${x100(pi.xirr)} in INR, ${x100(pe.xirrLocal)} without currency moves. Gains from before tracking (left out): EUR ${f0(pe.earlier || 0)}.`);
+    L.push(`Last 12 months: market return EUR ${f0(pe.l12.profit)}, ${pe.l12.pos} of ${pe.l12.n} months up, put in EUR ${f0(pe.l12.invested)}.`);
+    L.push('Accounts: name | kind | currency | value | value EUR | gain since tracking (own currency) | expected return | target/month | notes');
+    pe.withData.forEach(x => { const a = x.a, g = x.invested > 0 ? (x.value - x.invested) / x.invested : null;
+      L.push(`${a.name} | ${a.invType || 'other'} | ${x.cur} | ${f0(x.value)} | ${f0(x.valueEur)} | ${g === null ? '-' : x100(g)} | ${a.returnPct ?? '-'}% | ${a.target ? f0(a.target) : '-'} | ${[a.valueMode === 'auto' ? 'modelled value' : '', a.inFire === false ? 'not counted for FIRE' : '', x.pending ? 'moved in since last value ' + f0(x.pending) : '', 'updated ' + x.last.month].filter(Boolean).join(', ')}`); });
+  }
+  const plan = (key, cur, pf) => { const f = state[key] || {}; if (!(f.expenses > 0)) return null;
+    const p = { exp: f.expenses, inf: f.inflation ?? (cur === 'INR' ? 6 : 3), year: f.fireYear ?? new Date().getFullYear() + 20, wr: f.withdrawal ?? (cur === 'INR' ? 3.5 : 4),
+      save: f.savings ?? (pf.l12?.months ? pf.l12.invested / pf.l12.months : 0), ret: f.returnPct ?? (cur === 'INR' ? 10 : 7), cur: pf.withData.filter(x => x.a.inFire !== false).reduce((s,x) => s + x.valueEur, 0) };
+    const c = fireCalc(p);
+    return `${cur} plan: spend ${f0(p.exp)}/yr today, inflation ${p.inf}%, return ${p.ret}%, withdrawal ${p.wr}%, FIRE year ${p.year}, investing ${f0(p.save)}/month, invested now ${f0(p.cur)}. FIRE number ${f0(c.num)}, projected ${f0(c.proj)} (${c.on ? 'on track' : 'behind'}), needed ${c.need === null ? '-' : f0(c.need)}/month, reach around ${c.reach || 'not within 60 years'}.`; };
+  const fe = plan('fire', 'EUR', pe), fi = plan('fireInr', 'INR', pi);
+  if (fe || fi) L.push('\n## FIRE plans\n' + [fe, fi].filter(Boolean).join('\n'));
+  const since45 = addDays(td, -45);
+  const recentRows = [...state.items.filter(i => i.date >= since45).map(i => `${i.date} | ${i.store} | ${i.category} | ${(+i.amount).toFixed(2)}${i.currency && i.currency !== 'EUR' ? ' (' + i.origAmount + ' ' + i.currency + ')' : ''} | ${i.account} | ${i.spender}${i.tripId && state.tripMap[i.tripId] ? ' | trip ' + state.tripMap[i.tripId].name : ''}`),
+    ...state.income.filter(i => i.date >= since45).map(i => `${i.date} | INCOME ${i.source} | ${i.category} | ${(+i.amount).toFixed(2)} | ${i.account} | ${i.earner}`),
+    ...state.transfers.filter(t => t.date >= since45).map(t => `${t.date} | TRANSFER ${t.from} to ${t.to} | ${transferType(t)} | ${(+t.amount).toFixed(2)}${t.currency && t.currency !== 'EUR' ? ' (' + t.origAmount + ' ' + t.currency + ')' : ''}`)].sort().reverse().slice(0, 150);
+  L.push(`\n## Entries from the last 45 days (date | what | category | EUR | account | who), ${recentRows.length} shown`);
+  L.push(...recentRows);
+  return L.join('\n');
+}
+// Small, safe Markdown: text is escaped first, then headings, lists, bold, code and pipe tables.
+function aiMd(src){
+  const inline = t => t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  const lines = esc(src).split('\n'), out = []; let list = null, para = [];
+  const flush = () => { if (para.length){ out.push('<p>' + inline(para.join(' ')) + '</p>'); para = []; } if (list){ out.push(`</${list}>`); list = null; } };
+  for (let i = 0; i < lines.length; i++){
+    const ln = lines[i].trimEnd(), t = ln.trim();
+    if (!t){ flush(); continue; }
+    if (/^\|.*\|$/.test(t) && i + 1 < lines.length && /^\|?\s*:?-{2,}/.test(lines[i+1].trim())){
+      flush(); const cells = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => inline(c.trim()));
+      let h = `<table><tr>${cells(t).map(c => `<th>${c}</th>`).join('')}</tr>`; i += 2;
+      while (i < lines.length && /^\|.*\|$/.test(lines[i].trim())){ h += `<tr>${cells(lines[i]).map(c => `<td>${c}</td>`).join('')}</tr>`; i++; }
+      i--; out.push(h + '</table>'); continue;
+    }
+    let m;
+    if ((m = t.match(/^#{1,4}\s+(.*)$/))){ flush(); out.push(`<h4>${inline(m[1])}</h4>`); continue; }
+    if ((m = t.match(/^[-*•]\s+(.*)$/)) || (m = t.match(/^\d+[.)]\s+(.*)$/))){
+      const kind = /^\d/.test(t) ? 'ol' : 'ul';
+      if (para.length){ out.push('<p>' + inline(para.join(' ')) + '</p>'); para = []; }
+      if (list !== kind){ if (list) out.push(`</${list}>`); out.push(`<${kind}>`); list = kind; }
+      out.push(`<li>${inline(m[1])}</li>`); continue;
+    }
+    if (list){ out.push(`</${list}>`); list = null; }
+    para.push(t);
+  }
+  flush();
+  return out.join('');
+}
+const AI_SUGGEST = ['How did we do this month, and where did the money go?', 'Where can we realistically cut spending?', 'Are we on track for FIRE? What would change the outcome most?', 'Review my investments: what stands out?', 'What should I think about before moving money to India?'];
+state.ai = [];
+const aidlg = $('#aiDlg');
+function aiRender(){
+  const box = $('#aiMsgs');
+  box.innerHTML = state.ai.length ? state.ai.map(m => m.role === 'user' ? `<div class="aim u">${esc(m.content)}</div>`
+    : m.error ? `<div class="aim err">${esc(m.error)}</div>` : `<div class="aim a ${m.typing ? 'typing' : ''}">${m.content ? aiMd(m.content) : ''}</div>`).join('')
+    : `<div class="aisug"><p>Ask anything about your money. I see your ledger, budgets, accounts, investments and FIRE plans.</p>${AI_SUGGEST.map(q => `<button type="button" data-aiq="${esc(q)}">${esc(q)}</button>`).join('')}</div>`;
+  box.scrollTop = box.scrollHeight;
+}
+async function aiAsk(q){
+  q = q.trim(); if (!q || state.aiBusy) return;
+  state.aiBusy = true; $('#aiSend').disabled = true;
+  state.ai.push({ role:'user', content:q });
+  const ans = { role:'assistant', content:'', typing:true }; state.ai.push(ans); aiRender();
+  try {
+    const token = await (state.user || auth.currentUser).getIdToken();
+    const r = await fetch('/api/ask', { method:'POST', headers:{ 'content-type':'application/json', authorization:'Bearer ' + token },
+      body: JSON.stringify({ context: aiContext(), messages: state.ai.filter(m => !m.error && m !== ans).map(m => ({ role:m.role, content:m.content })) }) });
+    if (!r.ok){ let e = 'Couldn’t reach Ask AI (' + r.status + ').'; try { e = (await r.json()).error || e; } catch {} throw new Error(e); }
+    const rd = r.body.getReader(), dec = new TextDecoder(); let last = 0;
+    while (true){ const { done, value } = await rd.read(); if (done) break; ans.content += dec.decode(value, { stream:true });
+      if (Date.now() - last > 60){ aiRender(); last = Date.now(); } }
+    ans.typing = false; if (!ans.content.trim()) throw new Error('No answer came back. Try again.');
+  } catch (e){
+    const i = state.ai.indexOf(ans); state.ai[i] = { role:'assistant', error: e.message || 'Something went wrong.' };
+  } finally { ans.typing = false; state.aiBusy = false; $('#aiSend').disabled = false; aiRender(); $('#aiInput').focus(); }
+}
+$('#aiBtn').addEventListener('click', () => { aiRender(); aidlg.showModal(); setTimeout(() => $('#aiInput').focus(), 50); });
+$('#aiClose').addEventListener('click', () => aidlg.close());
+$('#aiNew').addEventListener('click', () => { if (state.aiBusy) return; state.ai = []; aiRender(); $('#aiInput').focus(); });
+aidlg.addEventListener('click', e => { if (e.target === aidlg) aidlg.close(); });
+$('#aiMsgs').addEventListener('click', e => { const b = e.target.closest('[data-aiq]'); if (b) aiAsk(b.dataset.aiq); });
+$('#aiForm').addEventListener('submit', e => { e.preventDefault(); const v = $('#aiInput').value; $('#aiInput').value = ''; $('#aiInput').style.height = ''; aiAsk(v); });
+$('#aiInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); $('#aiForm').requestSubmit(); } });
+$('#aiInput').addEventListener('input', e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(140, e.target.scrollHeight) + 'px'; });
 
 // ---------- backup & restore ----------
 const BK_COLS = { expenses:() => state.items, income:() => state.income, transfers:() => state.transfers, accounts:() => state.accounts,
