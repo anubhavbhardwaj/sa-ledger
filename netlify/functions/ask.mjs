@@ -32,8 +32,15 @@ export async function handle(req, { env = process.env, verify, fetch: f = fetch 
   if (req.method !== 'POST') return json(405, { error: 'Use POST' });
   if (!env.GROQ_API_KEY) return json(503, { error: 'Ask AI is not set up yet: add GROQ_API_KEY in Netlify.' });
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+  if (!token) return json(401, { error: 'Not signed in. Reload the app and sign in again.' });
   let email;
-  try { email = String((await verify(token)).email || '').toLowerCase(); } catch { return json(401, { error: 'Sign in again.' }); }
+  try { email = String((await verify(token)).email || '').toLowerCase(); }
+  catch (e) {
+    console.error('ask: sign-in check failed', e?.code, e?.message);
+    // A rejected token means the login itself; anything else is the server's own setup.
+    if (String(e?.code || '').startsWith('auth/')) return json(401, { error: `Your sign-in couldn’t be confirmed (${e.code}). Sign out and in again.` });
+    return json(500, { error: 'Server setup problem checking sign-in: ' + String(e?.message || e).slice(0, 160) });
+  }
   if (!MEMBERS.includes(email)) return json(403, { error: 'Not allowed.' });
 
   let body; try { body = await req.json(); } catch { return json(400, { error: 'Bad request' }); }
