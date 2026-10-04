@@ -310,6 +310,8 @@ table.mini th.num{font-family:var(--f-body)}
 .ilist .v small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
 .ilist .tot{cursor:default;font-weight:600}.ilist .tot:hover{background:none}
 .pos{color:var(--good)}
+.hint.cmp{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
+.hint.cmp strong{color:var(--ink);font-weight:600}
 /* to do card */
 .todo{display:grid}
 .todo .t{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line)}
@@ -1576,13 +1578,22 @@ function renderCum(){
   const lastDay = today().startsWith(state.period) ? +today().slice(8,10) : dim;
   const pts = []; let c = 0;
   for (let d=1; d<=lastDay; d++){ c += daily[d]; pts.push([d,c,daily[d]]); }
+  // Last month, same filters, day by day, for comparison.
+  const pm = addMonth(state.period, -1), dimP = new Date(yr, mo - 1, 0).getDate();
+  const prevRows = state.items.filter(i => i.date.startsWith(pm) && passFilters(i) && passSearch(i));
+  const prevDaily = Array(dimP + 1).fill(0); prevRows.forEach(r => { prevDaily[+r.date.slice(8,10)] += +r.amount || 0; });
+  const prevCum = [0]; for (let d = 1; d <= dimP; d++) prevCum.push(prevCum[d-1] + prevDaily[d]);
+  const prevAt = d => prevCum[Math.min(d, dimP)];
+  const hasPrev = prevRows.length > 0, pmName = MON[+pm.slice(5,7)-1];
+  const cmpText = () => { if (!hasPrev) return ''; const a = c, b = prevAt(lastDay), dd = b > 0 ? (a - b) / b : null;
+    return `<p class="hint cmp">By day ${lastDay}: <strong>${eur0.format(a)}</strong> vs ${eur0.format(b)} in ${pmName}${dd === null ? '' : ` <span class="delta ${dd >= 0 ? 'up' : 'down'}">${dd >= 0 ? '▲' : '▼'} ${Math.abs(dd * 100).toFixed(0)}%</span>`} · ${pmName} total ${eur0.format(prevCum[dimP])}</p>`; };
   const type = state.vz.cum;
   if (type === 'table'){
     const cntD = {}; rows.forEach(r => { const d = +r.date.slice(8,10); cntD[d] = (cntD[d]||0) + 1; });
     const days = pts.filter(p => p[2] > 0).reverse();
-    el.innerHTML = `<div class="mwrap"><table class="mini"><thead><tr><th>Day</th><th class="num">Spent</th><th class="num">So far</th><th class="num">Entries</th></tr></thead><tbody>
-      ${days.map(p => `<tr><td>${p[0]} ${MON[mo-1]}</td><td class="num">${eur.format(p[2])}</td><td class="num">${eur.format(p[1])}</td><td class="num">${cntD[p[0]]}</td></tr>`).join('')}
-      </tbody></table></div>`;
+    el.innerHTML = `<div class="mwrap"><table class="mini"><thead><tr><th>Day</th><th class="num">Spent</th><th class="num">So far</th>${hasPrev ? `<th class="num">${pmName} so far</th>` : ''}<th class="num">Entries</th></tr></thead><tbody>
+      ${days.map(p => `<tr><td>${p[0]} ${MON[mo-1]}</td><td class="num">${eur.format(p[2])}</td><td class="num">${eur.format(p[1])}</td>${hasPrev ? `<td class="num">${eur.format(prevAt(p[0]))}</td>` : ''}<td class="num">${cntD[p[0]]}</td></tr>`).join('')}
+      </tbody></table></div>` + cmpText();
     return;
   }
   const W = 460, H = 220, L = innerWidth <= 640 ? 70 : 62, R = 14, T = 12, B = 26;
@@ -1598,7 +1609,7 @@ function renderCum(){
     s += `<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" stroke="var(--muted)" stroke-width="1"/></svg>`;
     el.innerHTML = s; return;
   }
-  const max = niceMax(c || 1);
+  const max = niceMax(Math.max(c, hasPrev ? prevAt(dim) : 0) || 1);
   const x = d => L + (W-L-R) * (d-1)/(dim-1);
   const y = v => T + (H-T-B) * (1 - v/max);
   let s = `<svg class="chart small" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Cumulative spend by day">`;
@@ -1606,6 +1617,12 @@ function renderCum(){
   [1,8,15,22,dim].forEach(d => s += `<text x="${x(d)}" y="${H-8}" text-anchor="middle">${d}</text>`);
   const line = pts.map((p,i) => (i?'L':'M') + x(p[0]).toFixed(1) + ',' + y(p[1]).toFixed(1)).join(' ');
   s += `<path d="${line} L${x(pts[pts.length-1][0]).toFixed(1)},${H-B} L${x(1)},${H-B} Z" fill="var(--accent-soft)" opacity=".8"/>`;
+  if (hasPrev){
+    const pl = []; for (let d = 1; d <= dim; d++) pl.push((d > 1 ? 'L' : 'M') + x(d).toFixed(1) + ',' + y(prevAt(d)).toFixed(1));
+    s += `<path d="${pl.join(' ')}" fill="none" stroke="var(--muted)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+    const py = y(prevAt(dim));
+    s += `<text x="${W-R}" y="${Math.max(T+10, py - 6)}" text-anchor="end" style="fill:var(--muted)">${pmName} ${eur0.format(prevAt(dim))}</text>`;
+  }
   s += `<path d="${line}" fill="none" stroke="var(--bar)" stroke-width="2" stroke-linejoin="round"/>`;
   const e = pts[pts.length-1];
   s += `<circle cx="${x(e[0])}" cy="${y(e[1])}" r="4.5" fill="var(--bar)" stroke="var(--surface)" stroke-width="2"/>`;
@@ -1613,9 +1630,9 @@ function renderCum(){
   s += `<text x="${anchor==='end'?lx-8:lx+8}" y="${Math.max(T+10, y(e[1])-8)}" text-anchor="${anchor}" style="fill:var(--ink);font-weight:500">${eur0.format(e[1])}</text>`;
   s += `<line id="cross" x1="0" x2="0" y1="${T}" y2="${H-B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>`;
   const step = (W-L-R)/(dim-1);
-  pts.forEach(p => s += `<rect x="${x(p[0])-step/2}" y="${T}" width="${step}" height="${H-T-B}" fill="transparent" data-cx="${x(p[0])}" data-tip="${p[0]} ${MON[mo-1]}: ${eur.format(p[2])} that day · ${eur.format(p[1])} so far"/>`);
+  pts.forEach(p => s += `<rect x="${x(p[0])-step/2}" y="${T}" width="${step}" height="${H-T-B}" fill="transparent" data-cx="${x(p[0])}" data-tip="${p[0]} ${MON[mo-1]}: ${eur.format(p[2])} that day · ${eur.format(p[1])} so far${hasPrev ? ` · ${pmName} by day ${p[0]}: ${eur.format(prevAt(p[0]))}` : ''}"/>`);
   s += `<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" stroke="var(--muted)" stroke-width="1"/></svg>`;
-  el.innerHTML = s;
+  el.innerHTML = s + (hasPrev ? `<div class="legend" style="margin-top:4px"><span><i style="background:var(--bar)"></i>${MON[mo-1]}</span><span><i style="background:none;border-top:2px dashed var(--muted);height:0;border-radius:0;vertical-align:3px"></i>${pmName}</span></div>` : '') + cmpText();
 }
 
 function fillDatalists(){
