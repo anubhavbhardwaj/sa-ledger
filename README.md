@@ -55,7 +55,7 @@ screenshot to the installed app (Android share sheet), or by forwarding the conf
 - Forwarded emails: `netlify/functions/inbound.mjs` (`/api/inbound`) receives them. The free way, with no extra
   account, is the Gmail script in `tools/gmail-bookings.gs`:
   1. In Netlify add `INBOUND_TOKEN` (a long random string). Redeploy.
-  2. In Gmail create a filter: To `anubhav.iiitb+trips@gmail.com` → Apply the label "Ledger bookings", Skip the inbox.
+  2. (Optional) a Gmail filter To `anubhav.iiitb+trips@gmail.com` → Skip the inbox. The script finds those emails itself.
   3. On script.google.com create a project, paste the script, and in Project Settings → Script properties add
      `LEDGER_URL` (the site address) and `INBOUND_TOKEN`. Run `setup()` once and allow the permissions.
   4. In the app: Add booking → "Add your forwarding address" → `anubhav.iiitb+trips@gmail.com`.
