@@ -13,7 +13,7 @@ import { beat } from '../lib/health.mjs';
 const DEFAULT_MODEL = 'openai/gpt-oss-120b';
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const MAX_IMAGE = 4_000_000;   // characters of the base64 data URL (Groq's limit for inline images)
-const MAX_TEXT = 24000;
+const MAX_TEXT = 60000;   // about 15k tokens; the model reads far more, but keeps cost and time low
 export const TYPES = ['flight', 'train', 'bus', 'ferry', 'hotel', 'car', 'event', 'restaurant', 'other'];
 
 export const PROMPT = `You extract travel bookings from confirmation emails, e-tickets and boarding passes for a personal travel log.

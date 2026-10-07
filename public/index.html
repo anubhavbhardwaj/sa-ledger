@@ -4479,9 +4479,10 @@ function bkFail(x){ bkShow('pick'); renderBkPick(); $('#bkErr').textContent = x.
 // sources: [{ name, mime, blob } | { name, mime, id }] (id = already kept in Drive)
 async function bkProcess(sources, { text: extra = '', subject, date } = {}){
   const S = state.bk; S.sources = sources; S.subject = subject; S.date = date;
+  S.retry = () => bkProcess(sources, { text: extra, subject, date }).catch(bkFail);
   $('#bkErr').hidden = true;
   const live = () => state.bk === S && $('#bkDlg').open;
-  const texts = extra.trim() ? [extra.trim()] : [], codes = [];
+  const texts = [], codes = [];
   let image = null;
   for (const [i, s] of sources.entries()){
     bkBusy(sources.length > 1 ? `Reading ${s.name} (${i + 1} of ${sources.length})…` : `Reading ${s.name}…`);
@@ -4497,11 +4498,16 @@ async function bkProcess(sources, { text: extra = '', subject, date } = {}){
   let items = [];
   S.aiErr = '';
   try {
-    const plain = texts.join('\n\n');
+    // Attachments first (the e-ticket PDF has the facts), then the email text, shortened when files had text:
+    // long airline emails are mostly marketing and would otherwise push the ticket out of the AI's reading limit.
+    const email = extra.trim(), fileChars = texts.join('').length;
+    const plain = [...texts, email ? `[Email text]\n${email.slice(0, fileChars > 100 ? 8000 : 30000)}` : ''].filter(Boolean).join('\n\n');
+    S.readChars = { files: fileChars, email: email.length };
     const r = await api('/api/extract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
       text: plain, codes: codes.map(({ page, format, text }) => ({ page, format, text })), name: sources[0]?.name, subject, date,
       image: plain.replace(/\s/g, '').length < 60 && image ? image : undefined }) });
     items = (await r.json()).bookings || [];
+    if (!items.length) S.aiErr = S.readChars.files ? 'the AI found no booking in it' : sources.length ? 'no text could be read from the attachment' : 'the AI found no booking in it';
   } catch (x){ S.aiErr = x.message; }
   if (!live()) return;
   if (!items.length) items = [{ type: 'other', title: subject ? subject.replace(/^(fwd?|wg|tr|re):\s*/i, '').slice(0, 120) : (sources[0]?.name || '').replace(/\.[a-z0-9]+$/i, ''), codes: [] }];
@@ -4661,7 +4667,7 @@ function bkReviewRender(){
   }).join('');
   const nNew = on.filter(b => !bkMatched(b)).length, nUpd = on.length - nNew;
   $('#bkReview').innerHTML = `
-    ${S.aiErr ? `<div class="banner" style="background:var(--warn-soft);border-color:transparent"><span>Couldn’t read the details automatically (${esc(S.aiErr)}). Fill them in below${S.codes.length ? '; the ticket code was found' : ''}.</span></div>` : ''}
+    ${S.aiErr ? `<div class="banner" style="background:var(--warn-soft);border-color:transparent"><span>Couldn’t read the details automatically (${esc(S.aiErr)}). Fill them in below${S.codes.length ? '; the ticket code was found' : ''}.${S.readChars ? ` <span class="muted" style="font-size:12px">Read ${S.readChars.files} characters from ${S.sources.length} file${S.sources.length === 1 ? '' : 's'} and ${S.readChars.email} from the email.</span>` : ''}</span>${S.retry ? '<button class="btn small" type="button" data-bkretry>Try again</button>' : ''}</div>` : ''}
     ${!S.editId && S.sources.length && !S.codes.length && !('BarcodeDetector' in window) ? `<p class="hint muted" style="margin:0;font-size:12.5px">This browser can’t scan QR codes; open the app on your phone to pick them up, or use “Open PDF” at the gate.</p>` : ''}
     ${cards}
     ${needTrip || expRows ? `<div class="bkbox">${needTrip ? `<div class="fields">
@@ -4696,6 +4702,7 @@ $('#bkReview').addEventListener('change', e => {
   if (e.target.matches('[data-k="type"], [data-k="price"], [data-k="currency"], [data-k="sd"], [data-k="ed"], [data-k="number"], [data-k="ref"], #bkTrip, [data-bkon], [data-bkact]')){ bkCollect(); bkReviewRender(); }
 });
 $('#bkReview').addEventListener('click', e => {
+  if (e.target.closest('[data-bkretry]')){ state.bk.retry?.(); return; }
   const off = e.target.closest('[data-codeoff]'); if (!off) return;
   bkCollect(); const [i, ci] = off.dataset.codeoff.split(':').map(Number);
   state.bk.items[i].codes = state.bk.items[i].codes.filter(x => x !== ci); bkReviewRender();
