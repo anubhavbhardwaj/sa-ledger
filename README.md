@@ -62,3 +62,19 @@ screenshot to the installed app (Android share sheet), or by forwarding the conf
   Every 10 minutes the script sends labelled emails (text, PDFs, ticket images) to the app. You can also put the
   label on any email by hand. An inbound email service (Postmark, CloudMailin) also works: point its webhook at
   `/api/inbound?token=…` and list the allowed senders in `BOOKING_SENDERS`.
+
+## Flight alerts
+
+`netlify/functions/flights.mjs` runs every 10 minutes. For each flight booking from 8 hours before departure it
+asks FlightAware AeroAPI for the live status (hourly at first, every 10 minutes from 3 hours before until
+landing), keeps it in `flightStatus/<bookingId>` for the app, and sends phone notifications through Firebase
+Cloud Messaging: delays of 15+ minutes and cancellations to both of you, the gate to whoever flies, take-off and
+landing to whoever doesn't. Who flies comes from the passenger names on the booking (else the trip's traveller).
+Each of you turns alerts on per phone (menu → Flight alerts); the phone's token is kept in `pushTokens`.
+
+Setup:
+1. FlightAware: create an AeroAPI account on the Personal tier (it includes a monthly free allowance; a card
+   is required) and copy the API key into Netlify as `AEROAPI_KEY`.
+2. Firebase console → Project settings → Cloud Messaging → Web Push certificates → Generate key pair. Copy the
+   public key into Netlify as `FCM_VAPID_KEY`. Check that "Firebase Cloud Messaging API (V1)" is enabled.
+3. Redeploy, then on each phone: menu → Flight alerts → Turn on → Send a test.

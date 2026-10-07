@@ -258,6 +258,9 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .bkact.warn{background:var(--warn-soft)}
 .bkact .row{display:flex;gap:6px;flex-wrap:wrap}
 .bkmore summary{cursor:pointer;font-size:13px;color:var(--accent);font-weight:600;margin-bottom:8px}
+.fs{font-size:12.5px;font-weight:600}
+.fs.ok{color:var(--good)}
+.fs.bad{color:var(--danger)}
 /* inbox */
 .inboxbtn{position:relative;gap:6px}
 .inboxbtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:var(--surface);font-size:11px;line-height:18px;text-align:center;font-weight:700}
@@ -643,6 +646,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <button class="pm-item pm-alert" role="menuitem" type="button" data-addbk="" id="pmBkInbox" hidden><span>Forwarded bookings</span><small id="pmBkInboxN"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-addbk=""><span>Add booking</span><small>ticket, PDF or screenshot</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="alerts"><span>Flight alerts</span><small id="pmAlerts">off on this phone</small></button>
         <hr>
         <button class="pm-item" role="menuitem" type="button" data-pm="import"><span>Import CSV</span><small>into expenses</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="export"><span>Export CSV</span><small>current transactions view</small></button>
@@ -1045,6 +1049,15 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 
 <dialog id="codeView" aria-label="Ticket code"><img alt="Ticket code"><p></p></dialog>
 
+<dialog id="alDlg">
+  <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:460px">
+    <h3>Flight alerts</h3>
+    <div id="alBody" style="display:grid;gap:10px;font-size:14px"></div>
+    <p class="err" id="alErr" hidden></p>
+    <div class="dlg-actions"><button class="btn danger" type="button" id="alOff" hidden>Turn off here</button>
+      <div class="right"><button class="btn" type="button" id="alTest" hidden>Send a test</button><button class="btn primary" type="button" id="alOn">Turn on</button><button class="btn" type="submit">Close</button></div></div>
+  </form>
+</dialog>
 <div id="tip" hidden></div>
 <div class="toast" id="toast" hidden></div>
 
@@ -1154,7 +1167,7 @@ const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' +
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], bkInbox:[], bkSettings:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], bkInbox:[], bkSettings:{}, flightStatus:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -1222,6 +1235,11 @@ onAuthStateChanged(auth, user => {
     const bs = snap.docs.find(x => x.id === 'bookings'); state.bkSettings = bs ? bs.data() : {};
     pfCache = null; render();
   }, onErr('budgets')));
+  unsubs.push(onSnapshot(collection(fs, 'flightStatus'), snap => {
+    state.flightStatus = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
+    if (state.page === 'overview') renderNextUp();
+    if ($('#bkvDlg').open && state.viewBk) openBooking(state.viewBk);
+  }, () => {}));
   unsubs.push(onSnapshot(bookingsCol, snap => {
     state.bookings = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     render();
@@ -1236,6 +1254,7 @@ onAuthStateChanged(auth, user => {
   }, onErr('trips')));
   route();
   if (state.wantShare){ state.wantShare = false; takeShared(); }
+  refreshAlerts();
 });
 
 $('#loginForm').addEventListener('submit', async e => {
@@ -4845,6 +4864,93 @@ $('#bkDismiss').addEventListener('click', async () => {
   try { await bkDismissInbox(id); $('#bkDlg').close(); state.bk = null; } catch (x){ toast(writeError(x)); }
 });
 
+// --- live flight status (written by netlify/functions/flights.mjs) ---
+const tzHM = (iso, tz) => { if (!iso) return ''; try { return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz || undefined }); } catch { return new Date(iso).toTimeString().slice(0, 5); } };
+function flightLine(b){
+  const s = state.flightStatus[b.id]; if (!s || s.error && !s.sched) return '';
+  if (s.cancelled) return '<span class="fs bad">Cancelled</span>';
+  if (s.diverted) return '<span class="fs bad">Diverted</span>';
+  if (s.landed) return `<span class="fs ok">Landed ${tzHM(s.landedAt, s.toTz)}${s.arrGate ? ' · gate ' + esc(s.arrGate) : ''}</span>`;
+  if (s.departed) return `<span class="fs ok">In the air · lands ${tzHM(s.arrEst, s.toTz)}</span>`;
+  const g = s.gate ? ` · gate ${esc(s.gate)}` : '';
+  return s.delay >= 5 ? `<span class="fs bad">Delayed ${s.delay} min · leaves ${tzHM(s.depEst, s.fromTz)}${g}</span>` : `<span class="fs ok">On time${g}</span>`;
+}
+// Who is on a booking ('Anubhav', 'Sulekha'), from the passenger names, else the trip's traveller.
+const ME = () => cap(usernameOf(state.user));
+function bkWho(b){
+  const n = (b.travellers || []).join(' ').toLowerCase(), w = new Set();
+  if (/anubhav|bhardwaj/.test(n)) w.add('Anubhav');
+  if (/sulekha/.test(n)) w.add('Sulekha');
+  const t = state.tripMap[b.tripId];
+  if (!w.size && t?.traveller) (t.traveller === 'Both' ? ['Anubhav', 'Sulekha'] : [t.traveller]).forEach(p => w.add(p));
+  return w;
+}
+// A boarding-pass barcode carries the passenger's name ("M1SULEKHA/SULEKHA MRS ...").
+function codeOwner(c){ const t = String(c.text || '').toUpperCase(); return /ANUBHAV|BHARDWAJ/.test(t) ? 'Anubhav' : /SULEKHA/.test(t) ? 'Sulekha' : null; }
+function myCodes(b){
+  const codes = b.codes || [], me = ME(), owned = codes.filter(c => codeOwner(c));
+  if (owned.length) return codes.filter(c => codeOwner(c) === me);
+  const who = bkWho(b); return !who.size || who.has(me) ? codes : [];
+}
+
+// Phone alerts: this phone signs up with Firebase Cloud Messaging; the token is kept in pushTokens.
+const FCM = 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js';
+const alertsOn = () => !!lsGet('alertsToken', null) && typeof Notification !== 'undefined' && Notification.permission === 'granted';
+const alertsPossible = () => 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined';
+async function fcmToken(){
+  const cfg = await (await fetch('/api/push')).json().catch(() => ({}));
+  if (!cfg.vapidKey) throw new Error('Alerts aren’t set up on the server yet (FCM_VAPID_KEY in Netlify).');
+  const m = await import(FCM);
+  if (!(await m.isSupported())) throw new Error('This browser can’t receive notifications.');
+  const reg = (await navigator.serviceWorker.getRegistration()) || await navigator.serviceWorker.register('/sw.js');
+  return { m, token: await m.getToken(m.getMessaging(fbApp), { vapidKey: cfg.vapidKey, serviceWorkerRegistration: reg }) };
+}
+async function saveToken(token){
+  const u = state.user || auth.currentUser;
+  await setDoc(doc(fs, 'pushTokens', token), { email: u.email.toLowerCase(), user: ME(), createdAt: new Date().toISOString(), device: navigator.userAgent.slice(0, 120) });
+  lsSet('alertsToken', token);
+}
+async function enableAlerts(){
+  if (!alertsPossible()) throw new Error(isIOS && !standalone ? 'On an iPhone, add the app to the Home Screen first (Share → Add to Home Screen), then turn alerts on from there.' : 'This browser can’t receive notifications.');
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error('Notifications are blocked for this site. Allow them in the browser’s site settings, then try again.');
+  const { token } = await fcmToken();
+  await saveToken(token);
+}
+async function disableAlerts(){
+  const t = lsGet('alertsToken', null);
+  try { const m = await import(FCM); await m.deleteToken(m.getMessaging(fbApp)); } catch {}
+  if (t) try { await deleteDoc(doc(fs, 'pushTokens', t)); } catch {}
+  lsSet('alertsToken', null);
+}
+// Tokens can change; keep the stored one current whenever the app opens.
+async function refreshAlerts(){
+  $('#pmAlerts').textContent = alertsOn() ? 'on for this phone' : 'off on this phone';
+  if (!alertsOn()) return;
+  try { const { token } = await fcmToken(); if (token !== lsGet('alertsToken', null)){ try { await deleteDoc(doc(fs, 'pushTokens', lsGet('alertsToken', null))); } catch {} } await saveToken(token); } catch {}
+}
+function openAlerts(){
+  const on = alertsOn();
+  $('#alBody').innerHTML = `<p style="margin:0">${on ? '<strong>On for this phone.</strong> ' : ''}This phone will get a notification when:</p>
+    <ul style="margin:0;padding-left:18px;display:grid;gap:4px"><li>a flight of either of you is delayed 15+ minutes, back on time, or cancelled</li><li>your own flight gets its gate</li><li>the other one’s plane takes off and lands</li></ul>
+    <p class="muted" style="margin:0;font-size:12.5px">Turn it on separately on each phone, signed in as yourself. ${isIOS ? 'On an iPhone it works from the app added to the Home Screen. ' : ''}Status is checked every 10 minutes from 8 hours before departure.</p>`;
+  $('#alOn').hidden = on; $('#alOff').hidden = !on; $('#alTest').hidden = !on; $('#alErr').hidden = true;
+  if (!$('#alDlg').open) $('#alDlg').showModal();
+}
+const alFail = x => { $('#alErr').textContent = x.message || String(x); $('#alErr').hidden = false; };
+$('#alOn').addEventListener('click', async () => {
+  const b = $('#alOn'); b.disabled = true; b.textContent = 'Turning on…';
+  try { await enableAlerts(); refreshAlerts(); openAlerts(); toast('Flight alerts on for this phone'); if (state.page === 'overview') renderNextUp(); }
+  catch (x){ alFail(x); } finally { b.disabled = false; b.textContent = 'Turn on'; }
+});
+$('#alOff').addEventListener('click', async () => { await disableAlerts(); refreshAlerts(); openAlerts(); toast('Flight alerts off for this phone'); });
+$('#alTest').addEventListener('click', async () => {
+  const b = $('#alTest'); b.disabled = true;
+  try { const r = await api('/api/push', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"test":true}' }); const j = await r.json(); toast(`Test sent to ${j.sent} phone${j.sent === 1 ? '' : 's'} of yours`); }
+  catch (x){ alFail(x); } finally { b.disabled = false; }
+});
+document.addEventListener('click', e => { if (e.target.closest('[data-alerts]')) openAlerts(); });
+
 // --- viewing ---
 const fmtDT = s => s ? shortDate(s.slice(0, 10)) + (s.length > 10 ? ' ' + s.slice(11, 16) : '') : '';
 const wday = d => new Date(d.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-IE', { weekday: 'short' });
@@ -4889,13 +4995,17 @@ function renderNextUp(){
     const s = (b.start || '').slice(0, 10), e = (b.end || b.start || '').slice(0, 10);
     return s && ((s >= td && s <= lim) || (['hotel','car'].includes(b.type) && s < td && e >= td));
   }).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 5);
-  const done = lsGet('bkCheckedIn', []);
-  const flights = soon.filter(b => b.type === 'flight' && (b.start.length > 10 ? new Date(b.start) > now : b.start.slice(0, 10) >= td));
+  const done = lsGet('bkCheckedIn', []), me = ME();
+  const flights = soon.filter(b => b.type === 'flight' && (b.start.length > 10 ? new Date(b.start) > now || (state.flightStatus[b.id] && !state.flightStatus[b.id].landed) : b.start.slice(0, 10) >= td));
   const when = b => (b.start.slice(0, 10) === td ? 'today' : b.start.slice(0, 10) === addDays(td, 1) ? 'tomorrow' : wday(b.start)) + (b.start.length > 10 ? ' ' + b.start.slice(11, 16) : '');
-  const acts = flights.map(b => (b.codes || []).length
-    ? `<div class="bkact"><span><strong>${esc(b.number || b.title)}</strong> ${when(b)}${b.seat ? ' · seat ' + esc(b.seat) : ''}</span><button class="btn primary" type="button" data-bkpass="${esc(b.id)}">Show boarding pass</button></div>`
-    : done.includes(b.id) ? '' : `<div class="bkact warn"><span><strong>${esc(b.number || b.title)}</strong> ${when(b)}: no boarding pass yet. Check in online, then forward or add the pass.</span>
-        <span class="row"><a class="btn small primary" href="${esc(checkinUrl(b))}" target="_blank" rel="noopener">Check in${b.provider ? ' with ' + esc(b.provider) : ''}</a><button class="btn small" type="button" data-addbk="${esc(b.tripId || '')}">Add pass</button><button class="btn small ghost" type="button" data-bkckdone="${esc(b.id)}">Hide</button></span></div>`).join('');
+  const acts = flights.map(b => {
+    const who = bkWho(b), mine = !who.size || who.has(me), st = flightLine(b), codes = myCodes(b);
+    const label = `<strong>${esc(b.number || b.title)}</strong> ${when(b)}`;
+    if (!mine) return `<div class="bkact"><span>${esc([...who].join(' & '))}’s flight ${label}${st ? '<br>' + st : ''}</span><button class="btn small" type="button" data-bkopen="${esc(b.id)}">Details</button></div>`;
+    if (codes.length) return `<div class="bkact"><span>${label}${b.seat ? ' · seat ' + esc(b.seat) : ''}${st ? '<br>' + st : ''}</span><button class="btn primary" type="button" data-bkpass="${esc(b.id)}">Show boarding pass</button></div>`;
+    return done.includes(b.id) ? (st ? `<div class="bkact"><span>${label}<br>${st}</span></div>` : '') : `<div class="bkact warn"><span>${label}: no boarding pass yet. Check in online, then forward or add the pass.${st ? '<br>' + st : ''}</span>
+        <span class="row"><a class="btn small primary" href="${esc(checkinUrl(b))}" target="_blank" rel="noopener">Check in${b.provider ? ' with ' + esc(b.provider) : ''}</a><button class="btn small" type="button" data-addbk="${esc(b.tripId || '')}">Add pass</button><button class="btn small ghost" type="button" data-bkckdone="${esc(b.id)}">Hide</button></span></div>`;
+  }).join('') + (flights.length && !alertsOn() && alertsPossible() ? `<div class="bkact"><span>Get delay and landing alerts on this phone.</span><button class="btn small" type="button" data-alerts>Turn on alerts</button></div>` : '');
   // Trips starting soon with nothing booked yet.
   const bare = state.trips.filter(t => t.start && t.start >= td && t.start <= lim && !state.bookings.some(b => b.tripId === t.id));
   const tripNudge = bare.map(t => `<div class="bkact"><span><strong>${esc(t.name)}</strong> starts ${t.start === td ? 'today' : t.start === addDays(td, 1) ? 'tomorrow' : 'in 2 days'}. Add your tickets to have them here.</span><button class="btn small" type="button" data-addbk="${esc(t.id)}">+ Booking</button></div>`).join('');
@@ -4908,7 +5018,7 @@ function openBooking(id){
   const [ic, tl] = BK_TYPES[b.type] || BK_TYPES.other, t = b.tripId && state.tripMap[b.tripId];
   const exp = b.expenseId && state.items.find(i => i.id === b.expenseId);
   const files = bkFilesOf(b);
-  const rows = [['When', bkWhen(b)], ['Reference', esc(b.ref)], ['Number', esc(b.number)], [b.type === 'hotel' ? 'Room' : 'Seat', esc(b.seat)], ['Travellers', esc((b.travellers || []).join(', '))],
+  const rows = [['When', bkWhen(b)], ['Status', b.type === 'flight' ? flightLine(b) : ''], ['Reference', esc(b.ref)], ['Number', esc(b.number)], [b.type === 'hotel' ? 'Room' : 'Seat', esc(b.seat)], ['Travellers', esc((b.travellers || []).join(', '))],
     ['Address', b.address ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}" target="_blank" rel="noopener">${esc(b.address)}</a>` : ''],
     ['Details', esc(b.details)], ['Provider', esc(b.provider)], ['Price', b.price ? money(b.price, b.currency || 'EUR') : ''], ['Trip', t ? esc(t.name) : '']].filter(r => r[1]);
   const cands = exp ? [] : bkExpCands({ cur: b.currency || 'EUR', total: b.price || 0, items: [b] }, b.tripId);
@@ -4916,7 +5026,7 @@ function openBooking(id){
   $('#bkvBody').innerHTML = `
     <div class="head"><span class="ic" aria-hidden="true">${ic}</span><div><div class="muted" style="font-size:12px">${tl}</div>
       <div class="route">${b.from && b.to ? esc(b.from) + ' → ' + esc(b.to) : esc(b.title)}</div>${b.from && b.to ? `<div class="muted" style="font-size:13px">${esc(b.title)}</div>` : ''}</div></div>
-    ${(b.codes || []).length ? `<div class="bkbig"><strong style="font-size:13px">${passLbl}${b.codes.length > 1 ? 's' : ''}</strong>${b.codes.map((c, i) => `<img src="${c.img}" class="${/pdf417|code_128/.test(c.format) ? 'wide' : ''}" alt="${passLbl} code" data-bkcode="${i}">`).join('')}<span class="muted" style="font-size:12px">Tap the code to show it full screen</span></div>`
+    ${(b.codes || []).length ? `<div class="bkbig">${(b.codes || []).map((c, i) => [c, i]).sort(([x], [y]) => (codeOwner(y) === ME()) - (codeOwner(x) === ME())).map(([c, i]) => `<strong style="font-size:13px">${codeOwner(c) ? (codeOwner(c) === ME() ? 'Your ' + passLbl.toLowerCase() : codeOwner(c) + '’s ' + passLbl.toLowerCase()) : passLbl}</strong><img src="${c.img}" class="${/pdf417|code_128/.test(c.format) ? 'wide' : ''}" alt="${passLbl} code" data-bkcode="${i}">`).join('')}<span class="muted" style="font-size:12px">Tap the code to show it full screen</span></div>`
       : b.type === 'flight' && (b.start || '') >= today() ? `<div class="banner" style="background:var(--warn-soft);border-color:transparent"><span>No boarding pass yet. Check in online, then add or forward the pass; it lands on this flight.</span><span style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn small" href="${esc(checkinUrl(b))}" target="_blank" rel="noopener">Check in</a><button class="btn small primary" type="button" data-addbk="${esc(b.tripId || '')}">Add pass</button></span></div>` : ''}
     <dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -5002,7 +5112,7 @@ document.addEventListener('click', async e => {
   const b = state.viewBk && $('#bkvDlg').open ? state.bookings.find(x => x.id === state.viewBk) : null;
   const bc = t.closest('[data-bkcode]'); if (bc && b){ showCode(b.codes[+bc.dataset.bkcode]); return; }
   const bf = t.closest('[data-bkfile]'); if (bf && b){ const f = bkFilesOf(b)[+bf.dataset.bkfile || 0]; if (f) openBkFile({ ...b, fileId: f.id, fileName: f.name, fileMime: f.mime }); return; }
-  const bp = t.closest('[data-bkpass]'); if (bp){ const x = state.bookings.find(y => y.id === bp.dataset.bkpass); if (x && x.codes?.length === 1) showCode(x.codes[0]); else if (x) openBooking(x.id); return; }
+  const bp = t.closest('[data-bkpass]'); if (bp){ const x = state.bookings.find(y => y.id === bp.dataset.bkpass), mc = x ? myCodes(x) : []; if (mc.length === 1) showCode(mc[0]); else if (x) openBooking(x.id); return; }
   const ck = t.closest('[data-bkckdone]'); if (ck){ lsSet('bkCheckedIn', [...lsGet('bkCheckedIn', []), ck.dataset.bkckdone].slice(-50)); renderNextUp(); return; }
   if (t.closest('[data-bkexp]') && b){ $('#bkvDlg').close(); bkOfferExpense([b], [b.id], b.tripId, b.createdAt, [{ cur: b.currency || 'EUR', total: b.price, items: [b] }]); return; }
   const ve = t.closest('[data-bkvexp]'); if (ve){ $('#bkvDlg').close(); openEdit(ve.dataset.bkvexp, 'expense'); return; }
@@ -5092,6 +5202,7 @@ pm.addEventListener('click', async e => {
   toggleMenu(false);
   const a = it.dataset.pm;
   if (a === 'budgets') openBudgets(false);
+  if (a === 'alerts') openAlerts();
   if (a === 'backup') downloadBackup();
   if (a === 'restore') $('#rsFile').click();
   if (a === 'import'){ if (state.page !== 'transactions') location.hash = 'transactions'; state.txKind = 'expense'; $('#importFile').click(); }

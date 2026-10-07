@@ -1,6 +1,6 @@
 // S&A Ledger service worker: makes the app installable and lets it open offline.
 // Your expense data is NOT cached here; Firestore keeps its own offline copy.
-const VERSION = 'sa-ledger-v2';
+const VERSION = 'sa-ledger-v3';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -51,5 +51,27 @@ self.addEventListener('fetch', e => {
     const hit = await c.match(req);
     const net = fetch(req).then(res => { if (res.ok || res.type === 'opaque') c.put(req, res.clone()); return res; }).catch(() => hit);
     return hit || net;
+  }));
+});
+
+// Flight alerts (data messages from Firebase Cloud Messaging, sent by netlify/functions/flights.mjs).
+self.addEventListener('push', e => {
+  let p = {};
+  try { p = e.data ? e.data.json() : {}; } catch {}
+  const d = p.data || p;
+  const title = d.title || 'S&A Ledger';
+  e.waitUntil(self.registration.showNotification(title, {
+    body: d.body || '', tag: d.tag || undefined, renotify: !!d.tag, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png',
+    data: { url: d.url || '/#overview' },
+  }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || '/#overview', self.location.origin).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const open = list.find(c => c.url.startsWith(self.location.origin));
+    if (open) { open.navigate(url).catch(() => {}); return open.focus(); }
+    return self.clients.openWindow(url);
   }));
 });
