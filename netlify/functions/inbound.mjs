@@ -13,7 +13,8 @@ import { driveClient, BOOKINGS_FOLDER as FOLDER } from '../lib/drive.mjs';
 
 
 const MAX_TEXT = 30000;
-const KEEP = /^(application\/pdf|image\/(png|jpe?g|webp|gif))$/i;
+const MAX_IMG = 300 * 1024;       // images up to this size stay in the inbox item, bigger ones go to Drive
+const MAX_INLINE = 700 * 1024;    // characters of base64 in one inbox item (Firestore allows 1 MB per document)
 
 export function htmlToText(h) {
   return String(h || '')
@@ -51,8 +52,17 @@ export async function handle(req, { env = process.env, save, fetch: f = fetch, n
     text += '\n\n[Calendar attachment ' + a.Name + ']\n' + Buffer.from(a.Content, 'base64').toString('utf8').slice(0, 5000);
   text = text.slice(0, MAX_TEXT);
 
-  // PDFs always; images only when they aren't small inline logos.
-  const keep = atts.filter(a => KEEP.test(a.ContentType || '') && (/pdf/i.test(a.ContentType) || (a.ContentLength || 0) > 15000 || !a.ContentID));
+  // PDFs and big images go to Drive. Small images (QR codes, boarding-pass barcodes, and also logos) travel
+  // inside the inbox item instead, so the app can scan them for codes without cluttering Drive.
+  const size = a => a.ContentLength || Math.floor(a.Content.length * 3 / 4);
+  const isImg = a => /^image\/(png|jpe?g|webp|gif)$/i.test(a.ContentType || '');
+  const images = [];
+  let budget = MAX_INLINE;
+  for (const a of atts.filter(a => isImg(a) && size(a) >= 600 && size(a) <= MAX_IMG)) {
+    if (a.Content.length > budget || images.length >= 12) continue;
+    images.push({ name: String(a.Name || 'image').slice(0, 140), mime: a.ContentType.toLowerCase(), data: a.Content }); budget -= a.Content.length;
+  }
+  const keep = atts.filter(a => /pdf/i.test(a.ContentType || '') || (isImg(a) && size(a) > MAX_IMG));
   const files = [], skipped = [];
   let fileError;
   if (keep.length) {
@@ -60,19 +70,20 @@ export async function handle(req, { env = process.env, save, fetch: f = fetch, n
       const drive = await driveClient(env, f);
       const folder = await drive.folder(FOLDER);
       const up = await Promise.allSettled(keep.slice(0, 6).map(a => drive.upload({ name: String(a.Name || 'attachment').slice(0, 140), mime: a.ContentType.toLowerCase(), data: Buffer.from(a.Content, 'base64'), parent: folder })
-        .then(r => ({ id: r.id, name: r.name, mime: a.ContentType.toLowerCase(), size: a.ContentLength || Buffer.from(a.Content, 'base64').length }))));
+        .then(r => ({ id: r.id, name: r.name, mime: a.ContentType.toLowerCase(), size: size(a) }))));
       up.forEach((r, i) => r.status === 'fulfilled' ? files.push(r.value) : skipped.push(keep[i].Name));
       if (up.some(r => r.status === 'rejected')) fileError = String(up.find(r => r.status === 'rejected').reason?.message || '').slice(0, 200);
     } catch (e) { fileError = String(e.message || e).slice(0, 200); keep.forEach(a => skipped.push(a.Name)); }
   }
-  atts.filter(a => !keep.includes(a) && !/calendar|\.ics$/i.test(a.ContentType + ' ' + a.Name) && !a.ContentID).forEach(a => skipped.push(a.Name));
+  atts.filter(a => !keep.includes(a) && !isImg(a) && !/calendar|\.ics$/i.test(a.ContentType + ' ' + a.Name)).forEach(a => skipped.push(a.Name));
 
-  if (!text.trim() && !files.length) return json(200, { ok: true, note: 'nothing to keep' });
+  if (!text.trim() && !files.length && !images.length) return json(200, { ok: true, note: 'nothing to keep' });
   const id = String(m.MessageID || now().getTime()).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || String(now().getTime());
   const item = {
     from: from.slice(0, 120), by, subject: String(m.Subject || '').slice(0, 300), date: String(m.Date || '').slice(0, 60),
     text, files, receivedAt: now().toISOString(),
   };
+  if (images.length) item.images = images;
   if (skipped.length) item.skipped = skipped.map(s => String(s).slice(0, 140)).slice(0, 10);
   if (fileError) item.fileError = fileError;
   await save(id, item);

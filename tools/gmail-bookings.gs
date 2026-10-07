@@ -39,13 +39,17 @@ function sendBookings() {
     if (!msgs.length) msgs = [all[all.length - 1]];
     for (const msg of msgs) {
       const atts = msg.getAttachments({ includeInlineImages: true, includeAttachments: true })
-        .filter(a => /^(application\/pdf|text\/calendar)/i.test(a.getContentType()) || (/^image\//i.test(a.getContentType()) && a.getSize() > 15000))   // skip small logos
-        .filter(a => a.getSize() <= MAX_ATTACHMENT)
-        .slice(0, 6)
+        .filter(a => /^(application\/pdf|text\/calendar|image\/)/i.test(a.getContentType()) && a.getSize() <= MAX_ATTACHMENT)
+        .slice(0, 10)
         .map(a => ({ Name: a.getName(), ContentType: a.getContentType(), ContentLength: a.getSize(), Content: Utilities.base64Encode(a.getBytes()) }));
+      atts.push(...codeImages(msg.getBody()));
+      // Netlify takes about 6 MB per call: keep PDFs first, then images, within that.
+      let room = 5.5 * 1024 * 1024;
+      const fit = atts.sort((a, b) => (/pdf/i.test(b.ContentType) ? 1 : 0) - (/pdf/i.test(a.ContentType) ? 1 : 0))
+        .filter(a => (room -= a.Content.length) >= 0);
       const body = {
         Source: 'gmail-script', MessageID: msg.getId(), From: msg.getFrom(), Subject: msg.getSubject(),
-        Date: msg.getDate().toISOString(), TextBody: msg.getPlainBody(), HtmlBody: msg.getBody(), Attachments: atts,
+        Date: msg.getDate().toISOString(), TextBody: msg.getPlainBody(), HtmlBody: msg.getBody().slice(0, 200000), Attachments: fit,
       };
       const r = UrlFetchApp.fetch(url.replace(/\/$/, '') + '/api/inbound?token=' + encodeURIComponent(token), {
         method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true,
@@ -54,4 +58,33 @@ function sendBookings() {
     }
     if (ok) { thread.removeLabel(label); thread.addLabel(done); console.log('Sent to the ledger: ' + thread.getFirstMessageSubject()); }
   }
+}
+
+// Many boarding-pass emails show the QR code as a picture loaded from the airline's server rather than as an
+// attachment. Fetch the pictures that look like a code (by their name or alt text, or square and big enough).
+function codeImages(html) {
+  const out = [], seen = {};
+  const tags = String(html || '').match(/<img\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    if (out.length >= 6) break;
+    const attr = n => ((tag.match(new RegExp('\\b' + n + '\\s*=\\s*["\']([^"\']*)["\']', 'i')) || [])[1] || '').replace(/&amp;/g, '&');
+    const src = attr('src'); if (!src || seen[src]) continue; seen[src] = 1;
+    const hint = [src, attr('alt'), attr('title'), attr('class'), attr('id')].join(' ');
+    if (/logo|icon|social|facebook|twitter|instagram|linkedin|spacer|pixel|track|banner|app.?store|google.?play/i.test(hint)) continue;
+    const w = +attr('width'), h = +attr('height');
+    const looksLikeCode = /qr|bar.?code|aztec|pdf417|boarding|mobile.?pass|e.?ticket|ticket|pass/i.test(hint) || (w >= 100 && h >= 100 && Math.abs(w - h) <= w * 0.25);
+    if (!looksLikeCode) continue;
+    try {
+      let bytes, type;
+      if (/^data:image\//i.test(src)) { type = src.slice(5, src.indexOf(';')); bytes = Utilities.base64Decode(src.slice(src.indexOf(',') + 1)); }
+      else if (/^https?:\/\//i.test(src)) {
+        const r = UrlFetchApp.fetch(src, { muteHttpExceptions: true, followRedirects: true });
+        if (r.getResponseCode() !== 200) continue;
+        const blob = r.getBlob(); type = blob.getContentType() || ''; bytes = blob.getBytes();
+      } else continue;
+      if (!/^image\/(png|jpe?g|gif|webp)/i.test(type) || bytes.length < 300 || bytes.length > 300 * 1024) continue;
+      out.push({ Name: 'code-' + (out.length + 1) + '.' + type.split('/')[1].replace('jpeg', 'jpg'), ContentType: type, ContentLength: bytes.length, Content: Utilities.base64Encode(bytes) });
+    } catch (e) { console.warn('Couldn\'t fetch an image: ' + e.message); }
+  }
+  return out;
 }

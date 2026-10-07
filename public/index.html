@@ -4448,7 +4448,7 @@ async function bkProcess(sources, { text: extra = '', subject, date } = {}){
     const r = await readBlob(s.blob, s.name);
     if (r.text.trim()) texts.push(`[File ${s.name}]\n${r.text}`);
     r.codes.forEach(c => { if (!codes.some(x => x.text === c.text)) codes.push({ ...c, file: i }); });
-    if (!image && r.image) image = r.image;
+    if (!image && r.image && !s.inline) image = r.image;
   }
   if (!live()) return;
   bkBusy(codes.length ? `Found ${codes.length} ticket code${codes.length === 1 ? '' : 's'}. Reading the details…` : 'Reading the details…');
@@ -4681,6 +4681,7 @@ $('#bkForm').addEventListener('submit', async e => {
     const fileOf = {}, notes = [];
     for (const [i, s] of S.sources.entries()){
       if (s.id){ fileOf[i] = { id: s.id, name: s.name, mime: s.mime }; continue; }
+      if (s.inline) continue;
       if (!s.blob) continue;
       if (s.blob.size > BK_MAX_FILE){ notes.push(s.name + ' is over 4 MB, so no copy was kept'); continue; }
       btn.textContent = 'Keeping a copy in Drive…';
@@ -4789,7 +4790,10 @@ function renderBkPick(){
 async function bkFromInbox(id){
   const it = state.bkInbox.find(x => x.id === id); if (!it) return;
   bkOpen({ inboxId: id, source: 'email' });
-  try { await bkProcess((it.files || []).map(f => ({ id: f.id, name: f.name, mime: f.mime })), { text: (it.subject ? 'Subject: ' + it.subject + '\n\n' : '') + (it.text || ''), subject: it.subject, date: it.date || it.receivedAt }); }
+  // Small images from the email (QR codes, logos) came inside the item: scanned for codes, not kept in Drive.
+  const inline = (it.images || []).map(im => { try { const bin = atob(im.data), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return { name: im.name, mime: im.mime, blob: new Blob([u], { type: im.mime }), inline: true }; } catch { return null; } }).filter(Boolean);
+  try { await bkProcess([...(it.files || []).map(f => ({ id: f.id, name: f.name, mime: f.mime })), ...inline], { text: (it.subject ? 'Subject: ' + it.subject + '\n\n' : '') + (it.text || ''), subject: it.subject, date: it.date || it.receivedAt }); }
   catch (x){ bkFail(x); }
 }
 async function bkDismissInbox(id){
