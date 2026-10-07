@@ -261,6 +261,12 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .fs{font-size:12.5px;font-weight:600}
 .fs.ok{color:var(--good)}
 .fs.bad{color:var(--danger)}
+.hlist{display:grid;gap:2px}
+.hrow{display:grid;grid-template-columns:14px 1fr;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.hrow i{width:10px;height:10px;border-radius:50%;margin-top:5px;background:var(--s8)}
+.hrow.ok i{background:var(--good)} .hrow.warn i{background:var(--warn)} .hrow.bad i{background:var(--danger)}
+.hrow small{display:block;color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
+.hrow.bad small.e{color:var(--danger)}
 /* inbox */
 .inboxbtn{position:relative;gap:6px}
 .inboxbtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:var(--surface);font-size:11px;line-height:18px;text-align:center;font-weight:700}
@@ -646,6 +652,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <button class="pm-item pm-alert" role="menuitem" type="button" data-addbk="" id="pmBkInbox" hidden><span>Forwarded bookings</span><small id="pmBkInboxN"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-addbk=""><span>Add booking</span><small>ticket, PDF or screenshot</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="health"><span>System health</span><small id="pmHealth"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="alerts"><span>Notifications</span><small id="pmAlerts">off on this phone</small></button>
         <hr>
         <button class="pm-item" role="menuitem" type="button" data-pm="import"><span>Import CSV</span><small>into expenses</small></button>
@@ -1049,6 +1056,14 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 
 <dialog id="codeView" aria-label="Ticket code"><img alt="Ticket code"><p></p></dialog>
 
+<dialog id="hlDlg">
+  <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:520px">
+    <h3>System health</h3>
+    <p class="muted" style="margin:0;font-size:13px">What runs in the background, and when it last worked.</p>
+    <div class="hlist" id="hlBody"></div>
+    <div class="dlg-actions"><div class="right"><button class="btn" type="submit">Close</button></div></div>
+  </form>
+</dialog>
 <dialog id="alDlg">
   <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:460px">
     <h3>Notifications</h3>
@@ -1167,7 +1182,7 @@ const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' +
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], bkInbox:[], bkSettings:{}, flightStatus:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -1235,6 +1250,10 @@ onAuthStateChanged(auth, user => {
     const bs = snap.docs.find(x => x.id === 'bookings'); state.bkSettings = bs ? bs.data() : {};
     pfCache = null; render();
   }, onErr('budgets')));
+  unsubs.push(onSnapshot(collection(fs, 'health'), snap => {
+    state.health = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
+    renderBadge(); if ($('#hlDlg').open) renderHealth();
+  }, () => {}));
   unsubs.push(onSnapshot(collection(fs, 'flightStatus'), snap => {
     state.flightStatus = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
     if (state.page === 'overview') renderNextUp();
@@ -4795,7 +4814,7 @@ function renderBkInbox(){
   $$('[data-bkinboxbar]').forEach(bar => { bar.hidden = !n;
     bar.innerHTML = n ? `<div class="left"><strong>${n} forwarded booking${n === 1 ? '' : 's'} to add</strong><span class="note" style="font-size:12.5px;color:var(--muted)">${esc(it.subject || 'Email')}, ${ago(it.receivedAt)}</span></div><button class="btn primary" type="button" data-bkinbox="${esc(it.id)}">Review</button>` : ''; });
   // A badge on the profile button and the menu entry; a toast when one arrives while the app is open.
-  const badge = $('#profBadge'); badge.hidden = !n; badge.textContent = n > 9 ? '9+' : n;
+  renderBadge();
   $('#profBtn').setAttribute('aria-label', 'Menu: trips, budgets, settings' + (n ? `. ${n} forwarded booking${n === 1 ? '' : 's'} to add` : ''));
   $('#pmBkInbox').hidden = !n; $('#pmBkInboxN').textContent = n + ' to add';
   try { if (navigator.setAppBadge) n ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } catch {}
@@ -4965,6 +4984,44 @@ document.addEventListener('click', async e => {
   catch (x){ toast(x.message); }
   finally { b.disabled = false; b.textContent = 'Check status now'; }
 });
+
+// --- system health (heartbeats written by the Netlify functions into health/<job>) ---
+const H_MIN = 60e3, H_HOUR = 60 * H_MIN;
+const HEALTH = [
+  { id: 'flights', name: 'Flight checker', note: 'every 10 minutes', every: 30 * H_MIN },
+  { id: 'gmail', name: 'Gmail script (forwarded bookings)', note: 'every 10 minutes', every: 40 * H_MIN, setup: 'No report yet. Update the script in Google with the latest tools/gmail-bookings.gs so it checks in here.' },
+  { id: 'backup', name: 'Drive backup', note: 'every night', every: 26 * H_HOUR },
+  { id: 'daily', name: 'Evening reminder', note: 'daily at 21:00', every: 26 * H_HOUR },
+  { id: 'inbound', name: 'Forwarded emails received', onDemand: true },
+  { id: 'capture', name: 'Payment notifications captured', onDemand: true },
+  { id: 'extract', name: 'Reading bookings (AI)', onDemand: true },
+  { id: 'ask', name: 'Ask AI', onDemand: true },
+];
+function healthRows(){
+  const now = Date.now();
+  return HEALTH.map(j => {
+    let h = state.health[j.id];
+    if (!h && j.id === 'backup' && state.backup) h = { lastRun: state.backup.lastAt || state.backup.errorAt, lastOk: state.backup.lastAt, lastError: state.backup.lastError, errorAt: state.backup.errorAt };
+    if (!h || !h.lastRun) return { j, cls: '', text: j.onDemand ? 'Not used since this view was added' : (j.setup || 'No report yet. It appears after the first run.') };
+    const failed = h.errorAt && (!h.lastOk || h.errorAt > h.lastOk);
+    const late = !j.onDemand && now - Date.parse(h.lastRun) > j.every;
+    if (failed) return { j, cls: 'bad', text: `Failed ${ago(h.errorAt)}${h.lastOk ? ' · last worked ' + ago(h.lastOk) : ''}`, err: h.lastError };
+    if (late) return { j, cls: 'warn', text: `Overdue: last ran ${ago(h.lastRun)} (expected ${j.note})` };
+    return { j, cls: 'ok', text: `${j.onDemand ? 'Last worked' : 'OK, last ran'} ${ago(h.lastOk || h.lastRun)}${h.info ? ' · ' + h.info : ''}` };
+  });
+}
+const healthIssues = () => healthRows().filter(r => r.cls === 'bad' || r.cls === 'warn');
+function renderHealth(){
+  $('#hlBody').innerHTML = healthRows().map(r => `<div class="hrow ${r.cls}"><i aria-hidden="true"></i><span><strong>${esc(r.j.name)}</strong>${r.j.note ? ` <span class="muted" style="font-size:12px">(${r.j.note})</span>` : ''}<small>${esc(r.text)}</small>${r.err ? `<small class="e">${esc(r.err)}</small>` : ''}</span></div>`).join('');
+}
+// One badge on the profile button: forwarded bookings to add, else "!" when something needs attention.
+function renderBadge(){
+  const n = state.bkInbox.length, issues = healthIssues().length, badge = $('#profBadge');
+  badge.hidden = !n && !issues; badge.textContent = n ? (n > 9 ? '9+' : n) : '!';
+  $('#pmHealth').textContent = issues ? `${issues} need${issues === 1 ? 's' : ''} attention` : Object.keys(state.health).length ? 'all good' : '';
+  $('#pmHealth').style.color = issues ? 'var(--warn)' : '';
+}
+setInterval(() => { if (state.user) renderBadge(); }, 5 * 60e3);
 
 // --- viewing ---
 const fmtDT = s => s ? shortDate(s.slice(0, 10)) + (s.length > 10 ? ' ' + s.slice(11, 16) : '') : '';
@@ -5219,6 +5276,7 @@ pm.addEventListener('click', async e => {
   const a = it.dataset.pm;
   if (a === 'budgets') openBudgets(false);
   if (a === 'alerts') openAlerts();
+  if (a === 'health'){ renderHealth(); $('#hlDlg').showModal(); }
   if (a === 'backup') downloadBackup();
   if (a === 'restore') $('#rsFile').click();
   if (a === 'import'){ if (state.page !== 'transactions') location.hash = 'transactions'; state.txKind = 'expense'; $('#importFile').click(); }

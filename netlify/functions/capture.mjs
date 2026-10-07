@@ -14,6 +14,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { parseNotification, guessAccount } from '../../public/parse.js';
+import { beat } from '../lib/health.mjs';
 
 const MAX = 1000;
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -98,9 +99,10 @@ function firestore() {
 
 export default async (req) => {
   try {
-    return await handle(req, { save: (id, data) => firestore().collection('inbox').doc(id).set(data) });
+    return await handle(req, { save: async (id, data) => { await firestore().collection('inbox').doc(id).set(data); await beat(firestore(), 'capture', { info: [data.merchant, data.capturedBy].filter(Boolean).join(' · ').slice(0, 80) }); } });
   } catch (e) {
     console.error('capture failed', e);
+    try { await beat(firestore(), 'capture', { ok: false, error: e.message }); } catch {}
     return json(500, { error: 'Could not save the notification' });
   }
 };

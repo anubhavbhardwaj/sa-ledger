@@ -7,7 +7,8 @@
 // Environment: GROQ_API_KEY (same as Ask AI), FIREBASE_SERVICE_ACCOUNT, optional GROQ_EXTRACT_MODEL and
 // GROQ_VISION_MODEL.
 
-import { member, json, verifyToken } from '../lib/members.mjs';
+import { member, json, verifyToken, firestore } from '../lib/members.mjs';
+import { beat } from '../lib/health.mjs';
 
 const DEFAULT_MODEL = 'openai/gpt-oss-120b';
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
@@ -100,7 +101,12 @@ export function clean(list, nCodes = 0) {
 }
 
 export default async (req) => {
-  try { return await handle(req); }
+  try {
+    const res = await handle(req);
+    if (res.status >= 500 || res.status === 503) { const e = await res.clone().json().catch(() => ({})); await beat(firestore(), 'extract', { ok: false, error: e.error }); }
+    else if (res.status === 200) await beat(firestore(), 'extract', {});
+    return res;
+  }
   catch (e) { console.error('extract failed', e); return json(500, { error: 'Something went wrong reading the booking. Try again.' }); }
 };
 

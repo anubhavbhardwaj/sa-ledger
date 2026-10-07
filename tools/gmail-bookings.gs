@@ -31,6 +31,7 @@ function sendBookings() {
   const done = GmailApp.getUserLabelByName(DONE) || GmailApp.createLabel(DONE);
   // in:anywhere includes Sent, where emails you forward to yourself end up.
   const threads = GmailApp.search(`in:anywhere (label:"${LABEL}" OR to:${ADDRESS} OR deliveredto:${ADDRESS}) -label:"${DONE}" newer_than:30d`, 0, 10);
+  let sent = 0, refused = [];
   for (const thread of threads) {
     let ok = true;
     const all = thread.getMessages();
@@ -56,10 +57,16 @@ function sendBookings() {
         method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true,
       });
       console.log(msg.getSubject() + ': sending ' + (fit.map(a => a.Name + ' (' + Math.round(a.ContentLength / 1024) + ' KB)').join(', ') || 'no attachments or images'));
-      if (r.getResponseCode() !== 200) { ok = false; console.error('Ledger refused ' + msg.getSubject() + ': ' + r.getResponseCode() + ' ' + r.getContentText()); }
+      if (r.getResponseCode() !== 200) { ok = false; refused.push(r.getResponseCode() + ' ' + r.getContentText().slice(0, 120)); console.error('Ledger refused ' + msg.getSubject() + ': ' + r.getResponseCode() + ' ' + r.getContentText()); }
+      else sent++;
     }
     if (ok) { thread.removeLabel(label); thread.addLabel(done); console.log('Sent to the ledger: ' + thread.getFirstMessageSubject()); }
   }
+  // Tell the app the script is alive (shown in menu → System health).
+  UrlFetchApp.fetch(url.replace(/\/$/, '') + '/api/inbound?token=' + encodeURIComponent(token), {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    payload: JSON.stringify({ Ping: threads.length ? 'sent ' + sent + ' email' + (sent === 1 ? '' : 's') : 'no new emails', PingError: refused.length ? refused.join('; ') : undefined }),
+  });
 }
 
 // Many boarding-pass emails show the QR code as a picture loaded from the airline's server rather than as an

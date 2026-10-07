@@ -246,6 +246,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Heartbeats of the background jobs (System health). Only the server functions write them.
+    match /health/{job} {
+      allow read: if isMember();
+      allow write: if false;
+    }
+
     // Phones signed up for notifications (flight alerts, and the 21:00 reminder when daily is not false).
     // Document id is the phone's push token; each person manages their own.
     function validPushToken() {

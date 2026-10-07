@@ -10,6 +10,7 @@
 
 import { firestore, json, MEMBERS } from '../lib/members.mjs';
 import { driveClient, BOOKINGS_FOLDER as FOLDER } from '../lib/drive.mjs';
+import { beat } from '../lib/health.mjs';
 
 
 const MAX_TEXT = 30000;
@@ -28,13 +29,18 @@ export function htmlToText(h) {
 
 const allowed = env => (env.BOOKING_SENDERS || MEMBERS[0]).split(/[,\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
 
-export async function handle(req, { env = process.env, save, fetch: f = fetch, now = () => new Date() } = {}) {
+export async function handle(req, { env = process.env, save, heartbeat, fetch: f = fetch, now = () => new Date() } = {}) {
   if (req.method !== 'POST') return json(405, { error: 'Use POST' });
   const url = new URL(req.url);
   const want = String(env.INBOUND_TOKEN || '').trim(), got = String(url.searchParams.get('token') || '').trim();
   if (!want) return json(503, { error: 'INBOUND_TOKEN is not set for functions in Netlify (or the site was not redeployed after adding it).' });
   if (got !== want) return json(403, { error: `Wrong token: the script sent ${got.length} characters, Netlify expects ${want.length}.` });
   let m; try { m = await req.json(); } catch { return json(400, { error: 'Bad request' }); }
+  // The Gmail script says "still running" on every run, mail or not.
+  if (m.Ping) {
+    if (heartbeat) await heartbeat('gmail', m.PingError ? { ok: false, error: String(m.PingError).slice(0, 200), info: String(m.Ping).slice(0, 120) } : { info: m.Ping === true ? 'running' : String(m.Ping).slice(0, 120) });
+    return json(200, { ok: true });
+  }
 
   // A forward from one of you, or a Gmail auto-forward filter (which keeps the airline as sender but adds X-Forwarded-For).
   const from = String(m.FromFull?.Email || m.From || '').toLowerCase().replace(/^.*<|>.*$/g, '').trim();
@@ -87,11 +93,12 @@ export async function handle(req, { env = process.env, save, fetch: f = fetch, n
   if (skipped.length) item.skipped = skipped.map(s => String(s).slice(0, 140)).slice(0, 10);
   if (fileError) item.fileError = fileError;
   await save(id, item);
+  if (heartbeat) await heartbeat('inbound', fileError ? { ok: false, error: 'Attachments not kept: ' + fileError } : { info: item.subject.slice(0, 80) });
   return json(200, { ok: true, id, files: files.length });
 }
 
 export default async (req) => {
-  try { return await handle(req, { save: (id, item) => firestore().collection('bookingInbox').doc(id).set(item) }); }
+  try { return await handle(req, { save: (id, item) => firestore().collection('bookingInbox').doc(id).set(item), heartbeat: (job, d) => beat(firestore(), job, d) }); }
   catch (e) { console.error('inbound failed', e); return json(500, { error: 'failed' }); }
 };
 

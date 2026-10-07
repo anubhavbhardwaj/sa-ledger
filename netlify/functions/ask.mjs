@@ -9,6 +9,8 @@
 
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { beat } from '../lib/health.mjs';
 
 const MEMBERS = ['anubhav.iiitb@gmail.com', 'sulekha@sa-ledger.app'];
 const DEFAULT_MODEL = 'openai/gpt-oss-120b';
@@ -93,7 +95,14 @@ function verifier() {
 }
 
 export default async (req) => {
-  try { return await handle(req, { verify: t => verifier().verifyIdToken(t) }); }
+  try {
+    const res = await handle(req, { verify: t => verifier().verifyIdToken(t) });
+    let db = null; try { db = getApps()[0] && getFirestore(getApps()[0]); } catch {}
+    if (!db) return res;
+    if (res.status === 502 || res.status === 503) { const e = await res.clone().json().catch(() => ({})); await beat(db, 'ask', { ok: false, error: e.error }); }
+    else if (res.status === 200) await beat(db, 'ask', {});
+    return res;
+  }
   catch (e) { console.error('ask failed', e); return json(500, { error: 'Something went wrong. Try again.' }); }
 };
 

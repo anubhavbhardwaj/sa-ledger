@@ -83,6 +83,8 @@ export function summarizeAdb(f) {
   };
 }
 
+// The last quota RapidAPI reported (shown in System health).
+export const ctx_quota = { value: null };
 // Ask the configured service. Returns { s } or { error, status }.
 export async function lookup(b, st, env, f) {
   const ident = identOf(b);
@@ -92,6 +94,8 @@ export async function lookup(b, st, env, f) {
   if (env.AERODATABOX_KEY) {
     const r = await f(`https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(ident)}/${b.start.slice(0, 10)}?withAircraftImage=false&withLocation=false`, {
       headers: { 'x-rapidapi-key': env.AERODATABOX_KEY, 'x-rapidapi-host': 'aerodatabox.p.rapidapi.com', accept: 'application/json' } });
+    const left = r.headers?.get?.('x-ratelimit-requests-remaining') ?? r.headers?.get?.('x-ratelimit-units-remaining');
+    if (left != null) ctx_quota.value = `${left} lookups left this month`;
     if (r.status === 204) return { error: 'Flight not found', status: 404 };
     if (!r.ok) return { error: 'AeroDataBox ' + r.status + (r.status === 429 ? ' (monthly allowance used up?)' : ''), status: r.status };
     const j = await r.json(), list = (Array.isArray(j) ? j : j.items || j.flights || []).filter(x => !o || !x.departure?.airport?.iata || x.departure.airport.iata === o);
@@ -197,6 +201,7 @@ export async function run({ now = Date.now(), env = process.env, fetch: f = fetc
     if (r.error) out.errors.push((identOf(b) || b.id) + ': ' + r.error);
     if (r.stop) break;
   }
+  if (ctx_quota.value) out.quota = ctx_quota.value;
   return out;
 }
 

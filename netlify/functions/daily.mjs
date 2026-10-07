@@ -3,6 +3,7 @@
 // Netlify schedules are in UTC, so this runs at 19:00 and 20:00 UTC and only acts when it's 21:00 locally.
 import { firestore } from '../lib/members.mjs';
 import { sendTo, PEOPLE } from '../lib/push.mjs';
+import { beat } from '../lib/health.mjs';
 
 const TZ = 'Europe/Berlin';
 const USERNAME = { Anubhav: 'anubhav', Sulekha: 'sulekha' };
@@ -64,9 +65,11 @@ export default async () => {
       dropTokens: ids => Promise.all(ids.map(id => db.collection('pushTokens').doc(id).delete())),
     });
     console.log('daily', JSON.stringify(res));
+    if (!res.skipped) await beat(db, 'daily', { info: `sent ${res.sent}${res.quiet?.length ? ', quiet for ' + res.quiet.join(' & ') : ''}` });
     return new Response(JSON.stringify(res), { status: 200 });
   } catch (e) {
     console.error('daily failed', e);
+    await beat(db, 'daily', { ok: false, error: e.message });
     return new Response(JSON.stringify({ error: String(e.message || e) }), { status: 500 });
   }
 };

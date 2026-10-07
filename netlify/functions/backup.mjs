@@ -13,6 +13,7 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { driveClient } from '../lib/drive.mjs';
+import { beat } from '../lib/health.mjs';
 
 export const COLLECTIONS = ['expenses', 'income', 'transfers', 'accounts', 'checkins', 'invSnapshots', 'trips', 'bookings', 'settings'];
 const FOLDER = 'S&A Ledger backups';
@@ -66,9 +67,11 @@ export default async () => {
       saveStatus: s => store.collection('settings').doc('backup').set(s),
     });
     console.log('backup ok', status);
+    await beat(store, 'backup', { info: `${status.file}, ${Math.round(status.bytes / 1024)} KB` });
     return new Response(JSON.stringify(status), { status: 200 });
   } catch (e) {
     console.error('backup failed', e);
+    await beat(store, 'backup', { ok: false, error: e.message });
     try { await store.collection('settings').doc('backup').set({ lastError: String(e.message || e).slice(0, 300), errorAt: new Date().toISOString() }, { merge: true }); } catch {}
     return new Response(JSON.stringify({ error: String(e.message || e) }), { status: 500 });
   }
