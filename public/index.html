@@ -4933,7 +4933,7 @@ function openAlerts(){
   const on = alertsOn();
   $('#alBody').innerHTML = `<p style="margin:0">${on ? '<strong>On for this phone.</strong> ' : ''}This phone will get a notification when:</p>
     <ul style="margin:0;padding-left:18px;display:grid;gap:4px"><li>a flight of either of you is delayed 15+ minutes, back on time, or cancelled</li><li>your own flight gets its gate</li><li>the other one’s plane takes off and lands</li></ul>
-    <p class="muted" style="margin:0;font-size:12.5px">Turn it on separately on each phone, signed in as yourself. ${isIOS ? 'On an iPhone it works from the app added to the Home Screen. ' : ''}Status is checked every 10 minutes from 8 hours before departure.</p>`;
+    <p class="muted" style="margin:0;font-size:12.5px">Turn it on separately on each phone, signed in as yourself. ${isIOS ? 'On an iPhone it works from the app added to the Home Screen. ' : ''}Status is checked about 10 times per flight: from 3 hours before departure, more often in the last hour, and around the landing.</p>`;
   $('#alOn').hidden = on; $('#alOff').hidden = !on; $('#alTest').hidden = !on; $('#alErr').hidden = true;
   if (!$('#alDlg').open) $('#alDlg').showModal();
 }
