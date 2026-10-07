@@ -248,6 +248,16 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .pdfdlg .pages{display:grid;gap:12px;justify-items:center;padding:12px;overflow:auto;height:calc(100dvh - 58px)}
 .pdfdlg canvas,.pdfdlg .pages img{width:min(100%,900px);height:auto;background:#fff;box-shadow:var(--shadow)}
 .nextup{display:grid;gap:4px}
+.avatar{position:relative}
+.pbadge{position:absolute;top:-5px;right:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:#fff;font:700 11px/18px var(--f-body);border:2px solid var(--surface);box-sizing:content-box}
+.pbadge[hidden]{display:none}
+.pm-alert span{color:var(--warn);font-weight:600}
+.bkmatch{margin:0;font-size:13px;color:var(--accent);background:var(--accent-soft);padding:6px 10px;border-radius:8px}
+.bkcard .hd select{font:inherit;font-size:13px;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.bkact{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:var(--accent-soft);margin-bottom:8px;font-size:14px}
+.bkact.warn{background:var(--warn-soft)}
+.bkact .row{display:flex;gap:6px;flex-wrap:wrap}
+.bkmore summary{cursor:pointer;font-size:13px;color:var(--accent);font-weight:600;margin-bottom:8px}
 /* inbox */
 .inboxbtn{position:relative;gap:6px}
 .inboxbtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:var(--surface);font-size:11px;line-height:18px;text-align:center;font-weight:700}
@@ -626,10 +636,11 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <button class="btn primary" id="addBtn" type="button">+ <span class="long">Add expense</span></button>
     <button class="btn small inboxbtn" id="inboxBtn" type="button" hidden>To review <span class="badge" id="inboxCount">0</span></button>
     <div class="prof">
-      <button class="avatar" id="profBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="profMenu" aria-label="Menu: trips, budgets, settings"><span id="profInitial">A</span></button>
+      <button class="avatar" id="profBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="profMenu" aria-label="Menu: trips, budgets, settings"><span id="profInitial">A</span><span class="pbadge" id="profBadge" hidden>0</span></button>
       <div class="pmenu" id="profMenu" role="menu" hidden>
         <div class="pm-head">Signed in as <strong id="whoName"></strong></div>
         <a class="pm-item" role="menuitem" href="#trips"><span>Trips</span><small id="pmTrips"></small></a>
+        <button class="pm-item pm-alert" role="menuitem" type="button" data-addbk="" id="pmBkInbox" hidden><span>Forwarded bookings</span><small id="pmBkInboxN"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-addbk=""><span>Add booking</span><small>ticket, PDF or screenshot</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
         <hr>
@@ -1153,7 +1164,7 @@ onAuthStateChanged(auth, user => {
   state.user = user;
   unsubs.forEach(f => f()); unsubs = [];
   if (!user){
-    state.items = []; state.income = []; state.trips = []; state.transfers = []; state.accounts = []; state.checkins = []; state.snaps = []; state.bookings = []; state.bkInbox = []; pfCache = null; state.ready = false; state.tripsReady = false;
+    state.items = []; state.income = []; state.trips = []; state.transfers = []; state.accounts = []; state.checkins = []; state.snaps = []; state.bookings = []; state.bkInbox = []; state.bkSeen = null; pfCache = null; state.ready = false; state.tripsReady = false;
     $('#app').hidden = true; $('#login').hidden = false; $('#l-user').focus();
     return;
   }
@@ -2410,7 +2421,7 @@ function renderTripDetail(t){
       <section class="panel span-7"><header><h2>Linked expenses</h2><span class="hint">Tap to edit · × to unlink</span></header>
         <div class="recent">${ex.length ? ex.map(r => `<div class="r withx" data-edit="${esc(r.id)}" data-kind="expense" tabindex="0" role="button">
           <span class="d">${shortDate(r.date)}</span>
-          <span><span class="store">${esc(r.store)}</span><br><span class="meta">${esc(r.category)} · ${esc(r.account)} · ${esc(r.spender)}</span></span>
+          <span><span class="store">${esc(r.store)}</span>${state.bookings.some(b => b.expenseId === r.id) ? '<span class="tag">booking</span>' : ''}<br><span class="meta">${esc(r.category)} · ${esc(r.account)} · ${esc(r.spender)}</span></span>
           <span class="a">${eur.format(r.amount)}${origHtml(r)}</span>
           <button class="unlink" type="button" data-unlink="${esc(r.id)}" aria-label="Unlink ${esc(r.store)} from this trip">×</button></div>`).join('')
           : '<div class="empty">No expenses linked yet. Use “Attach transactions” for past payments, or “Add expense” for new ones.</div>'}</div>
@@ -4318,7 +4329,7 @@ document.addEventListener('click', async e => {
 // A PDF or screenshot is read right here in the browser (pdf.js for text, the built-in BarcodeDetector for
 // QR/Aztec/PDF417 codes); the server only asks the AI to sort the text into bookings and keeps the original
 // file in Google Drive. Forwarded emails arrive in bookingInbox and go through the same steps.
-const BK_KEYS = ['tripId','type','title','provider','ref','number','travellers','start','end','from','to','address','seat','details','price','currency','codes','fileId','fileName','fileMime','source','expenseId','createdAt','createdBy','updatedBy'];
+const BK_KEYS = ['tripId','type','title','provider','ref','number','travellers','start','end','from','to','address','seat','details','price','currency','codes','fileId','fileName','fileMime','source','expenseId','files','createdAt','createdBy','updatedBy'];
 const BK_TYPES = { flight:['✈️','Flight'], train:['🚆','Train'], bus:['🚌','Bus'], ferry:['⛴️','Ferry'], hotel:['🏨','Stay'], car:['🚗','Car rental'], event:['🎫','Event'], restaurant:['🍽️','Restaurant'], other:['📌','Other'] };
 const BK_CAT = { flight:'Transportation', train:'Transportation', bus:'Transportation', ferry:'Transportation', car:'Transportation', hotel:'Accommodation' };
 // The legacy build carries polyfills, so it also runs on phones whose browser is a version or two behind.
@@ -4476,7 +4487,7 @@ function bkRange(items){
   return [ds[0] || '', ds[ds.length - 1] || ''];
 }
 function bkTripFor(items){
-  const dupTrip = items.map(bkDup).find(x => x && x.tripId)?.tripId;
+  const dupTrip = items.map(bkMatch).find(x => x && x.tripId)?.tripId;
   if (dupTrip && state.tripMap[dupTrip]) return dupTrip;
   const d = bkRange(items.filter(b => b.on !== false))[0] || bkRange(items)[0]; if (!d) return null;
   const t = state.trips.find(t => t.start && d >= addDays(t.start, -2) && d <= addDays(t.end || t.start, 1));
@@ -4486,33 +4497,91 @@ function bkTraveller(items){
   const n = items.flatMap(b => b.travellers || []).join(' ').toLowerCase(), a = /anubhav/.test(n), s = /sulekha/.test(n);
   return a && s ? 'Both' : s ? 'Sulekha' : a ? 'Anubhav' : (cap(usernameOf(state.user)) === 'Sulekha' ? 'Sulekha' : 'Anubhav');
 }
-function bkDup(b){
+const normNo = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const cityKey = v => bkCity(v).toLowerCase();
+// A saved booking for the same thing (same type and day, and the same reference, number, route or title):
+// a boarding pass forwarded later updates it instead of adding a second one.
+function bkMatch(b){
   if (!b.start) return null;
-  return state.bookings.find(x => x.id !== state.bk?.editId && x.type === b.type && (x.start || '').slice(0, 10) === b.start.slice(0, 10)
-    && (x.ref && b.ref ? x.ref === b.ref : true) && (x.title === b.title || (x.from && x.from === b.from && x.to === b.to))) || null;
+  const d = b.start.slice(0, 10);
+  return state.bookings.find(x => x.id !== state.bk?.editId && x.type === b.type && (x.start || '').slice(0, 10) === d && (
+    (x.number && b.number && normNo(x.number) === normNo(b.number))
+    || (x.ref && b.ref && normNo(x.ref) === normNo(b.ref))
+    || (x.from && b.from && x.to && b.to && cityKey(x.from) === cityKey(b.from) && cityKey(x.to) === cityKey(b.to))
+    || x.title === b.title)) || null;
 }
+const bkMatched = b => b.act === 'merge' && b.matchId ? state.bookings.find(x => x.id === b.matchId) || null : null;
+const bkFilesOf = b => b.files?.length ? b.files : b.fileId ? [{ id: b.fileId, name: b.fileName, mime: b.fileMime }] : [];
+// What a newer document adds to a saved booking: its codes go first (the boarding pass on top), times, seat and
+// gate details replace the old ones, and anything the old booking lacked is filled in.
+function bkMerge(x, it, codes, file){
+  const out = { ...x };
+  for (const k of ['number','start','end','from','to','address','seat','details']) if (it[k]) out[k] = it[k];
+  for (const k of ['title','provider','ref']) if (it[k] && !x[k]) out[k] = it[k];
+  if (it.travellers?.length) out.travellers = [...new Set([...(x.travellers || []), ...it.travellers])].slice(0, 9);
+  if (it.price > 0 && !(x.price > 0)){ out.price = it.price; out.currency = it.currency || 'EUR'; }
+  const fresh = codes.filter(c => !(x.codes || []).some(o => o.text === c.text));
+  out.codes = [...fresh, ...(x.codes || [])].slice(0, 8);
+  if (file){
+    out.files = [file, ...bkFilesOf(x).filter(f => f.id !== file.id)].slice(0, 4);
+    if (fresh.length || !x.fileId){ out.fileId = file.id; out.fileName = file.name; out.fileMime = file.mime; }
+  }
+  return out;
+}
+function bkChanges(x, it, codes){
+  const c = [];
+  if (codes.some(k => !(x.codes || []).some(o => o.text === k.text))) c.push(x.type === 'flight' ? 'boarding pass' : 'ticket code');
+  if (it.seat && it.seat !== x.seat) c.push((x.type === 'hotel' ? 'room ' : 'seat ') + it.seat);
+  if (it.start && it.start !== x.start) c.push('time ' + fmtDT(it.start));
+  if (it.details && it.details !== x.details) c.push('details');
+  if (it.price > 0 && !(x.price > 0)) c.push('price');
+  return c;
+}
+// Expenses a booking's price could already be: same amount, or the same shop, or in the same trip.
+function bkExpCands(P, tripId){
+  const linked = new Set(state.bookings.map(b => b.expenseId).filter(Boolean));
+  const name = norm(P.items[0].provider || P.items[0].title), from = addDays(today(), -400);
+  const score = i => {
+    let s = 0;
+    if (P.total > 0 && (P.cur === 'EUR' ? Math.abs(+i.amount - P.total) < 0.02 : i.currency === P.cur && Math.abs(+i.origAmount - P.total) < 0.02)) s += 3;
+    const st = norm(i.store); if (name.length > 2 && st.length > 2 && (st.includes(name) || name.includes(st))) s += 2;
+    if (tripId && i.tripId === tripId) s += 1;
+    return s;
+  };
+  return state.items.filter(i => !linked.has(i.id) && i.date >= from).map(i => [score(i), i]).filter(([sc]) => sc > 0)
+    .sort((a, b) => b[0] - a[0] || b[1].date.localeCompare(a[1].date)).slice(0, 12).map(([sc, i]) => ({ i, strong: sc >= 3 }));
+}
+const expLabel = i => `${i.store} ${i.currency && i.currency !== 'EUR' && i.origAmount ? money(i.origAmount, i.currency) : eur.format(i.amount)} · ${shortDate(i.date)}${i.tripId && state.tripMap[i.tripId] ? ' · ' + state.tripMap[i.tripId].name : ''}`;
 // Priced bookings as expenses: one per provider and currency (the two Lufthansa legs together, the hotel apart).
 function bkPriced(items){
   const g = new Map();
-  for (const b of items.filter(b => b.on !== false && b.price > 0 && !b.expenseId)){
-    const k = (b.provider || b.title).toLowerCase() + '|' + (b.currency || 'EUR');
-    if (!g.has(k)) g.set(k, { cur: b.currency || 'EUR', total: 0, items: [] });
-    const x = g.get(k); x.items.push(b); x.total = Math.round((x.total + b.price) * 100) / 100;
+  for (const b of items.filter(b => b.on !== false && b.price > 0 && !b.expenseId && !bkMatched(b)?.expenseId)){
+    const key = (b.provider || b.title).toLowerCase() + '|' + (b.currency || 'EUR');
+    if (!g.has(key)) g.set(key, { key, cur: b.currency || 'EUR', total: 0, items: [] });
+    const x = g.get(key); x.items.push(b); x.total = Math.round((x.total + b.price) * 100) / 100;
   }
   return [...g.values()];
 }
 
 function bkReviewRender(){
-  const S = state.bk; bkShow('review');
+  const S = state.bk; bkShow('review'); S.expChoice ||= {};
   const opts = (sel, list) => list.map(([v, l]) => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(l)}</option>`).join('');
   const inp = (b, k, label, cls = '') => `<label class="f ${cls}">${label}<input data-k="${k}" value="${esc(b[k] ?? '')}" autocomplete="off"></label>`;
   const cards = S.items.map((b, i) => {
-    const dup = bkDup(b); if (dup && b.on === undefined) b.on = false;
+    const m = S.editId ? null : bkMatch(b);
+    if (m && b.matchId !== m.id){ b.matchId = m.id; b.act = 'merge'; b.on = true; }
+    if (!m){ b.matchId = null; if (b.act !== 'skip') b.act = 'new'; }
     const [sd, st] = splitDT(b.start), [ed, et] = splitDT(b.end), h = b.type === 'hotel' || b.type === 'car';
     const curs = CURRENCIES.includes(b.currency || 'EUR') ? CURRENCIES : [...CURRENCIES, b.currency];
+    const codes = (b.codes || []).map(ci => S.codes[ci]).filter(Boolean);
+    const ch = m ? bkChanges(m, b, codes) : [];
+    const head = S.editId ? '' : m
+      ? `<select data-bkact aria-label="What to do with this booking">${opts(b.act, [['merge', 'Update the saved booking'], ['new', 'Save as a new booking'], ['skip', 'Skip']])}</select>`
+      : `<input type="checkbox" data-bkon ${b.on === false ? '' : 'checked'}>`;
     return `<div class="bkcard ${b.on === false ? 'off' : ''}" data-bi="${i}">
-      <div class="hd"><label>${S.editId ? '' : `<input type="checkbox" data-bkon ${b.on === false ? '' : 'checked'}>`}<span>${(BK_TYPES[b.type] || BK_TYPES.other)[0]} ${esc(b.title || 'Booking')}</span></label>${dup ? '<span class="tag">already saved</span>' : ''}</div>
-      <div class="fields">
+      <div class="hd"><label>${m ? '' : head}<span>${(BK_TYPES[b.type] || BK_TYPES.other)[0]} ${esc(b.title || 'Booking')}</span></label>${m ? head : ''}</div>
+      ${m ? `<p class="bkmatch">${b.act === 'merge' ? `Already saved${m.tripId && state.tripMap[m.tripId] ? ' in ' + esc(state.tripMap[m.tripId].name) : ''}. ${ch.length ? 'Adds ' + esc(ch.join(', ')) + '.' : 'Nothing new in this one.'}` : b.act === 'new' ? 'A second, separate booking will be saved.' : 'Not saved.'}</p>` : ''}
+      ${m && b.act === 'merge' ? '<details class="bkmore"><summary>Check what it read</summary>' : ''}<div class="fields">
         <label class="f">Type<select data-k="type">${opts(b.type, Object.entries(BK_TYPES).map(([k, [ic, l]]) => [k, ic + ' ' + l]))}</select></label>
         ${inp(b, 'ref', 'Booking reference')}
         ${inp(b, 'title', 'Title', 'full')}
@@ -4522,42 +4591,55 @@ function bkReviewRender(){
         <label class="f">Time<input type="time" data-k="et" value="${et}"></label>
         ${b.type === 'hotel' ? '' : inp(b, 'from', 'From') + inp(b, 'to', 'To')}
         ${inp(b, 'seat', b.type === 'hotel' ? 'Room' : 'Seat / coach')}${inp(b, 'provider', 'Provider')}
+        ${b.type === 'flight' || b.type === 'train' || b.number ? inp(b, 'number', b.type === 'train' ? 'Train number' : 'Flight number') : ''}
         <label class="f full">Travellers<input data-k="travellers" value="${esc((b.travellers || []).join(', '))}" autocomplete="off"></label>
         ${['hotel','car','event','restaurant','other'].includes(b.type) || b.address ? inp(b, 'address', 'Address', 'full') : ''}
-        ${inp(b, 'details', 'Details for the day (terminal, platform, check-in…)', 'full')}
+        ${inp(b, 'details', 'Details for the day (terminal, gate, platform, check-in…)', 'full')}
         <label class="f">Price<input type="number" step="0.01" min="0" inputmode="decimal" data-k="price" value="${b.price ?? ''}"></label>
         <label class="f">Currency<select data-k="currency">${opts(b.currency || 'EUR', curs.map(c => [c, c]))}</select></label>
-      </div>
+      </div>${m && b.act === 'merge' ? '</details>' : ''}
       ${(b.codes || []).length ? `<div class="codes">${b.codes.map(ci => S.codes[ci] ? `<span class="cd"><img src="${S.codes[ci].img}" alt="${esc(S.codes[ci].format)} code" data-codeview="${ci}"><button type="button" data-codeoff="${i}:${ci}" aria-label="Remove this code">×</button></span>` : '').join('')}</div>` : ''}
     </div>`;
   }).join('');
+  const on = S.items.filter(b => b.on !== false);
+  // A trip is only asked for when something will be saved without one (updates keep their booking's trip).
+  const needTrip = S.editId || on.some(b => !bkMatched(b)?.tripId);
   if (S.tripSel === undefined) S.tripSel = bkTripFor(S.items) || '__new';
   const trips = [...state.trips].sort((a, b) => (b.start || '').localeCompare(a.start || ''));
-  const [rs, re] = bkRange(S.items.filter(b => b.on !== false));
+  const [rs, re] = bkRange(on);
+  const tripForExp = S.tripSel && S.tripSel !== '__new' ? S.tripSel : bkMatched(on[0] || {})?.tripId;
   const P = S.editId ? [] : bkPriced(S.items);
-  const pLabel = x => esc(x.items[0].provider || x.items[0].title) + ' ' + money(x.total, x.cur);
-  const nOn = S.items.filter(b => b.on !== false).length;
+  const expRows = P.map(x => {
+    const cands = bkExpCands(x, tripForExp), valid = ['new', 'none', ...cands.map(c => 'link:' + c.i.id)];
+    if (!valid.includes(S.expChoice[x.key])) S.expChoice[x.key] = cands[0]?.strong ? 'link:' + cands[0].i.id : 'new';
+    return `<label class="f full">${esc(x.items[0].provider || x.items[0].title)} ${money(x.total, x.cur)}<select data-pg="${esc(x.key)}">
+      <option value="new" ${S.expChoice[x.key] === 'new' ? 'selected' : ''}>Add as a new expense (you check it first)</option>
+      ${cands.length ? `<optgroup label="Already in the ledger: link to">${cands.map(c => `<option value="link:${esc(c.i.id)}" ${S.expChoice[x.key] === 'link:' + c.i.id ? 'selected' : ''}>${esc(expLabel(c.i))}</option>`).join('')}</optgroup>` : ''}
+      <option value="none" ${S.expChoice[x.key] === 'none' ? 'selected' : ''}>Don’t add an expense</option></select></label>`;
+  }).join('');
+  const nNew = on.filter(b => !bkMatched(b)).length, nUpd = on.length - nNew;
   $('#bkReview').innerHTML = `
     ${S.aiErr ? `<div class="banner" style="background:var(--warn-soft);border-color:transparent"><span>Couldn’t read the details automatically (${esc(S.aiErr)}). Fill them in below${S.codes.length ? '; the ticket code was found' : ''}.</span></div>` : ''}
     ${!S.editId && S.sources.length && !S.codes.length && !('BarcodeDetector' in window) ? `<p class="hint muted" style="margin:0;font-size:12.5px">This browser can’t scan QR codes; open the app on your phone to pick them up, or use “Open PDF” at the gate.</p>` : ''}
     ${cards}
-    <div class="bkbox"><div class="fields">
-      <label class="f full">Trip<select id="bkTrip"><option value="__new" ${S.tripSel === '__new' ? 'selected' : ''}>New trip from these bookings</option><option value="" ${S.tripSel === '' ? 'selected' : ''}>No trip</option>${trips.map(t => `<option value="${esc(t.id)}" ${t.id === S.tripSel ? 'selected' : ''}>${esc(tripLabel(t))}</option>`).join('')}</select></label>
+    ${needTrip || expRows ? `<div class="bkbox">${needTrip ? `<div class="fields">
+      <label class="f full">Trip${nUpd ? ' for the new bookings' : ''}<select id="bkTrip"><option value="__new" ${S.tripSel === '__new' ? 'selected' : ''}>New trip from these bookings</option><option value="" ${S.tripSel === '' ? 'selected' : ''}>No trip</option>${trips.map(t => `<option value="${esc(t.id)}" ${t.id === S.tripSel ? 'selected' : ''}>${esc(tripLabel(t))}</option>`).join('')}</select></label>
       ${S.tripSel === '__new' ? `<label class="f">Trip name<input id="bkTName" value="${esc(S.tName ?? bkTripName(S.items))}" autocomplete="off"></label>
         <label class="f">Trip type<select id="bkTType">${opts(S.tType || bkTripType(S.items), Object.entries(TRIP_TYPE))}</select></label>
         <p class="full muted" style="margin:0;font-size:12.5px">${rs ? 'Dates ' + fmtRange(rs, re !== rs ? re : '') + ', ' : ''}${bkTraveller(S.items)} travelling. Budget and the rest can be set on the trip later.</p>` : ''}
-    </div>
-    ${P.length ? `<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="bkExp" ${S.exp === false ? '' : 'checked'}> <span>Then add ${P.length === 1 ? pLabel(P[0]) + ' as an expense' : P.length + ' expenses: ' + P.map(pLabel).join(', ')} (you check ${P.length === 1 ? 'it' : 'each'} before saving)</span></label>` : ''}
-    </div>`;
-  $('#bkSave').textContent = S.editId ? 'Save changes' : nOn > 1 ? `Save ${nOn} bookings` : 'Save booking';
+    </div>` : ''}
+    ${expRows ? `<div class="fields"><p class="full" style="margin:0;font-weight:600;font-size:13.5px">Expense</p>${expRows}</div>` : ''}
+    </div>` : ''}`;
+  $('#bkSave').textContent = S.editId ? 'Save changes' : !on.length ? 'Save' : [nNew ? `Save ${nNew === 1 ? '' : nNew + ' '}booking${nNew === 1 ? '' : 's'}` : '', nUpd ? `${nNew ? 'update' : 'Update'} ${nUpd === 1 ? 'saved booking' : nUpd + ' saved'}` : ''].filter(Boolean).join(', ');
 }
 function bkCollect(){
   const S = state.bk; if (!S || $('#bkReview').hidden) return;
   $$('#bkReview [data-bi]').forEach(card => {
     const b = S.items[+card.dataset.bi], v = k => { const el = card.querySelector(`[data-k="${k}"]`); return el ? el.value.trim() : null; };
     const on = card.querySelector('[data-bkon]'); if (on) b.on = on.checked;
+    const act = card.querySelector('[data-bkact]'); if (act){ b.act = act.value; b.on = act.value !== 'skip'; }
     b.type = v('type') || 'other';
-    for (const k of ['ref','title','from','to','seat','provider','address','details']){ const x = v(k); if (x !== null) b[k] = x; }
+    for (const k of ['ref','title','from','to','seat','provider','number','address','details']){ const x = v(k); if (x !== null) b[k] = x; }
     b.travellers = (v('travellers') || '').split(/\s*[,;]\s*/).filter(Boolean);
     b.start = v('sd') ? v('sd') + (v('st') ? 'T' + v('st') : '') : '';
     b.end = v('ed') ? v('ed') + (v('et') ? 'T' + v('et') : '') : '';
@@ -4566,10 +4648,10 @@ function bkCollect(){
   if ($('#bkTrip')) S.tripSel = $('#bkTrip').value;
   if ($('#bkTName')) S.tName = $('#bkTName').value;
   if ($('#bkTType')) S.tType = $('#bkTType').value;
-  if ($('#bkExp')) S.exp = $('#bkExp').checked;
+  $$('#bkReview [data-pg]').forEach(sel => S.expChoice[sel.dataset.pg] = sel.value);
 }
 $('#bkReview').addEventListener('change', e => {
-  if (e.target.matches('[data-k="type"], [data-k="price"], [data-k="currency"], [data-k="sd"], [data-k="ed"], #bkTrip, [data-bkon]')){ bkCollect(); bkReviewRender(); }
+  if (e.target.matches('[data-k="type"], [data-k="price"], [data-k="currency"], [data-k="sd"], [data-k="ed"], [data-k="number"], [data-k="ref"], #bkTrip, [data-bkon], [data-bkact]')){ bkCollect(); bkReviewRender(); }
 });
 $('#bkReview').addEventListener('click', e => {
   const off = e.target.closest('[data-codeoff]'); if (!off) return;
@@ -4588,13 +4670,13 @@ $('#bkForm').addEventListener('submit', async e => {
   const btn = $('#bkSave'), me = usernameOf(state.user); btn.disabled = true;
   try {
     let tripId = S.tripSel;
-    if (tripId === '__new'){
+    if (tripId === '__new' && items.some(b => !bkMatched(b)?.tripId)){
       btn.textContent = 'Creating trip…';
-      const [start, end] = bkRange(items);
-      const rec = { name: (S.tName ?? bkTripName(items)).trim().slice(0, 80) || 'Trip', type: S.tType || bkTripType(items), traveller: bkTraveller(items), createdAt: new Date().toISOString(), createdBy: me };
+      const fresh = items.filter(b => !bkMatched(b)?.tripId), [start, end] = bkRange(fresh);
+      const rec = { name: (S.tName ?? bkTripName(fresh)).trim().slice(0, 80) || 'Trip', type: S.tType || bkTripType(fresh), traveller: bkTraveller(fresh), createdAt: new Date().toISOString(), createdBy: me };
       if (start) rec.start = start; if (end && end > start) rec.end = end;
       tripId = (await addDoc(tripsCol, rec)).id;
-    }
+    } else if (tripId === '__new') tripId = '';
     // Keep the originals in Drive (forwarded emails' files are there already).
     const fileOf = {}, notes = [];
     for (const [i, s] of S.sources.entries()){
@@ -4607,28 +4689,52 @@ $('#bkForm').addEventListener('submit', async e => {
         const j = await r.json(); fileOf[i] = { id: j.id, name: j.name, mime: j.mime }; bkFiles.set(j.id, Promise.resolve(s.blob));
       } catch (x){ notes.push('the file wasn’t kept in Drive (' + x.message + ')'); }
     }
+    // Expenses: link to one already in the ledger, or queue a new one to check.
+    const linkOf = new Map(), queue = [];
+    for (const P of bkPriced(items)){
+      const ch = S.expChoice?.[P.key] || 'new';
+      if (ch.startsWith('link:')) P.items.forEach(b => linkOf.set(b, ch.slice(5)));
+      else if (ch === 'new') queue.push(P);
+    }
     btn.textContent = 'Saving…';
     const old = S.editId ? state.bookings.find(x => x.id === S.editId) || {} : {};
-    const batch = writeBatch(fs), ids = [];
+    const batch = writeBatch(fs), ids = [], tripOfItem = new Map(); let nUpd = 0;
+    const expTrip = new Map();
     for (const it of items){
       const fi = (it.codes || []).map(ci => S.codes[ci]?.file).find(f => f != null) ?? 0;
       const f = fileOf[fi] || fileOf[0];
-      const d = { ...it, tripId: tripId || '', travellers: it.travellers?.length ? it.travellers : null,
-        codes: (it.codes || []).map(ci => S.codes[ci]).filter(Boolean).slice(0, 8).map(c => ({ format: String(c.format || '').slice(0, 20), text: String(c.text || '').slice(0, 2000), img: c.img })),
-        fileId: f ? f.id : old.fileId, fileName: f ? f.name : old.fileName, fileMime: f ? f.mime : old.fileMime,
-        source: old.source || S.source || 'upload', expenseId: old.expenseId, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || me,
-        updatedBy: S.editId ? me : null };
-      const ref = S.editId ? doc(fs, 'bookings', S.editId) : doc(bookingsCol);
-      batch.set(ref, pickDoc(BK_KEYS, d)); ids.push(ref.id);
+      const codes = (it.codes || []).map(ci => S.codes[ci]).filter(Boolean).map(c => ({ format: String(c.format || '').slice(0, 20), text: String(c.text || '').slice(0, 2000), img: c.img }));
+      const clean = { ...it, travellers: it.travellers?.length ? it.travellers : null };
+      const m = bkMatched(it);
+      let d, ref;
+      if (m){
+        d = bkMerge(m, clean, codes, f); d.tripId = m.tripId || tripId || ''; d.expenseId = m.expenseId || linkOf.get(it); d.updatedBy = me;
+        ref = doc(fs, 'bookings', m.id); nUpd++;
+      } else {
+        d = { ...clean, tripId: (S.editId ? tripId : tripId) || '', codes: codes.slice(0, 8),
+          fileId: f ? f.id : old.fileId, fileName: f ? f.name : old.fileName, fileMime: f ? f.mime : old.fileMime,
+          files: f ? [f, ...bkFilesOf(old).filter(x => x.id !== f.id)].slice(0, 4) : old.files,
+          source: old.source || S.source || 'upload', expenseId: old.expenseId || linkOf.get(it), createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || me,
+          updatedBy: S.editId ? me : null };
+        ref = S.editId ? doc(fs, 'bookings', S.editId) : doc(bookingsCol);
+      }
+      for (const k of ['act','matchId','on']) delete d[k];
+      batch.set(ref, pickDoc(BK_KEYS, d)); ids.push(ref.id); tripOfItem.set(it, d.tripId);
+      if (linkOf.has(it) && d.tripId) expTrip.set(linkOf.get(it), d.tripId);
     }
+    // A linked expense that isn't in a trip yet joins the booking's trip.
+    for (const [eid, tid] of expTrip){ const ex = state.items.find(i => i.id === eid); if (ex && !ex.tripId) batch.set(doc(fs, 'expenses', eid), expenseDoc(ex, { tripId: tid })); }
     await batch.commit();
     if (S.inboxId) try { await deleteDoc(doc(fs, 'bookingInbox', S.inboxId)); } catch {}
     $('#bkDlg').close(); state.bk = null;
-    toast((S.editId ? 'Booking saved' : `Saved ${items.length} booking${items.length === 1 ? '' : 's'}`) + (notes.length ? '. Note: ' + notes.join('; ') : ''));
-    if (tripId){ state.openTrip = tripId; state.attachOpen = false; if (state.page !== 'trips') location.hash = 'trips'; else render(); }
-    if (!S.editId && S.exp !== false) bkOfferExpense(items, ids, tripId, S.date);
+    const nNew = items.length - nUpd;
+    toast((S.editId ? 'Booking saved' : [nNew ? `Saved ${nNew} booking${nNew === 1 ? '' : 's'}` : '', nUpd ? `updated ${nUpd} saved booking${nUpd === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ').replace(/^u/, 'U'))
+      + (linkOf.size ? ', linked to the existing expense' : '') + (notes.length ? '. Note: ' + notes.join('; ') : ''));
+    const goTrip = tripOfItem.get(items[0]);
+    if (goTrip){ state.openTrip = goTrip; state.attachOpen = false; if (state.page !== 'trips') location.hash = 'trips'; else render(); }
+    if (!S.editId && queue.length) bkOfferExpense(items, ids, tripOfItem.get(queue[0].items[0]) || goTrip, S.date, queue);
   } catch (x){ fail(writeError(x)); }
-  finally { btn.disabled = false; if (state.bk === S) btn.textContent = S.editId ? 'Save changes' : 'Save'; }
+  finally { btn.disabled = false; if (state.bk === S) bkReviewRender(); }
 });
 
 function bkOfferExpense(items, ids, tripId, date, queue, of){
@@ -4664,6 +4770,14 @@ function renderBkInbox(){
   const n = state.bkInbox.length, it = state.bkInbox[0];
   $$('[data-bkinboxbar]').forEach(bar => { bar.hidden = !n;
     bar.innerHTML = n ? `<div class="left"><strong>${n} forwarded booking${n === 1 ? '' : 's'} to add</strong><span class="note" style="font-size:12.5px;color:var(--muted)">${esc(it.subject || 'Email')}, ${ago(it.receivedAt)}</span></div><button class="btn primary" type="button" data-bkinbox="${esc(it.id)}">Review</button>` : ''; });
+  // A badge on the profile button and the menu entry; a toast when one arrives while the app is open.
+  const badge = $('#profBadge'); badge.hidden = !n; badge.textContent = n > 9 ? '9+' : n;
+  $('#profBtn').setAttribute('aria-label', 'Menu: trips, budgets, settings' + (n ? `. ${n} forwarded booking${n === 1 ? '' : 's'} to add` : ''));
+  $('#pmBkInbox').hidden = !n; $('#pmBkInboxN').textContent = n + ' to add';
+  try { if (navigator.setAppBadge) n ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } catch {}
+  const seen = state.bkSeen;
+  state.bkSeen = new Set(state.bkInbox.map(x => x.id));
+  if (seen){ const fresh = state.bkInbox.filter(x => !seen.has(x.id)); if (fresh.length) toast('New booking: ' + (fresh[0].subject || 'forwarded email').replace(/^(fwd?|wg|tr):\s*/i, '')); }
   if ($('#bkDlg').open && !$('#bkPick').hidden) renderBkPick();
 }
 function renderBkPick(){
@@ -4750,7 +4864,7 @@ function bkItinerary(list, { dayLabels = true, from = '', to = '9999' } = {}){
     const title = e.co ? (b.type === 'hotel' ? 'Check out · ' : 'Return car · ') + esc(b.title) : (b.type === 'hotel' ? 'Check in · ' : '') + esc(b.title);
     const route = b.from && b.to && !b.title.includes(bkCity(b.to)) ? esc(b.from) + ' → ' + esc(b.to) : '';
     const sub = e.co ? esc(b.address || b.ref || '') : [route, !['hotel','car'].includes(b.type) && b.end && b.end.length > 10 ? 'arr ' + b.end.slice(11, 16) : '', b.seat ? esc(b.seat) : '', b.type === 'hotel' ? esc(b.address || '') : '', b.ref ? esc(b.ref) : ''].filter(Boolean).join(' · ');
-    out += `<button type="button" class="bk ${d < td ? 'past' : ''} ${e.co ? 'co' : ''}" data-bkopen="${esc(b.id)}"><span class="tm">${dayLabels ? tm : (d === td ? 'Today' : d === addDays(td, 1) ? 'Tmrw' : shortDate(d)) + (tm ? '<br>' + tm : '')}</span><span class="ic" aria-hidden="true">${(BK_TYPES[b.type] || BK_TYPES.other)[0]}</span><span class="ti">${title}<span class="sub">${sub || '&nbsp;'}</span></span>${!e.co && (b.codes || []).length ? '<span class="chip">Ticket</span>' : !e.co && b.fileId ? '<span class="chip">PDF</span>' : '<span></span>'}</button>`;
+    out += `<button type="button" class="bk ${d < td ? 'past' : ''} ${e.co ? 'co' : ''}" data-bkopen="${esc(b.id)}"><span class="tm">${dayLabels ? tm : (d === td ? 'Today' : d === addDays(td, 1) ? 'Tmrw' : shortDate(d)) + (tm ? '<br>' + tm : '')}</span><span class="ic" aria-hidden="true">${(BK_TYPES[b.type] || BK_TYPES.other)[0]}</span><span class="ti">${title}<span class="sub">${sub || '&nbsp;'}</span></span>${!e.co && (b.codes || []).length ? `<span class="chip">${b.type === 'flight' ? 'Boarding pass' : 'Ticket'}</span>` : !e.co && b.fileId ? '<span class="chip">PDF</span>' : '<span></span>'}</button>`;
   }
   return out;
 }
@@ -4760,36 +4874,69 @@ function bkPanel(t){
     ${bl.length ? `<div class="itin">${bkItinerary(bl)}</div>` : `<p class="empty" style="margin:0">Add tickets and hotel confirmations: choose a PDF or screenshot${state.bkSettings?.email ? ', or forward the email' : ''}. Flights, trains and stays line up here by day, with their QR codes ready to show.</p>`}</section>`;
 }
 // Overview: what's on in the next two days.
+// Overview: what's on in the next two days, with the boarding pass one tap away, or a nudge to check in.
 function renderNextUp(){
   const el = $('#nextUp'); if (!el) return;
-  const td = today(), lim = addDays(td, 2);
+  const td = today(), lim = addDays(td, 2), now = new Date();
   const soon = state.bookings.filter(b => {
     const s = (b.start || '').slice(0, 10), e = (b.end || b.start || '').slice(0, 10);
     return s && ((s >= td && s <= lim) || (['hotel','car'].includes(b.type) && s < td && e >= td));
-  }).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 4);
-  el.hidden = !soon.length;
-  if (soon.length) el.innerHTML = `<header><h2>Coming up</h2><span class="hint">Tap for tickets</span></header><div class="itin">${bkItinerary(soon, { dayLabels: false, from: td, to: lim })}</div>`;
+  }).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 5);
+  const done = lsGet('bkCheckedIn', []);
+  const flights = soon.filter(b => b.type === 'flight' && (b.start.length > 10 ? new Date(b.start) > now : b.start.slice(0, 10) >= td));
+  const when = b => (b.start.slice(0, 10) === td ? 'today' : b.start.slice(0, 10) === addDays(td, 1) ? 'tomorrow' : wday(b.start)) + (b.start.length > 10 ? ' ' + b.start.slice(11, 16) : '');
+  const acts = flights.map(b => (b.codes || []).length
+    ? `<div class="bkact"><span><strong>${esc(b.number || b.title)}</strong> ${when(b)}${b.seat ? ' · seat ' + esc(b.seat) : ''}</span><button class="btn primary" type="button" data-bkpass="${esc(b.id)}">Show boarding pass</button></div>`
+    : done.includes(b.id) ? '' : `<div class="bkact warn"><span><strong>${esc(b.number || b.title)}</strong> ${when(b)}: no boarding pass yet. Check in online, then forward or add the pass.</span>
+        <span class="row"><a class="btn small primary" href="${esc(checkinUrl(b))}" target="_blank" rel="noopener">Check in${b.provider ? ' with ' + esc(b.provider) : ''}</a><button class="btn small" type="button" data-addbk="${esc(b.tripId || '')}">Add pass</button><button class="btn small ghost" type="button" data-bkckdone="${esc(b.id)}">Hide</button></span></div>`).join('');
+  // Trips starting soon with nothing booked yet.
+  const bare = state.trips.filter(t => t.start && t.start >= td && t.start <= lim && !state.bookings.some(b => b.tripId === t.id));
+  const tripNudge = bare.map(t => `<div class="bkact"><span><strong>${esc(t.name)}</strong> starts ${t.start === td ? 'today' : t.start === addDays(td, 1) ? 'tomorrow' : 'in 2 days'}. Add your tickets to have them here.</span><button class="btn small" type="button" data-addbk="${esc(t.id)}">+ Booking</button></div>`).join('');
+  el.hidden = !soon.length && !bare.length;
+  if (!el.hidden) el.innerHTML = `<header><h2>Coming up</h2><span class="hint">${soon.length ? 'Tap for details' : ''}</span></header>${acts}${tripNudge}${soon.length ? `<div class="itin">${bkItinerary(soon, { dayLabels: false, from: td, to: lim })}</div>` : ''}`;
 }
 function openBooking(id){
   const b = state.bookings.find(x => x.id === id); if (!b) return;
   state.viewBk = id;
   const [ic, tl] = BK_TYPES[b.type] || BK_TYPES.other, t = b.tripId && state.tripMap[b.tripId];
   const exp = b.expenseId && state.items.find(i => i.id === b.expenseId);
+  const files = bkFilesOf(b);
   const rows = [['When', bkWhen(b)], ['Reference', esc(b.ref)], ['Number', esc(b.number)], [b.type === 'hotel' ? 'Room' : 'Seat', esc(b.seat)], ['Travellers', esc((b.travellers || []).join(', '))],
     ['Address', b.address ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}" target="_blank" rel="noopener">${esc(b.address)}</a>` : ''],
     ['Details', esc(b.details)], ['Provider', esc(b.provider)], ['Price', b.price ? money(b.price, b.currency || 'EUR') : ''], ['Trip', t ? esc(t.name) : '']].filter(r => r[1]);
+  const cands = exp ? [] : bkExpCands({ cur: b.currency || 'EUR', total: b.price || 0, items: [b] }, b.tripId);
+  const passLbl = b.type === 'flight' ? 'Boarding pass' : 'Ticket';
   $('#bkvBody').innerHTML = `
     <div class="head"><span class="ic" aria-hidden="true">${ic}</span><div><div class="muted" style="font-size:12px">${tl}</div>
       <div class="route">${b.from && b.to ? esc(b.from) + ' → ' + esc(b.to) : esc(b.title)}</div>${b.from && b.to ? `<div class="muted" style="font-size:13px">${esc(b.title)}</div>` : ''}</div></div>
-    ${(b.codes || []).length ? `<div class="bkbig">${b.codes.map((c, i) => `<img src="${c.img}" class="${/pdf417|code_128/.test(c.format) ? 'wide' : ''}" alt="Ticket code" data-bkcode="${i}">`).join('')}<span class="muted" style="font-size:12px">Tap the code to show it full screen</span></div>` : ''}
+    ${(b.codes || []).length ? `<div class="bkbig"><strong style="font-size:13px">${passLbl}${b.codes.length > 1 ? 's' : ''}</strong>${b.codes.map((c, i) => `<img src="${c.img}" class="${/pdf417|code_128/.test(c.format) ? 'wide' : ''}" alt="${passLbl} code" data-bkcode="${i}">`).join('')}<span class="muted" style="font-size:12px">Tap the code to show it full screen</span></div>`
+      : b.type === 'flight' && (b.start || '') >= today() ? `<div class="banner" style="background:var(--warn-soft);border-color:transparent"><span>No boarding pass yet. Check in online, then add or forward the pass; it lands on this flight.</span><span style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn small" href="${esc(checkinUrl(b))}" target="_blank" rel="noopener">Check in</a><button class="btn small primary" type="button" data-addbk="${esc(b.tripId || '')}">Add pass</button></span></div>` : ''}
     <dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${b.fileId ? `<button class="btn" type="button" data-bkfile>Open ${isPdf(b.fileMime, b.fileName) ? 'PDF' : 'file'}</button>` : ''}
+      ${files.map((f, i) => `<button class="btn" type="button" data-bkfile="${i}">${files.length === 1 ? 'Open ' + (isPdf(f.mime, f.name) ? 'PDF' : 'file') : esc((f.name || 'File ' + (i + 1)).replace(/\.[a-z0-9]+$/i, '').slice(0, 28))}</button>`).join('')}
       ${exp ? `<button class="btn" type="button" data-bkvexp="${esc(exp.id)}">Expense ${eur.format(exp.amount)}</button>` : b.price ? `<button class="btn" type="button" data-bkexp>Add ${money(b.price, b.currency || 'EUR')} as expense</button>` : ''}
       ${t && !(state.page === 'trips' && state.openTrip === t.id) ? `<button class="btn" type="button" data-bktrip="${esc(t.id)}">Open trip</button>` : ''}
-    </div>`;
+    </div>
+    ${!exp && cands.length ? `<label class="f">Or link an expense already in the ledger<select data-bklink><option value="">Choose…</option>${cands.map(c => `<option value="${esc(c.i.id)}">${esc(expLabel(c.i))}</option>`).join('')}</select></label>` : ''}`;
   const del = $('#bkvDel'); del.classList.remove('armed'); del.textContent = 'Delete';
-  $('#bkvDlg').showModal();
+  if (!$('#bkvDlg').open) $('#bkvDlg').showModal();
+}
+$('#bkvBody').addEventListener('change', async e => {
+  const sel = e.target.closest('[data-bklink]'); if (!sel || !sel.value) return;
+  const b = state.bookings.find(x => x.id === state.viewBk), ex = state.items.find(i => i.id === sel.value); if (!b || !ex) return;
+  try {
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, 'bookings', b.id), pickDoc(BK_KEYS, { ...b, expenseId: ex.id, updatedBy: usernameOf(state.user) }));
+    if (!ex.tripId && b.tripId) batch.set(doc(fs, 'expenses', ex.id), expenseDoc(ex, { tripId: b.tripId }));
+    await batch.commit(); toast('Linked to ' + ex.store); openBooking(b.id);
+  } catch (x){ toast(writeError(x)); }
+});
+// Online check-in pages for the airlines you fly most; others get a search.
+const CHECKIN = [[/lufthansa|^LH\d/i, 'https://www.lufthansa.com/de/en/online-check-in'], [/easyjet|^(U2|EZY|EJU|EZS)\d/i, 'https://www.easyjet.com/en/manage-bookings'],
+  [/ryanair|^FR\d/i, 'https://www.ryanair.com/gb/en/check-in']];
+function checkinUrl(b){
+  const key = normNo(b.number), hit = CHECKIN.find(([re]) => re.test(b.provider || '') || re.test(key));
+  return hit ? hit[1] : 'https://www.google.com/search?q=' + encodeURIComponent((b.provider || b.number || 'airline') + ' online check-in');
 }
 function showCode(c){
   const v = $('#codeView'), img = v.querySelector('img');
@@ -4840,14 +4987,16 @@ $('#bkvDel').addEventListener('click', async () => {
 });
 document.addEventListener('click', async e => {
   const t = e.target;
-  const ab = t.closest('[data-addbk]'); if (ab){ bkOpen({ source: 'upload', ...(ab.dataset.addbk ? { tripSel: ab.dataset.addbk } : {}) }); return; }
+  const ab = t.closest('[data-addbk]'); if (ab){ if ($('#bkvDlg').open) $('#bkvDlg').close(); bkOpen({ source: 'upload', ...(ab.dataset.addbk ? { tripSel: ab.dataset.addbk } : {}) }); return; }
   const op = t.closest('[data-bkopen]'); if (op){ openBooking(op.dataset.bkopen); return; }
   const ib = t.closest('[data-bkinbox]'); if (ib){ bkFromInbox(ib.dataset.bkinbox); return; }
   const idis = t.closest('[data-bkidis]'); if (idis){ idis.disabled = true; try { await bkDismissInbox(idis.dataset.bkidis); } catch (x){ toast(writeError(x)); idis.disabled = false; } return; }
   const cv = t.closest('[data-codeview]'); if (cv){ showCode(state.bk.codes[+cv.dataset.codeview]); return; }
   const b = state.viewBk && $('#bkvDlg').open ? state.bookings.find(x => x.id === state.viewBk) : null;
   const bc = t.closest('[data-bkcode]'); if (bc && b){ showCode(b.codes[+bc.dataset.bkcode]); return; }
-  if (t.closest('[data-bkfile]') && b){ openBkFile(b); return; }
+  const bf = t.closest('[data-bkfile]'); if (bf && b){ const f = bkFilesOf(b)[+bf.dataset.bkfile || 0]; if (f) openBkFile({ ...b, fileId: f.id, fileName: f.name, fileMime: f.mime }); return; }
+  const bp = t.closest('[data-bkpass]'); if (bp){ const x = state.bookings.find(y => y.id === bp.dataset.bkpass); if (x && x.codes?.length === 1) showCode(x.codes[0]); else if (x) openBooking(x.id); return; }
+  const ck = t.closest('[data-bkckdone]'); if (ck){ lsSet('bkCheckedIn', [...lsGet('bkCheckedIn', []), ck.dataset.bkckdone].slice(-50)); renderNextUp(); return; }
   if (t.closest('[data-bkexp]') && b){ $('#bkvDlg').close(); bkOfferExpense([b], [b.id], b.tripId, b.createdAt, [{ cur: b.currency || 'EUR', total: b.price, items: [b] }]); return; }
   const ve = t.closest('[data-bkvexp]'); if (ve){ $('#bkvDlg').close(); openEdit(ve.dataset.bkvexp, 'expense'); return; }
   const bt = t.closest('[data-bktrip]'); if (bt){ $('#bkvDlg').close(); state.openTrip = bt.dataset.bktrip; state.attachOpen = false; if (state.page !== 'trips') location.hash = 'trips'; else render(); window.scrollTo(0, 0); return; }
