@@ -4841,7 +4841,7 @@ function renderBkPick(){
 }
 // The inbox may still be loading when the app opens from a notification: wait a moment for it.
 async function openBkInboxFromLink(tries = 0){
-  if (!state.bkInbox.length && tries < 10) return setTimeout(() => openBkInboxFromLink(tries + 1), 300);
+  if (!state.bkInbox.length && tries < 30) return setTimeout(() => openBkInboxFromLink(tries + 1), 300);
   if (state.bkInbox.length === 1) bkFromInbox(state.bkInbox[0].id); else bkOpen({ source: 'email' });
 }
 async function bkFromInbox(id){
@@ -5329,6 +5329,15 @@ document.addEventListener('click', async e => {
   if (e.target.id === 'instGo' && installEvt){ installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; $('#installBar').hidden = true; }
 });
 showInstall();
+
+// A tapped notification while the app is already open: go where it points, with fresh data on screen.
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => {
+  if (e.data?.type !== 'notification-open') return;
+  const h = e.data.hash || '#overview';
+  if (location.hash === h) route(); else location.hash = h;
+});
+// Coming back to the app (from another app or the lock screen): redraw, so times, badges and new items are current.
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.user){ render(); renderBadge(); renderBkInbox(); } });
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
