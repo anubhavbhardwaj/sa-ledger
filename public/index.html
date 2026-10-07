@@ -313,6 +313,15 @@ table.mini th.num{font-family:var(--f-body)}
 .autohint{margin:0;font-size:12.5px;color:var(--muted);background:var(--sunk);border-radius:8px;padding:7px 10px}
 .autohint b{color:var(--ink-2);font-weight:600}
 .kpi .sub.fc strong{color:var(--ink);font-weight:600}
+.linkish{border:0;background:none;padding:0;text-align:left;font:inherit;cursor:pointer;color:inherit}
+.linkish .more{color:var(--accent);font-weight:500}
+#fcDlg{max-height:88dvh;overflow:auto}
+.fcl{display:grid;gap:2px;margin:0}
+.fcl .r{display:grid;grid-template-columns:minmax(0,1fr) auto 26px;gap:8px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.fcl .r .a{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+.fcl .r small{display:block;color:var(--muted);font-size:12px}
+.fcl .sec{font:700 11px/1 var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:12px 0 4px}
+.fcl .tot{font-weight:700;border-bottom:0;font-size:15px}
 .hint.cmp{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
 .hint.cmp strong{color:var(--ink);font-weight:600}
 /* to do card */
@@ -914,6 +923,14 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   </div>
 </dialog>
 
+<dialog id="fcDlg">
+  <form method="dialog" style="display:grid;gap:12px;padding:20px;min-width:min(440px,88vw)">
+    <h3 id="fcTitle">Forecast</h3>
+    <div id="fcBody"></div>
+    <div class="dlg-actions"><div class="right"><button class="btn" type="submit">Close</button></div></div>
+  </form>
+</dialog>
+
 <div id="tip" hidden></div>
 <div class="toast" id="toast" hidden></div>
 
@@ -1255,8 +1272,8 @@ function renderOverview(ms){
     <div class="kpi"><span class="lbl">Spent</span><span class="val">${eur.format(total)}</span>${deltaHtml}${(() => {
       if (state.period !== thisMonth()) return '';
       const f = forecastMonth(); if (!f.reliable && !f.recLeft) return '';
-      const tip = `So far ${eur0.format(f.soFar)} + repeats still due ${eur0.format(f.recLeft)}${f.upcoming.length ? ' (' + f.upcoming.map(r => r.name).join(', ') + ')' : ''} + usual spending ${f.rate === null ? '' : eur0.format(f.rate) + '/day × ' + f.left + ' days = ' + eur0.format(f.varLeft)}${f.tripLeft ? ' + trip budgets ' + eur0.format(f.tripLeft) : ''}. Pace from ${f.basis}.`;
-      return `<span class="sub fc" title="${esc(tip)}">Heading for <strong>~${eur0.format(f.total)}</strong> by ${f.D} ${MON[+f.month.slice(5,7)-1]}${f.left > 0 && f.varLeft > 0 ? ` (${eur0.format(f.low)} to ${eur0.format(f.high)})` : ''}</span>`; })()}</div>
+      const tip = `So far ${eur0.format(f.soFar)} + bills and repeats still due ${eur0.format(f.recLeft)}${f.upcoming.length ? ' (' + f.upcoming.map(r => r.name).join(', ') + ')' : ''} + usual spending ${f.rate === null ? '' : eur0.format(f.rate) + '/day × ' + f.left + ' days = ' + eur0.format(f.varLeft)}${f.tripLeft ? ' + trip budgets ' + eur0.format(f.tripLeft) : ''}. Pace from ${f.basis}.`;
+      return `<button type="button" class="sub fc linkish" data-fcopen title="${esc(tip)}">Heading for <strong>~${eur0.format(f.total)}</strong> by ${f.D} ${MON[+f.month.slice(5,7)-1]}${f.left > 0 && f.varLeft > 0 ? ` (${eur0.format(f.low)} to ${eur0.format(f.high)})` : ''} <span class="more">· how?</span></button>`; })()}</div>
     <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
     <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' : ''}</span></div>
     <div class="kpi"><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
@@ -3852,29 +3869,56 @@ function dueRecurring(){
 }
 
 // ---------- month-end forecast ----------
-// Spent so far + repeats still due this month (known amounts, on their dates) + the usual day-to-day pace for the
-// days left + what's left of planned trip budgets. The usual pace leaves out trips, repeats and one-off big buys
-// (a single entry of €250 or more that isn't a repeat), so a flight or a card bill doesn't inflate every forecast.
+// Spent so far + monthly bills not yet paid + other repeats still due + the usual day-to-day pace for the days
+// left + what's left of planned trip budgets.
+// Bills: every store paid in a bill category (marked Fixed in budgets, or rent, insurance, phone/internet,
+// subscriptions, fitness) in the last month that had them is expected again on about the same day, unless it
+// has already been paid this month. Day-to-day pace leaves out trips, bills, repeats and one-off entries of
+// €250 or more, so a flight or a card bill doesn't inflate every forecast.
 const BIG_ONE_OFF = 250;
+function billCategories(){
+  const bm = budgetMap(), cats = new Set();
+  Object.values(bm).forEach(b => { if (b.f) cats.add(b.c); });
+  state.items.forEach(i => { if (FIXED_GUESS.test(i.category || '') && !(bm[i.category] && !bm[i.category].f)) cats.add(i.category); });
+  return cats;
+}
 function forecastMonth(){
   const cm = thisMonth(), td = today(), d = +td.slice(8,10), [y, m] = cm.split('-').map(Number), D = new Date(y, m, 0).getDate();
-  const groups = recurringGroups().filter(r => r.kind === 'expense'), recKeys = new Set(groups.map(r => r.key));
+  const billCats = billCategories(), isBill = i => billCats.has(i.category);
+  const groups = recurringGroups().filter(r => r.kind === 'expense' && !billCats.has(r.last.category)), recKeys = new Set(groups.map(r => r.key));
   const isRec = i => recKeys.has('e|' + nk(i.store) + '|' + nk(i.account));
-  const variable = i => !i.tripId && !isRec(i) && !(+i.amount >= BIG_ONE_OFF);
-  const soFar = sum(state.items.filter(i => i.date.startsWith(cm) && i.date <= td));
-  // usual pace from up to 6 complete earlier months
-  const hist = [];
-  for (let k = 1; k <= 6; k++){
-    const pm = addMonth(cm, -k), rows = state.items.filter(i => i.date.startsWith(pm)); if (rows.length < 8) continue;  // skip partly logged months
-    const [py, pmo] = pm.split('-').map(Number); hist.push(sum(rows.filter(variable)) / new Date(py, pmo, 0).getDate());
+  const variable = i => !i.tripId && !isBill(i) && !isRec(i) && !(+i.amount >= BIG_ONE_OFF);
+  const thisRows = state.items.filter(i => i.date.startsWith(cm) && i.date <= td);
+  const soFar = sum(thisRows);
+  const skipped = lsGet('recSkip', {});
+  // monthly bills: from the most recent of the last two months that had any
+  const bills = [];
+  for (let k = 1; k <= 2 && !bills.length; k++){
+    const pm = addMonth(cm, -k), prev = state.items.filter(i => i.date.startsWith(pm) && isBill(i) && !i.tripId);
+    const byStore = {}; prev.forEach(i => { const key = nk(i.store); (byStore[key] ||= { name: i.store, category: i.category, amount: 0, day: 1 }); byStore[key].amount += +i.amount || 0; byStore[key].day = Math.max(byStore[key].day, +i.date.slice(8,10)); });
+    for (const [key, b] of Object.entries(byStore)){
+      const paid = state.items.some(i => i.date.startsWith(cm) && nk(i.store) === key);
+      if (paid || skipped['bill|' + key + '|' + cm]) continue;
+      bills.push({ name: b.name, category: b.category, amount: b.amount, day: Math.min(D, Math.max(d + 1, b.day)), key });
+    }
   }
-  const curRate = d >= 3 ? sum(state.items.filter(i => i.date.startsWith(cm) && i.date <= td && variable(i))) / d : null;
+  // other repeats (not bills) still due this month
+  const repeats = groups.filter(r => r.due.startsWith(cm) && !skipped[r.key + '|' + r.due])
+    .map(r => ({ name: r.last.store, category: r.last.category, amount: +r.last.amount, day: Math.min(D, Math.max(d + 1, +r.due.slice(8,10))) }));
+  const upcoming = [...bills, ...repeats].sort((p, q) => p.day - q.day);
+  // usual day-to-day pace from up to 6 earlier months (skipping partly logged ones), by category too
+  const hist = [], catTot = {}; let histDays = 0;
+  for (let k = 1; k <= 6; k++){
+    const pm = addMonth(cm, -k), rows = state.items.filter(i => i.date.startsWith(pm)); if (rows.length < 8) continue;
+    const [py, pmo] = pm.split('-').map(Number), dm = new Date(py, pmo, 0).getDate(), v = rows.filter(variable);
+    hist.push(sum(v) / dm); histDays += dm; v.forEach(i => catTot[i.category] = (catTot[i.category] || 0) + (+i.amount || 0));
+  }
+  const curVar = thisRows.filter(variable), curRate = d >= 3 ? sum(curVar) / d : null;
   const histRate = hist.length ? hist.reduce((a,b) => a + b, 0) / hist.length : null;
   // Blend: early in the month trust history, later trust this month's own pace.
   const rate = histRate !== null ? (curRate !== null ? histRate * (1 - d / D) + curRate * (d / D) : histRate) : curRate;
-  const skipped = lsGet('recSkip', {});
-  const upcoming = groups.filter(r => r.due.startsWith(cm) && !skipped[r.key + '|' + r.due])
-    .map(r => ({ name: r.last.store, amount: +r.last.amount, day: Math.max(d + 1, +r.due.slice(8,10)), overdue: r.due <= td }));
+  const byCat = histDays ? Object.entries(catTot).map(([c, t]) => ({ category: c, perDay: t / histDays })).sort((p, q) => q.perDay - p.perDay)
+    : Object.entries(curVar.reduce((o, i) => (o[i.category] = (o[i.category] || 0) + (+i.amount || 0), o), {})).map(([c, t]) => ({ category: c, perDay: t / Math.max(d, 1) })).sort((p, q) => q.perDay - p.perDay);
   const tripsLeft = state.trips.filter(t => t.budget > 0 && t.start && t.start > td && t.start.startsWith(cm))
     .map(t => ({ name: t.name, amount: Math.max(0, +t.budget - sum(tripExpenses(t.id))), day: +t.start.slice(8,10) })).filter(t => t.amount > 0);
   const left = D - d, varLeft = rate === null ? 0 : rate * left;
@@ -3890,7 +3934,8 @@ function forecastMonth(){
     tripsLeft.filter(t => t.day === k).forEach(t => c += t.amount);
     path.push([k, c]);
   }
-  return { month: cm, d, D, left, soFar, rate, upcoming, tripsLeft, recLeft, varLeft, tripLeft, total,
+  return { month: cm, d, D, left, soFar, rate, upcoming, bills, repeats, tripsLeft, recLeft, varLeft, tripLeft, total, byCat,
+    soFarBills: sum(thisRows.filter(isBill)), soFarOther: sum(thisRows.filter(i => !isBill(i))),
     low: total - varLeft * spread, high: total + varLeft * spread, basis: hist.length ? hist.length + ' earlier month' + (hist.length === 1 ? '' : 's') : 'this month so far', path,
     reliable: rate !== null };
 }
@@ -3976,7 +4021,7 @@ function aiContext(){
     const trips = sum(ex.filter(i => i.tripId)), cats = group(ex, 'category').slice(0, 5).map(g => `${g.key} ${f0(g.total)}`).join(', ');
     L.push(`${m}${m === cm ? ' (so far)' : ''}: ${f0(spent)} | ${f0(inc)} | ${inv === null ? '-' : f0(inv)} | ${f0(spent - trips)} | ${f0(trips)} | ${cats}`);
   }
-  { const f = forecastMonth(); if (f.reliable || f.recLeft) L.push(`Month-end forecast for ${cm}: ~${f0(f.total)} (range ${f0(f.low)} to ${f0(f.high)}) = so far ${f0(f.soFar)} + repeats still due ${f0(f.recLeft)}${f.upcoming.length ? ' (' + f.upcoming.map(r => r.name + ' ' + f0(r.amount)).join(', ') + ')' : ''} + usual day-to-day ${f.rate === null ? '-' : f0(f.rate) + '/day'} for ${f.left} days${f.tripLeft ? ' + trip budgets left ' + f0(f.tripLeft) : ''}; pace from ${f.basis}.`); }
+  { const f = forecastMonth(); if (f.reliable || f.recLeft) L.push(`Month-end forecast for ${cm}: ~${f0(f.total)} (range ${f0(f.low)} to ${f0(f.high)}) = so far ${f0(f.soFar)} + bills and repeats still due ${f0(f.recLeft)}${f.upcoming.length ? ' (' + f.upcoming.map(r => r.name + ' ' + f0(r.amount)).join(', ') + ')' : ''} + usual day-to-day ${f.rate === null ? '-' : f0(f.rate) + '/day'} for ${f.left} days${f.tripLeft ? ' + trip budgets left ' + f0(f.tripLeft) : ''}; pace from ${f.basis}.`); }
   const bm = budgetMap();
   if (Object.keys(bm).length){
     const b = budgetStatus(cm);
@@ -4093,6 +4138,35 @@ $('#aiMsgs').addEventListener('click', e => { const b = e.target.closest('[data-
 $('#aiForm').addEventListener('submit', e => { e.preventDefault(); const v = $('#aiInput').value; $('#aiInput').value = ''; $('#aiInput').style.height = ''; aiAsk(v); });
 $('#aiInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); $('#aiForm').requestSubmit(); } });
 $('#aiInput').addEventListener('input', e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(140, e.target.scrollHeight) + 'px'; });
+
+
+function renderForecastBreakdown(){
+  const f = forecastMonth(), mn = MON[+f.month.slice(5,7)-1];
+  const row = (label, sub, amt, act = '') => `<div class="r"><span>${label}${sub ? `<small>${sub}</small>` : ''}</span><span class="a">${amt}</span><span>${act}</span></div>`;
+  let h = `<div class="fcl">`;
+  h += row(`<strong>Spent so far</strong>`, `1 to ${f.d} ${mn}${f.soFarBills ? ` · bills ${eur0.format(f.soFarBills)}, everything else ${eur0.format(f.soFarOther)}` : ''}`, eur0.format(f.soFar));
+  if (f.bills.length || f.repeats.length){
+    h += `<div class="sec">Still to pay (known)</div>`;
+    h += f.bills.slice().sort((p, q) => p.day - q.day || q.amount - p.amount).map(b => row(esc(b.name), `${esc(b.category)} · like last month · ~${b.day} ${mn}`, eur0.format(b.amount), `<button class="unlink" type="button" data-fcskip="${esc(b.key)}" title="Not this month" aria-label="Not this month">×</button>`)).join('');
+    h += f.repeats.map(r => row(esc(r.name), `${esc(r.category)} · repeats monthly · ~${r.day} ${mn}`, eur0.format(r.amount))).join('');
+  }
+  if (f.left > 0 && f.rate !== null){
+    h += `<div class="sec">Day-to-day for the ${f.left} days left</div>`;
+    h += row(`${eur0.format(f.rate)} a day × ${f.left} days`, `pace from ${f.basis}${f.d >= 3 ? ', blended with this month so far' : ''}`, eur0.format(f.varLeft));
+    const top = f.byCat.slice(0, 5);
+    if (top.length) h += `<p class="muted" style="margin:4px 0 0;font-size:12.5px">Usual daily spend by category: ${top.map(c => `${esc(c.category)} ${eur.format(c.perDay)}`).join(' · ')}</p>`;
+  }
+  if (f.tripsLeft.length){ h += `<div class="sec">Trips starting this month</div>` + f.tripsLeft.map(t => row(esc(t.name), `budget left · ${t.day} ${mn}`, eur0.format(t.amount))).join(''); }
+  h += `<div class="sec"></div>` + row(`<strong>Month-end estimate</strong>`, f.varLeft > 0 ? `likely ${eur0.format(f.low)} to ${eur0.format(f.high)}` : '', `~${eur0.format(f.total)}`);
+  h += `</div><p class="muted" style="margin:8px 0 0;font-size:12.5px">Not predicted: one-off purchases of €${BIG_ONE_OFF} or more and trips without a budget. Bills are categories marked Fixed in budgets, plus rent, insurance, phone/internet, subscriptions and fitness.</p>`;
+  $('#fcTitle').textContent = `${monthLabel(f.month)}: heading for ~${eur0.format(f.total)}`;
+  $('#fcBody').innerHTML = h;
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-fcopen]')){ renderForecastBreakdown(); $('#fcDlg').showModal(); return; }
+  const sk = e.target.closest('[data-fcskip]');
+  if (sk){ const s = lsGet('recSkip', {}); s['bill|' + sk.dataset.fcskip + '|' + thisMonth()] = 1; lsSet('recSkip', s); renderForecastBreakdown(); render(); }
+});
 
 // ---------- backup & restore ----------
 const BK_COLS = { expenses:() => state.items, income:() => state.income, transfers:() => state.transfers, accounts:() => state.accounts,
