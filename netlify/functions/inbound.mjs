@@ -82,6 +82,10 @@ export async function handle(req, { env = process.env, save, heartbeat, fetch: f
       if (up.some(r => r.status === 'rejected')) fileError = String(up.find(r => r.status === 'rejected').reason?.message || '').slice(0, 200);
     } catch (e) { fileError = String(e.message || e).slice(0, 200); keep.forEach(a => skipped.push(a.Name)); }
   }
+  // Drive unavailable: small PDFs ride inside the item instead, so the app can still read them (no copy is kept).
+  if (fileError) for (const a of keep.filter(a => /pdf/i.test(a.ContentType) && !files.some(x => x.name === a.Name))) {
+    if (a.Content.length <= budget) { images.push({ name: String(a.Name || 'attachment.pdf').slice(0, 140), mime: 'application/pdf', data: a.Content }); budget -= a.Content.length; skipped.splice(skipped.indexOf(a.Name), 1); }
+  }
   atts.filter(a => !keep.includes(a) && !isImg(a) && !/calendar|\.ics$/i.test(a.ContentType + ' ' + a.Name)).forEach(a => skipped.push(a.Name));
 
   if (!text.trim() && !files.length && !images.length) return json(200, { ok: true, note: 'nothing to keep' });
