@@ -52,10 +52,13 @@ screenshot to the installed app (Android share sheet), or by forwarding the conf
   `meta-llama/llama-4-scout-17b-16e-instruct`). Uses the same `GROQ_API_KEY`.
 - `netlify/functions/booking-file.mjs` (`/api/booking-file`) keeps the original file in Google Drive, folder
   "S&A Ledger bookings", using the same `GDRIVE_*` variables as the backup. Files up to 4 MB.
-- Forwarded emails: `netlify/functions/inbound.mjs` (`/api/inbound`) receives Postmark's inbound webhook.
-  1. Create a free Postmark account and a server; open the server's **Default Inbound Stream → Settings**.
-  2. Set the webhook URL to `https://<your-site>/api/inbound?token=<INBOUND_TOKEN>`.
-  3. In Netlify add `INBOUND_TOKEN` (a long random string) and `BOOKING_SENDERS` (comma-separated addresses
-     allowed to forward, for example both of yours).
-  4. Copy the inbound address (`…@inbound.postmarkapp.com`) into the app: Add booking → "Add your forwarding
-     address". Gmail auto-forward filters work too (the original sender is accepted when Gmail marks the forward).
+- Forwarded emails: `netlify/functions/inbound.mjs` (`/api/inbound`) receives them. The free way, with no extra
+  account, is the Gmail script in `tools/gmail-bookings.gs`:
+  1. In Netlify add `INBOUND_TOKEN` (a long random string). Redeploy.
+  2. In Gmail create a filter: To `anubhav.iiitb+trips@gmail.com` → Apply the label "Ledger bookings", Skip the inbox.
+  3. On script.google.com create a project, paste the script, and in Project Settings → Script properties add
+     `LEDGER_URL` (the site address) and `INBOUND_TOKEN`. Run `setup()` once and allow the permissions.
+  4. In the app: Add booking → "Add your forwarding address" → `anubhav.iiitb+trips@gmail.com`.
+  Every 10 minutes the script sends labelled emails (text, PDFs, ticket images) to the app. You can also put the
+  label on any email by hand. An inbound email service (Postmark, CloudMailin) also works: point its webhook at
+  `/api/inbound?token=…` and list the allowed senders in `BOOKING_SENDERS`.

@@ -4853,7 +4853,7 @@ document.addEventListener('click', async e => {
   const bt = t.closest('[data-bktrip]'); if (bt){ $('#bkvDlg').close(); state.openTrip = bt.dataset.bktrip; state.attachOpen = false; if (state.page !== 'trips') location.hash = 'trips'; else render(); window.scrollTo(0, 0); return; }
   if (t.closest('[data-bkcopy]')){ try { await navigator.clipboard.writeText(state.bkSettings.email); toast('Address copied'); } catch { toast(state.bkSettings.email); } return; }
   if (t.closest('[data-bkemail]')){
-    const v = (prompt('Your Postmark inbound address (Postmark → your server → Settings → Inbound). Booking emails forwarded there show up here.', state.bkSettings?.email || '') || '').trim();
+    const v = (prompt('The address you forward booking emails to (for example anubhav.iiitb+trips@gmail.com with the Gmail script, see README). It’s shown here as a reminder.', state.bkSettings?.email || '') || '').trim();
     if (!v) return;
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){ toast('That doesn’t look like an email address.'); return; }
     try { await setDoc(doc(fs, 'settings', 'bookings'), { email: v.slice(0, 120), updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) }); toast('Forwarding address saved'); }

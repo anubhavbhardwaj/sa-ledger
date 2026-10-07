@@ -1,4 +1,5 @@
-// Booking emails forwarded to the app's Postmark inbound address land here. The email's text and its PDF or
+// Booking emails land here, sent either by the Gmail script in tools/gmail-bookings.gs (emails you label or
+// forward to your +trips address) or by an inbound email service such as Postmark. The email's text and its PDF or
 // image attachments are kept (attachments in Drive, "S&A Ledger bookings"), and an item appears in the app's
 // "Bookings to review"; the app then reads the PDFs, finds the ticket codes and asks the AI for the details.
 //
@@ -36,7 +37,8 @@ export async function handle(req, { env = process.env, save, fetch: f = fetch, n
   const from = String(m.FromFull?.Email || m.From || '').toLowerCase().replace(/^.*<|>.*$/g, '').trim();
   const fwd = (m.Headers || []).filter(h => /^x-forwarded-(for|to)$/i.test(h?.Name || '')).map(h => String(h.Value || '').toLowerCase()).join(' ');
   const ok = allowed(env);
-  const by = ok.find(a => a === from) || ok.find(a => fwd.includes(a));
+  // The Gmail script only sends mail from your own mailbox that you labelled, so any original sender is fine.
+  const by = m.Source === 'gmail-script' ? 'gmail' : ok.find(a => a === from) || ok.find(a => fwd.includes(a));
   if (!by) { console.warn('inbound: sender not allowed', from); return json(403, { error: 'Sender not allowed' }); }
 
   const atts = (m.Attachments || []).filter(a => a && a.Content);
