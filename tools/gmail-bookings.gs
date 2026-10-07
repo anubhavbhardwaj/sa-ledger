@@ -38,11 +38,12 @@ function sendBookings() {
     let msgs = all.filter(m => (m.getTo() + ',' + m.getCc()).toLowerCase().includes(ADDRESS));
     if (!msgs.length) msgs = [all[all.length - 1]];
     for (const msg of msgs) {
-      const atts = msg.getAttachments({ includeInlineImages: true, includeAttachments: true })
+      // Real attachments (PDFs, calendar invites, photos); pictures inside the email only when they look like a code.
+      const atts = msg.getAttachments({ includeInlineImages: false, includeAttachments: true })
         .filter(a => /^(application\/pdf|text\/calendar|image\/)/i.test(a.getContentType()) && a.getSize() <= MAX_ATTACHMENT)
-        .slice(0, 10)
+        .slice(0, 6)
         .map(a => ({ Name: a.getName(), ContentType: a.getContentType(), ContentLength: a.getSize(), Content: Utilities.base64Encode(a.getBytes()) }));
-      atts.push(...codeImages(msg.getBody()));
+      atts.push(...codeImages(msg));
       // Netlify takes about 6 MB per call: keep PDFs first, then images, within that.
       let room = 5.5 * 1024 * 1024;
       const fit = atts.sort((a, b) => (/pdf/i.test(b.ContentType) ? 1 : 0) - (/pdf/i.test(a.ContentType) ? 1 : 0))
@@ -63,9 +64,10 @@ function sendBookings() {
 
 // Many boarding-pass emails show the QR code as a picture loaded from the airline's server rather than as an
 // attachment. Fetch the pictures that look like a code (by their name or alt text, or square and big enough).
-function codeImages(html) {
+function codeImages(msg) {
   const out = [], seen = {};
-  const tags = String(html || '').match(/<img\b[^>]*>/gi) || [];
+  const tags = String(msg.getBody() || '').match(/<img\b[^>]*>/gi) || [];
+  let raw = null;
   for (const tag of tags) {
     if (out.length >= 6) break;
     const attr = n => ((tag.match(new RegExp('\\b' + n + '\\s*=\\s*["\']([^"\']*)["\']', 'i')) || [])[1] || '').replace(/&amp;/g, '&');
@@ -78,7 +80,13 @@ function codeImages(html) {
     if (!looksLikeCode) continue;
     try {
       let bytes, type;
-      if (/^data:image\//i.test(src)) { type = src.slice(5, src.indexOf(';')); bytes = Utilities.base64Decode(src.slice(src.indexOf(',') + 1)); }
+      if (/^cid:/i.test(src)) {
+        // A picture carried inside the email (Gmail shows it as an attachment called "inline"): find it by its Content-ID.
+        raw = raw || msg.getRawContent();
+        const part = mimePart(raw, src.slice(4));
+        if (!part) continue;
+        type = part.type; bytes = Utilities.base64Decode(part.data);
+      } else if (/^data:image\//i.test(src)) { type = src.slice(5, src.indexOf(';')); bytes = Utilities.base64Decode(src.slice(src.indexOf(',') + 1)); }
       else if (/^https?:\/\//i.test(src)) {
         const r = UrlFetchApp.fetch(src, { muteHttpExceptions: true, followRedirects: true });
         if (r.getResponseCode() !== 200) continue;
@@ -89,4 +97,16 @@ function codeImages(html) {
     } catch (e) { console.warn('Couldn\'t fetch an image: ' + e.message); }
   }
   return out;
+}
+
+// The part of a raw email whose Content-ID is cid, as { type, data (base64) }.
+function mimePart(raw, cid) {
+  const at = raw.search(new RegExp('Content-ID:\\s*<?' + cid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '>?', 'i'));
+  if (at < 0) return null;
+  const start = raw.lastIndexOf('\n--', at), end = raw.indexOf('\n--', at);
+  const part = raw.slice(start < 0 ? 0 : start, end < 0 ? raw.length : end);
+  const split = part.search(/\r?\n\r?\n/);
+  if (split < 0 || !/Content-Transfer-Encoding:\s*base64/i.test(part.slice(0, split))) return null;
+  const type = ((part.slice(0, split).match(/Content-Type:\s*([^;\s]+)/i) || [])[1] || '').toLowerCase();
+  return { type, data: part.slice(split).replace(/\s+/g, '') };
 }
