@@ -50,7 +50,8 @@ export async function handle(req, { env = process.env, save, heartbeat, fetch: f
   const by = m.Source === 'gmail-script' ? 'gmail' : ok.find(a => a === from) || ok.find(a => fwd.includes(a));
   if (!by) { console.warn('inbound: sender not allowed', from); return json(403, { error: 'Sender not allowed' }); }
 
-  const atts = (m.Attachments || []).filter(a => a && a.Content);
+  // Some senders label PDFs as a generic file: go by the name too.
+  const atts = (m.Attachments || []).filter(a => a && a.Content).map(a => /\.pdf$/i.test(a.Name || '') && !/pdf/i.test(a.ContentType || '') ? { ...a, ContentType: 'application/pdf' } : a);
   let text = String(m.TextBody || '').trim();
   if (text.length < 200 && m.HtmlBody) text = htmlToText(m.HtmlBody);
   // Calendar invites carry times and places in plain text: add them to the text.

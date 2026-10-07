@@ -40,10 +40,15 @@ function sendBookings() {
     if (!msgs.length) msgs = [all[all.length - 1]];
     for (const msg of msgs) {
       // Real attachments (PDFs, calendar invites, photos); pictures inside the email only when they look like a code.
-      const atts = msg.getAttachments({ includeInlineImages: false, includeAttachments: true })
-        .filter(a => /^(application\/pdf|text\/calendar|image\/)/i.test(a.getContentType()) && a.getSize() <= MAX_ATTACHMENT)
+      // Airlines often label PDFs as a generic file ("application/octet-stream"): go by the name too.
+      const typeOf = a => /\.pdf$/i.test(a.getName()) ? 'application/pdf' : /\.ics$/i.test(a.getName()) ? 'text/calendar' : a.getContentType();
+      const all = msg.getAttachments({ includeInlineImages: false, includeAttachments: true });
+      all.forEach(a => console.log('Attachment: ' + a.getName() + ' (' + a.getContentType() + ', ' + Math.round(a.getSize() / 1024) + ' KB)'));
+      const atts = all
+        .filter(a => /^(application\/pdf|text\/calendar|image\/)/i.test(typeOf(a)))
+        .filter(a => a.getSize() <= MAX_ATTACHMENT || (console.warn('Too big to send (over 4 MB): ' + a.getName()), false))
         .slice(0, 6)
-        .map(a => ({ Name: a.getName(), ContentType: a.getContentType(), ContentLength: a.getSize(), Content: Utilities.base64Encode(a.getBytes()) }));
+        .map(a => ({ Name: a.getName(), ContentType: typeOf(a), ContentLength: a.getSize(), Content: Utilities.base64Encode(a.getBytes()) }));
       atts.push(...codeImages(msg));
       // Netlify takes about 6 MB per call: keep PDFs first, then images, within that.
       let room = 5.5 * 1024 * 1024;
