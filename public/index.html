@@ -310,6 +310,8 @@ table.mini th.num{font-family:var(--f-body)}
 .ilist .v small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
 .ilist .tot{cursor:default;font-weight:600}.ilist .tot:hover{background:none}
 .pos{color:var(--good)}
+.autohint{margin:0;font-size:12.5px;color:var(--muted);background:var(--sunk);border-radius:8px;padding:7px 10px}
+.autohint b{color:var(--ink-2);font-weight:600}
 .hint.cmp{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
 .hint.cmp strong{color:var(--ink);font-weight:600}
 /* to do card */
@@ -939,6 +941,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         </div>
       </div>
     </div>
+    <p class="autohint" id="autoHint" hidden></p>
     <p class="err" id="formErr" hidden></p>
     <div class="dlg-actions">
       <button class="btn danger" id="delBtn" type="button" hidden>Delete</button>
@@ -1695,6 +1698,7 @@ function setKind(kind, locked){
   const inc = kind === 'income', tr = kind === 'transfer';
   $$('#kindSeg [data-kind]').forEach(b => { b.setAttribute('aria-checked', b.dataset.kind === kind); b.disabled = !!locked && b.dataset.kind !== kind; });
   $('#dlgTitle').textContent = (state.editing ? 'Edit ' : 'Add ') + kind;
+  if ($('#autoHint')) $('#autoHint').hidden = true;
   $$('#dlg .not-tr').forEach(el => el.hidden = tr);
   $$('#dlg .tr-only').forEach(el => el.hidden = !tr);
   trHint();
@@ -1731,6 +1735,58 @@ function fillTripSelect(cur){
   F('trip').innerHTML = `<option value="">No trip (daily life)</option>` + og('Ongoing', groups.ongoing) + og('Upcoming', groups.upcoming) + og('No dates yet', groups.nodate) + og('Past', groups.past.slice(0, 30));
   F('trip').value = cur || '';
 }
+
+// ---------- learned defaults ----------
+// A store (or income source) used at least twice before fills in its usual details: whatever most of the last
+// 10 entries there agree on. Only for new entries, and never over a field you've already touched.
+const AUTO_FIELDS = { expense: ['category','subcategory','account','spender','country'], income: ['category','account','spender'] };
+const AUTO_LABEL = { category:'category', subcategory:'sub category', account:'account', spender:'who', country:'country' };
+function learnedFor(kind, name){
+  const n = String(name || '').trim().toLowerCase(); if (n.length < 2) return null;
+  const all = kind === 'income'
+    ? state.income.filter(i => String(i.source || '').trim().toLowerCase() === n).map(i => ({ date:i.date, name:i.source, category:i.category, account:i.account, spender:i.earner }))
+    : state.items.filter(i => String(i.store || '').trim().toLowerCase() === n).map(i => ({ ...i, name:i.store }));
+  if (all.length < 2) return null;
+  const recent = all.sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10), fields = {};
+  for (const f of AUTO_FIELDS[kind]){
+    const c = {}; recent.forEach(r => { const v = String(r[f] || '').trim(); if (v) c[v] = (c[v] || 0) + 1; });
+    const top = Object.entries(c).sort((a,b) => b[1] - a[1])[0];
+    if (top && top[1] / recent.length >= 0.6) fields[f] = top[0];
+  }
+  return Object.keys(fields).length ? { fields, n: all.length, name: recent[0].name } : null;
+}
+function applyLearned(){
+  if (state.editing || !['expense','income'].includes(state.kind)) return;
+  const L = learnedFor(state.kind, F('store').value), hint = $('#autoHint');
+  if (!L){ hint.hidden = true; return; }
+  const prev = {}, done = [];
+  state.autofilling = true;
+  for (const [f, v] of Object.entries(L.fields)){
+    if (state.touched?.has(f) || F(f).value === v) continue;
+    if (F(f).tagName === 'SELECT' && ![...F(f).options].some(o => o.value === v)) continue;
+    prev[f] = F(f).value; F(f).value = v; done.push(f);
+  }
+  state.autofilling = false;
+  if (done.includes('account')) curFromAccount();
+  if (typeof moreSummary === 'function') moreSummary();
+  const key = F('store').value.trim().toLowerCase();
+  if (!done.length){ if (state.autoStore !== key) hint.hidden = true; return; }
+  state.autoUndo = prev; state.autoStore = key;
+  hint.innerHTML = `Filled from ${L.n} earlier ${esc(L.name)} entries: ${done.map(f => `<b>${esc(F(f).value)}</b>`).join(' · ')} <button type="button" class="linkbtn" id="autoUndo">undo</button>`;
+  hint.hidden = false;
+}
+['category','subcategory','account','spender','country'].forEach(f => ['input','change'].forEach(ev => F(f).addEventListener(ev, () => { if (!state.autofilling) state.touched?.add(f); })));
+F('store').addEventListener('change', applyLearned);
+F('store').addEventListener('input', () => {
+  const v = F('store').value.trim().toLowerCase(), pool = state.kind === 'income' ? state.income.map(i => i.source) : state.items.map(i => i.store);
+  if (v && pool.some(x => String(x || '').trim().toLowerCase() === v)) applyLearned(); else $('#autoHint').hidden = true;
+});
+document.addEventListener('click', e => {
+  if (e.target.id !== 'autoUndo' || !state.autoUndo) return;
+  for (const [f, v] of Object.entries(state.autoUndo)){ F(f).value = v; state.touched?.add(f); }
+  state.autoUndo = null; state.autoStore = null; $('#autoHint').hidden = true; curFromAccount(); if (typeof moreSummary === 'function') moreSummary();
+});
+
 // ---------- currencies ----------
 const fxCache = {};
 try { Object.assign(fxCache, JSON.parse(localStorage.getItem('fxRates') || '{}')); } catch {}
@@ -1801,7 +1857,7 @@ function setCur(cur, rate){
 }
 
 function openAdd(kind, tripId){
-  state.editKind = null;
+  state.editKind = null; state.touched = new Set(); state.autoUndo = null; state.autoStore = null; $('#autoHint').hidden = true;
   if (typeof kind !== 'string') kind = (state.page === 'transactions' && state.txKind === 'income') ? 'income' : 'expense';
   state.editing = null; state.fromInbox = null;
   const mine = arr => arr.find(i => i.createdBy === usernameOf(state.user)) || arr[0] || {};
@@ -1829,7 +1885,7 @@ function openAdd(kind, tripId){
 function openEdit(id, kind = 'expense'){
   const list = kind === 'income' ? state.income : kind === 'transfer' ? state.transfers : state.items;
   const it = list.find(i => i.id === id); if (!it) return;
-  state.editing = id;
+  state.editing = id; state.autoUndo = null; $('#autoHint').hidden = true;
   FIELDS.forEach(k => F(k).value = it[k] ?? '');
   F('to').value = '';
   if (kind === 'transfer'){ F('account').value = it.from || ''; F('to').value = it.to || ''; }
