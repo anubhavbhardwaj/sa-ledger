@@ -95,4 +95,5 @@ menu → Notifications.
 Each trip has a "To book" list (`toBook` collection): what to book, the date it's for and the date to book it by
 (suggested from the type: flights about 6 weeks ahead, trains and stays 3, the rest 2). Items due within a week or
 overdue show on the Overview, the 21:00 reminder lists those due within 3 days, and saving a matching booking in the
-trip ticks the item off and links it.
+trip ticks the item off and links it. Typing it in plain words ("flights to Rome on 12 Nov and back on the 15th")
+and "Fill in" turns it into items via `/api/tobook` (Groq), shown for checking before they are added.

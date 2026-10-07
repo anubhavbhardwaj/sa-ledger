@@ -279,6 +279,9 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .tbchips{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
 .tbdone summary{cursor:pointer;color:var(--muted);font-size:13px;padding:8px 2px}
 .tbcount{color:var(--warn);font-weight:600}
+.tbquick{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px}
+.tbquick textarea{flex:1;min-width:0;font:inherit;font-size:14px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--ground);color:var(--ink);resize:vertical}
+.tbpreview{border:1px dashed var(--accent);border-radius:12px;padding:10px 12px;display:grid;gap:4px;margin-bottom:10px}
 /* inbox */
 .inboxbtn{position:relative;gap:6px}
 .inboxbtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:var(--surface);font-size:11px;line-height:18px;text-align:center;font-weight:700}
@@ -5133,8 +5136,17 @@ function tbPanel(t){
   // One-tap starters for what most trips need.
   const chips = !ed && t.start ? [['flight', 'Outbound journey', t.start], t.end && t.end !== t.start ? ['flight', 'Return journey', t.end] : null, t.type !== 'visit' ? ['hotel', 'Place to stay', t.start] : null]
     .filter(c => c && !list.some(x => x.what === c[1]) && !state.bookings.some(b => b.tripId === t.id && (b.start || '').slice(0, 10) === c[2] && tbFam(b.type) === tbFam(c[0]))) : [];
+  // Typed in plain words, filled in by the AI, checked here before anything is added.
+  const ai = state.tbAi && state.tbAi.tripId === t.id ? state.tbAi : null;
+  const quick = ed ? '' : `<div class="tbquick">
+      <textarea id="tbText" data-trip="${esc(t.id)}" rows="2" placeholder="Or just write it: flights Munich → Rome on 12 Nov and back on the 15th, book by end of October; hotel near Termini for 3 nights">${esc((state.tbText || {})[t.id] || '')}</textarea>
+      <button class="btn small" type="button" data-tbai="${esc(t.id)}" ${ai?.busy ? 'disabled' : ''}>${ai?.busy ? 'Reading…' : 'Fill in'}</button></div>
+    ${ai?.err ? `<p class="err" style="margin:0">${esc(ai.err)}</p>` : ''}
+    ${ai?.items?.length ? `<div class="tbpreview"><strong style="font-size:13px">Check and add:</strong>${ai.items.map((x, i) => `<label class="tbrow"><input type="checkbox" data-tbaii="${i}" ${x.skip ? '' : 'checked'}><span class="ic" aria-hidden="true">${(BK_TYPES[x.type] || BK_TYPES.other)[0]}</span>
+        <span class="tbmain"><strong>${esc(x.what)}</strong><small>${x.forDate ? 'for ' + wday(x.forDate) + ' ' + shortDate(x.forDate) + ' · ' : ''}${x.byDate ? 'book by ' + shortDate(x.byDate) + (x.suggested ? ' (suggested)' : '') : 'no deadline'}${x.price ? ' · about ' + eur0.format(x.price) : ''}${x.note ? ' · ' + esc(x.note) : ''}</small></span><span></span></label>`).join('')}
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn small" type="button" data-tbaicancel>Cancel</button><button class="btn primary small" type="button" data-tbaiadd>Add ${ai.items.filter(x => !x.skip).length}</button></div></div>` : ''}`;
   return `<section class="panel"><header><h2>To book</h2><span class="right"><button class="btn small" type="button" data-tbnew="${esc(t.id)}">+ Add</button></span></header>
-    ${form}
+    ${form}${quick}
     ${open.length ? `<div class="tblist">${open.map(row).join('')}</div>` : !ed ? `<p class="empty" style="margin:0 0 6px">Nothing left to book${list.length ? '. ' : '. Add what still needs booking, with the date it’s for and a deadline.'}</p>` : ''}
     ${chips.length ? `<div class="tbchips">${chips.map(([type, what, d]) => `<button class="btn small" type="button" data-tbchip="${esc(t.id)}|${type}|${esc(what)}|${d}">+ ${esc(what)} (${shortDate(d)})</button>`).join('')}</div>` : ''}
     ${done.length ? `<details class="tbdone"><summary>${done.length} booked</summary><div class="tblist">${done.map(row).join('')}</div></details>` : ''}
@@ -5176,7 +5188,38 @@ document.addEventListener('click', async e => {
   const op = t.closest('[data-tbopen]'); if (op){ state.openTrip = op.dataset.tbopen; state.attachOpen = false; if (state.page !== 'trips') location.hash = 'trips'; else render(); window.scrollTo(0, 0); return; }
 });
 // Keep what's typed in state, so a redraw (new data arriving) doesn't clear the form.
-document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#tbForm')) tbCollect(); });
+document.addEventListener('input', e => {
+  if (e.target.closest && e.target.closest('#tbForm')) tbCollect();
+  if (e.target.id === 'tbText'){ state.tbText ||= {}; state.tbText[e.target.dataset.trip] = e.target.value; }
+});
+document.addEventListener('click', async e => {
+  const t = e.target;
+  const go = t.closest('[data-tbai]'); if (go){
+    const tripId = go.dataset.tbai, trip = state.tripMap[tripId], text = ((state.tbText || {})[tripId] || '').trim();
+    if (text.length < 3){ state.tbAi = { tripId, err: 'Write what you still need to book first.' }; render(); return; }
+    state.tbAi = { tripId, busy: true }; render();
+    try {
+      const r = await api('/api/tobook', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, today: today(), trip: { name: trip.name, start: trip.start, end: trip.end, type: trip.type } }) });
+      const items = (await r.json()).items || [];
+      // No deadline given: suggest one from the type, as the form does.
+      items.forEach(x => { if (!x.byDate && x.forDate){ x.byDate = tbBy(x.type, x.forDate); x.suggested = true; } });
+      state.tbAi = items.length ? { tripId, items } : { tripId, err: 'Nothing to book found in that. Try naming what and when, e.g. “train to Florence on 14 Nov”.' };
+    } catch (x){ state.tbAi = { tripId, err: x.message }; }
+    render(); return;
+  }
+  const ti = t.closest('[data-tbaii]'); if (ti && state.tbAi?.items){ state.tbAi.items[+ti.dataset.tbaii].skip = !ti.checked; render(); return; }
+  if (t.closest('[data-tbaicancel]')){ state.tbAi = null; render(); return; }
+  if (t.closest('[data-tbaiadd]') && state.tbAi?.items){
+    const { tripId, items } = state.tbAi, me = usernameOf(state.user), now = new Date().toISOString();
+    const pick = items.filter(x => !x.skip); if (!pick.length) return;
+    try {
+      const b = writeBatch(fs);
+      pick.forEach(x => b.set(doc(toBookCol), pickDoc(TB_KEYS, { tripId, what: x.what, type: x.type, forDate: x.forDate, byDate: x.byDate, price: x.price, note: x.note, done: false, createdAt: now, createdBy: me })));
+      await b.commit();
+      state.tbAi = null; (state.tbText || {})[tripId] = ''; render(); toast(`Added ${pick.length} to book`);
+    } catch (x){ state.tbAi.err = x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules (with the To book list), then try again.' : writeError(x); render(); }
+  }
+});
 // Typing a "for" date suggests a deadline, until you set one yourself.
 document.addEventListener('change', e => {
   if (e.target.id === 'tbFor' || e.target.id === 'tbType'){ const by = $('#tbBy'); if (by && (!by.value || by.dataset.auto !== '0')) by.value = tbBy($('#tbType').value, $('#tbFor').value); }
