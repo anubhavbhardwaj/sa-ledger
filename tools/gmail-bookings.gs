@@ -70,10 +70,10 @@ function codeImages(html) {
     if (out.length >= 6) break;
     const attr = n => ((tag.match(new RegExp('\\b' + n + '\\s*=\\s*["\']([^"\']*)["\']', 'i')) || [])[1] || '').replace(/&amp;/g, '&');
     const src = attr('src'); if (!src || seen[src]) continue; seen[src] = 1;
-    const hint = [src, attr('alt'), attr('title'), attr('class'), attr('id')].join(' ');
-    if (/logo|icon|social|facebook|twitter|instagram|linkedin|spacer|pixel|track|banner|app.?store|google.?play/i.test(hint)) continue;
     const w = +attr('width'), h = +attr('height');
     console.log('Image in email: ' + src.slice(0, 120) + (attr('alt') ? ' alt="' + attr('alt').slice(0, 40) + '"' : '') + (w ? ' ' + w + 'x' + h : ''));
+    const hint = [src, attr('alt'), attr('title'), attr('class'), attr('id')].join(' ');
+    if (/logo|icon|social|facebook|twitter|instagram|linkedin|spacer|pixel|track|banner|app.?store|google.?play/i.test(hint)) continue;
     const looksLikeCode = /qr|bar.?code|aztec|pdf417|boarding|mobile.?pass|e.?ticket|ticket|pass/i.test(hint) || (w >= 100 && h >= 100 && Math.abs(w - h) <= w * 0.25);
     if (!looksLikeCode) continue;
     try {
