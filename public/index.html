@@ -5125,7 +5125,7 @@ function tbPanel(t){
         <label class="f">Book by<input id="tbBy" type="date" value="${ed.byDate || ''}"></label>
         <label class="f full">Note<input id="tbNote" value="${esc(ed.note || '')}" placeholder="e.g. window seat, flexible fare" autocomplete="off"></label>
       </div>
-      <p class="err" id="tbErr" hidden></p>
+      <p class="err" id="tbErr" ${ed.err ? '' : 'hidden'}>${esc(ed.err || '')}</p>
       <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap">
         ${ed.id ? '<button class="btn danger small" type="button" id="tbDel">Delete</button>' : '<span></span>'}
         <span style="display:flex;gap:8px"><button class="btn small" type="button" id="tbCancel">Cancel</button><button class="btn primary small" type="button" id="tbSave">${ed.id ? 'Save' : 'Add'}</button></span>
@@ -5147,13 +5147,17 @@ function tbCollect(){
   return ed;
 }
 async function tbSave(){
-  const ed = tbCollect(), err = $('#tbErr'), me = usernameOf(state.user);
-  if (!ed.what){ err.textContent = 'Say what to book.'; err.hidden = false; return; }
-  if (ed.byDate && ed.forDate && ed.byDate > ed.forDate){ err.textContent = 'The deadline is after the date it’s for.'; err.hidden = false; return; }
+  const ed = tbCollect(), me = usernameOf(state.user);
+  // The message lives in state, so a redraw while saving doesn't wipe it.
+  const fail = m => { ed.err = m; const e = $('#tbErr'); if (e){ e.textContent = m; e.hidden = false; } };
+  ed.err = '';
+  if (!ed.what) return fail('Say what to book.');
+  if (ed.byDate && ed.forDate && ed.byDate > ed.forDate) return fail('The deadline is after the date it’s for.');
   const old = ed.id ? state.toBook.find(x => x.id === ed.id) || {} : {};
-  const d = pickDoc(TB_KEYS, { ...old, ...ed, done: !!old.done, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || me, updatedBy: ed.id ? me : null });
+  const { err: _e, ...clean } = ed;
+  const d = pickDoc(TB_KEYS, { ...old, ...clean, done: !!old.done, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || me, updatedBy: ed.id ? me : null });
   try { if (ed.id) await setDoc(doc(fs, 'toBook', ed.id), d); else await addDoc(toBookCol, d); state.tbEdit = null; render(); toast(ed.id ? 'Saved' : 'Added to the list'); }
-  catch (x){ err.textContent = writeError(x); err.hidden = false; }
+  catch (x){ fail(x?.code === 'permission-denied' ? 'Not saved: the database rules don’t allow the To book list yet. Publish the latest Firestore rules, then try again.' : writeError(x)); }
 }
 document.addEventListener('click', async e => {
   const t = e.target;
@@ -5171,6 +5175,8 @@ document.addEventListener('click', async e => {
   const bk = t.closest('[data-tbbook]'); if (bk){ const x = state.toBook.find(y => y.id === bk.dataset.tbbook); if (x) bkOpen({ source: 'upload', tripSel: x.tripId }); return; }
   const op = t.closest('[data-tbopen]'); if (op){ state.openTrip = op.dataset.tbopen; state.attachOpen = false; if (state.page !== 'trips') location.hash = 'trips'; else render(); window.scrollTo(0, 0); return; }
 });
+// Keep what's typed in state, so a redraw (new data arriving) doesn't clear the form.
+document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#tbForm')) tbCollect(); });
 // Typing a "for" date suggests a deadline, until you set one yourself.
 document.addEventListener('change', e => {
   if (e.target.id === 'tbFor' || e.target.id === 'tbType'){ const by = $('#tbBy'); if (by && (!by.value || by.dataset.auto !== '0')) by.value = tbBy($('#tbType').value, $('#tbFor').value); }
