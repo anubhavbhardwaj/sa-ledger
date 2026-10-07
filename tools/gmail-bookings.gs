@@ -42,9 +42,9 @@ function sendBookings() {
       // Real attachments (PDFs, calendar invites, photos); pictures inside the email only when they look like a code.
       // Airlines often label PDFs as a generic file ("application/octet-stream"): go by the name too.
       const typeOf = a => /\.pdf$/i.test(a.getName()) ? 'application/pdf' : /\.ics$/i.test(a.getName()) ? 'text/calendar' : a.getContentType();
-      const all = msg.getAttachments({ includeInlineImages: false, includeAttachments: true });
-      all.forEach(a => console.log('Attachment: ' + a.getName() + ' (' + a.getContentType() + ', ' + Math.round(a.getSize() / 1024) + ' KB)'));
-      const atts = all
+      const files = msg.getAttachments({ includeInlineImages: false, includeAttachments: true });
+      files.forEach(a => console.log('Attachment: ' + a.getName() + ' (' + a.getContentType() + ', ' + Math.round(a.getSize() / 1024) + ' KB)'));
+      const atts = files
         .filter(a => /^(application\/pdf|text\/calendar|image\/)/i.test(typeOf(a)))
         .filter(a => a.getSize() <= MAX_ATTACHMENT || (console.warn('Too big to send (over 4 MB): ' + a.getName()), false))
         .slice(0, 6)
