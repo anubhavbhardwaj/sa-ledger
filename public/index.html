@@ -2207,7 +2207,7 @@ function tripCard(t){
   const budget = +t.budget > 0 ? `<span class="prog ${total > t.budget ? 'over' : ''}" title="${eur.format(total)} of ${eur.format(t.budget)} budget"><span style="width:${Math.min(100, total/t.budget*100).toFixed(1)}%"></span></span><span class="tmeta">${eur0.format(total)} of ${eur0.format(t.budget)} budget</span>` : '';
   return `<button type="button" class="tcard" data-trip="${esc(t.id)}">
     <span class="top"><span class="ttype"><i style="background:${TRIP_DOT[t.type]}"></i>${TRIP_TYPE[t.type]}</span><span class="tmeta">${fmtRange(t.start, t.end)}</span></span>
-    <span class="tname">${esc(t.name)}</span>
+    <span class="tname">${esc(t.name)}${t.closed ? ' <span class="tag">finished</span>' : ''}</span>
     <span class="tmeta">${esc(t.traveller)} · ${ex.length} entr${ex.length===1?'y':'ies'}${cats[0] ? ' · mostly ' + esc(cats[0].key) : ''}</span>
     <span class="ttotal">${eur.format(total)}</span>${mix}${budget}
   </button>`;
@@ -2246,7 +2246,7 @@ function renderTripDetail(t){
   const total = sum(ex);
   const cats = group(ex, 'category'), who = group(ex, 'spender');
   const maxC = Math.max(1, ...cats.map(c => c.total));
-  const budget = +t.budget > 0 ? `<div class="kpi"><span class="lbl">Budget</span><span class="val ${total > t.budget ? 'neg' : ''}">${eur0.format(t.budget)}</span><span class="sub">${total > t.budget ? eur.format(total - t.budget) + ' over' : eur.format(t.budget - total) + ' left'}</span></div>` : '';
+  const budget = +t.budget > 0 ? `<div class="kpi"><span class="lbl">Budget${t.closed ? ' · finished' : ''}</span><span class="val ${total > t.budget ? 'neg' : ''}">${eur0.format(t.budget)}</span><span class="sub">${total > t.budget ? eur.format(total - t.budget) + ' over' : eur.format(t.budget - total) + (t.closed ? ' left unspent' : ' left')}${!t.closed && total < t.budget && (t.end || t.start) >= today() ? ' · counted in this month’s forecast' : ''}</span></div>` : '';
   // candidates for attaching
   let cand = [];
   if (state.attachOpen){
@@ -2263,6 +2263,7 @@ function renderTripDetail(t){
       <div><span class="ttype"><i style="background:${TRIP_DOT[t.type]}"></i>${TRIP_TYPE[t.type]}</span><h1>${esc(t.name)}</h1><p>${fmtRange(t.start, t.end)} · ${esc(t.traveller)}${t.currency ? ' · local currency ' + t.currency : ''}${t.notes ? ' · ' + esc(t.notes) : ''}</p></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" type="button" data-edittrip="${esc(t.id)}">Edit trip</button>
+        ${+t.budget > 0 ? `<button class="btn" type="button" data-tripclose="${esc(t.id)}">${t.closed ? 'Reopen' : 'Mark as finished'}</button>` : ''}
         <button class="btn" type="button" data-attach>${state.attachOpen ? 'Close attach' : 'Attach transactions'}</button>
         <button class="btn primary" type="button" data-addtotrip="${esc(t.id)}">+ Add expense</button>
       </div>
@@ -2342,6 +2343,7 @@ $('#tripForm').addEventListener('submit', async e => {
   try {
     if (state.editingTrip){
       const old = state.tripMap[state.editingTrip] || {};
+      if (old.closed) rec.closed = true;
       await setDoc(doc(fs, 'trips', state.editingTrip), { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
       toast('Trip saved');
     } else {
@@ -3919,8 +3921,16 @@ function forecastMonth(){
   const rate = histRate !== null ? (curRate !== null ? histRate * (1 - d / D) + curRate * (d / D) : histRate) : curRate;
   const byCat = histDays ? Object.entries(catTot).map(([c, t]) => ({ category: c, perDay: t / histDays })).sort((p, q) => q.perDay - p.perDay)
     : Object.entries(curVar.reduce((o, i) => (o[i.category] = (o[i.category] || 0) + (+i.amount || 0), o), {})).map(([c, t]) => ({ category: c, perDay: t / Math.max(d, 1) })).sort((p, q) => q.perDay - p.perDay);
-  const tripsLeft = state.trips.filter(t => t.budget > 0 && t.start && t.start > td && t.start.startsWith(cm))
-    .map(t => ({ name: t.name, amount: Math.max(0, +t.budget - sum(tripExpenses(t.id))), day: +t.start.slice(8,10) })).filter(t => t.amount > 0);
+  // Trips with a budget that aren't finished: what's left of the budget is expected over the trip's remaining days,
+  // and only the share that falls in this month counts now. Marking a trip finished stops this.
+  const monthEnd = cm + '-' + String(D).padStart(2, '0'), tmw = addDays(td, 1), dayN = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5) + 1;
+  const tripsLeft = state.trips.filter(t => +t.budget > 0 && !t.closed && t.start && t.start <= monthEnd && (t.end || t.start) >= td).map(t => {
+    const spent = sum(tripExpenses(t.id)), remaining = Math.max(0, +t.budget - spent), end = t.end || t.start;
+    let from = t.start > tmw ? t.start : tmw, to = end; if (from > to){ from = to = tmw; }
+    const total = dayN(from, to), inMonth = from > monthEnd ? 0 : dayN(from, to < monthEnd ? to : monthEnd);
+    return { id: t.id, name: t.name, budget: +t.budget, spent, remaining, amount: remaining * inMonth / total, perDay: remaining / total,
+      fromDay: +from.slice(8,10), toDay: to < monthEnd ? +to.slice(8,10) : D, daysIn: inMonth, totalDays: total, crosses: to > monthEnd };
+  }).filter(t => t.amount > 0.5);
   const left = D - d, varLeft = rate === null ? 0 : rate * left;
   const recLeft = upcoming.reduce((s,r) => s + r.amount, 0), tripLeft = tripsLeft.reduce((s,t) => s + t.amount, 0);
   const spread = hist.length >= 2 ? Math.max(0.15, Math.sqrt(hist.reduce((a,b) => a + (b - histRate) ** 2, 0) / (hist.length - 1)) / (histRate || 1)) : hist.length === 1 ? 0.25 : 0.3;
@@ -3931,7 +3941,7 @@ function forecastMonth(){
   for (let k = d + 1; k <= D; k++){
     c += rate || 0;
     upcoming.filter(r => r.day === k).forEach(r => c += r.amount);
-    tripsLeft.filter(t => t.day === k).forEach(t => c += t.amount);
+    tripsLeft.forEach(t => { if (k >= t.fromDay && k <= t.toDay) c += t.perDay; });
     path.push([k, c]);
   }
   return { month: cm, d, D, left, soFar, rate, upcoming, bills, repeats, tripsLeft, recLeft, varLeft, tripLeft, total, byCat,
@@ -4156,9 +4166,11 @@ function renderForecastBreakdown(){
     const top = f.byCat.slice(0, 5);
     if (top.length) h += `<p class="muted" style="margin:4px 0 0;font-size:12.5px">Usual daily spend by category: ${top.map(c => `${esc(c.category)} ${eur.format(c.perDay)}`).join(' · ')}</p>`;
   }
-  if (f.tripsLeft.length){ h += `<div class="sec">Trips starting this month</div>` + f.tripsLeft.map(t => row(esc(t.name), `budget left · ${t.day} ${mn}`, eur0.format(t.amount))).join(''); }
+  if (f.tripsLeft.length){ h += `<div class="sec">Trip budgets not yet spent</div>` + f.tripsLeft.map(t => row(esc(t.name),
+    `budget ${eur0.format(t.budget)}, spent ${eur0.format(t.spent)}, ${eur0.format(t.remaining)} left${t.crosses ? ` · ${t.daysIn} of its ${t.totalDays} days left fall in ${mn}` : ''} · <button type="button" class="linkbtn" data-tripclose="${esc(t.id)}">mark finished</button>`,
+    eur0.format(t.amount))).join(''); }
   h += `<div class="sec"></div>` + row(`<strong>Month-end estimate</strong>`, f.varLeft > 0 ? `likely ${eur0.format(f.low)} to ${eur0.format(f.high)}` : '', `~${eur0.format(f.total)}`);
-  h += `</div><p class="muted" style="margin:8px 0 0;font-size:12.5px">Not predicted: one-off purchases of €${BIG_ONE_OFF} or more and trips without a budget. Bills are categories marked Fixed in budgets, plus rent, insurance, phone/internet, subscriptions and fitness.</p>`;
+  h += `</div><p class="muted" style="margin:8px 0 0;font-size:12.5px">Trip budgets count until the trip ends or you mark it finished. Not predicted: one-off purchases of €${BIG_ONE_OFF} or more and trips without a budget. Bills are categories marked Fixed in budgets, plus rent, insurance, phone/internet, subscriptions and fitness.</p>`;
   $('#fcTitle').textContent = `${monthLabel(f.month)}: heading for ~${eur0.format(f.total)}`;
   $('#fcBody').innerHTML = h;
 }
@@ -4166,6 +4178,20 @@ document.addEventListener('click', e => {
   if (e.target.closest('[data-fcopen]')){ renderForecastBreakdown(); $('#fcDlg').showModal(); return; }
   const sk = e.target.closest('[data-fcskip]');
   if (sk){ const s = lsGet('recSkip', {}); s['bill|' + sk.dataset.fcskip + '|' + thisMonth()] = 1; lsSet('recSkip', s); renderForecastBreakdown(); render(); }
+});
+
+
+// Mark a trip finished (or reopen it): its leftover budget stops (or starts) counting in the forecast.
+const TRIP_KEYS = ['name','type','traveller','start','end','budget','notes','currency','createdAt','createdBy'];
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-tripclose]'); if (!b) return;
+  const t = state.tripMap[b.dataset.tripclose]; if (!t) return;
+  const d = pickDoc(TRIP_KEYS, t); d.updatedBy = usernameOf(state.user); if (!t.closed) d.closed = true;
+  b.disabled = true;
+  try { await setDoc(doc(fs, 'trips', t.id), d); toast(t.closed ? 'Trip reopened' : `${t.name} marked finished${+t.budget > sum(tripExpenses(t.id)) ? ': its leftover budget no longer counts' : ''}`);
+    if ($('#fcDlg').open) renderForecastBreakdown(); }
+  catch (x){ toast(writeError(x) + (x?.code === 'permission-denied' ? ' Update the Firestore rules first.' : '')); }
+  finally { b.disabled = false; }
 });
 
 // ---------- backup & restore ----------
