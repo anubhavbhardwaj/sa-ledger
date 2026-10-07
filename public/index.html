@@ -4505,7 +4505,7 @@ async function bkProcess(sources, { text: extra = '', subject, date } = {}){
     S.readChars = { files: fileChars, email: email.length };
     const r = await api('/api/extract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
       text: plain, codes: codes.map(({ page, format, text }) => ({ page, format, text })), name: sources[0]?.name, subject, date,
-      image: plain.replace(/\s/g, '').length < 60 && image ? image : undefined }) });
+      image: image && (plain.replace(/\s/g, '').length < 60 || (sources.length && fileChars < 40)) ? image : undefined }) });
     items = (await r.json()).bookings || [];
     if (!items.length) S.aiErr = S.readChars.files ? 'the AI found no booking in it' : sources.length ? 'no text could be read from the attachment' : 'the AI found no booking in it';
   } catch (x){ S.aiErr = x.message; }
