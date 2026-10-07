@@ -54,6 +54,7 @@ function sendBookings() {
       const r = UrlFetchApp.fetch(url.replace(/\/$/, '') + '/api/inbound?token=' + encodeURIComponent(token), {
         method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true,
       });
+      console.log(msg.getSubject() + ': sending ' + (fit.map(a => a.Name + ' (' + Math.round(a.ContentLength / 1024) + ' KB)').join(', ') || 'no attachments or images'));
       if (r.getResponseCode() !== 200) { ok = false; console.error('Ledger refused ' + msg.getSubject() + ': ' + r.getResponseCode() + ' ' + r.getContentText()); }
     }
     if (ok) { thread.removeLabel(label); thread.addLabel(done); console.log('Sent to the ledger: ' + thread.getFirstMessageSubject()); }
@@ -72,6 +73,7 @@ function codeImages(html) {
     const hint = [src, attr('alt'), attr('title'), attr('class'), attr('id')].join(' ');
     if (/logo|icon|social|facebook|twitter|instagram|linkedin|spacer|pixel|track|banner|app.?store|google.?play/i.test(hint)) continue;
     const w = +attr('width'), h = +attr('height');
+    console.log('Image in email: ' + src.slice(0, 120) + (attr('alt') ? ' alt="' + attr('alt').slice(0, 40) + '"' : '') + (w ? ' ' + w + 'x' + h : ''));
     const looksLikeCode = /qr|bar.?code|aztec|pdf417|boarding|mobile.?pass|e.?ticket|ticket|pass/i.test(hint) || (w >= 100 && h >= 100 && Math.abs(w - h) <= w * 0.25);
     if (!looksLikeCode) continue;
     try {
