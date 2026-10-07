@@ -1,6 +1,6 @@
 // S&A Ledger service worker: makes the app installable and lets it open offline.
 // Your expense data is NOT cached here; Firestore keeps its own offline copy.
-const VERSION = 'sa-ledger-v3';
+const VERSION = 'sa-ledger-v4';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -31,6 +31,8 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   if (req.method === 'POST' && url.origin === location.origin && url.pathname === '/share-target') { e.respondWith(receiveShare(req)); return; }
   if (req.method !== 'GET') return;
+  // Server answers (API, functions) always come fresh from the network.
+  if (url.origin === location.origin && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/.netlify/'))) return;
 
   // The app page: always try the network first so updates show up, fall back to cache offline.
   if (req.mode === 'navigate') {

@@ -4898,7 +4898,7 @@ const FCM = 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js';
 const alertsOn = () => !!lsGet('alertsToken', null) && typeof Notification !== 'undefined' && Notification.permission === 'granted';
 const alertsPossible = () => 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined';
 async function fcmToken(){
-  const cfg = await (await fetch('/api/push')).json().catch(() => ({}));
+  const cfg = await (await fetch('/api/push', { cache: 'no-store' })).json().catch(() => ({}));
   if (!cfg.vapidKey) throw new Error('Alerts aren’t set up on the server yet (FCM_VAPID_KEY in Netlify).');
   const m = await import(FCM);
   if (!(await m.isSupported())) throw new Error('This browser can’t receive notifications.');
