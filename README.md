@@ -65,16 +65,20 @@ screenshot to the installed app (Android share sheet), or by forwarding the conf
 
 ## Flight alerts
 
-`netlify/functions/flights.mjs` runs every 10 minutes. For each flight booking from 8 hours before departure it
-asks FlightAware AeroAPI for the live status (hourly at first, every 10 minutes from 3 hours before until
-landing), keeps it in `flightStatus/<bookingId>` for the app, and sends phone notifications through Firebase
-Cloud Messaging: delays of 15+ minutes and cancellations to both of you, the gate to whoever flies, take-off and
-landing to whoever doesn't. Who flies comes from the passenger names on the booking (else the trip's traveller).
-Each of you turns alerts on per phone (menu → Flight alerts); the phone's token is kept in `pushTokens`.
+`netlify/functions/flights.mjs` runs every 10 minutes (logic in `netlify/lib/flights.mjs`). For each flight booking
+it looks up the live status, keeps it in `flightStatus/<bookingId>` for the app, and sends phone notifications
+through Firebase Cloud Messaging: delays of 15+ minutes and cancellations to both of you, the gate to whoever flies,
+take-off and landing to whoever doesn't. Who flies comes from the passenger names on the booking (else the trip's
+traveller). Each of you turns alerts on per phone (menu → Flight alerts); the phone's token is kept in `pushTokens`.
+A flight's page has "Check status now" (`/api/flight-check`).
+
+Flight status comes from AeroDataBox (free RapidAPI plan, no card: 400 units a month, 2 per lookup). It checks
+sparingly, about 8 lookups a flight: from 3 hours before, every 25 minutes in the last hour, once after take-off,
+then around the expected landing. FlightAware AeroAPI also works (`AEROAPI_KEY`, checks every 10 minutes).
 
 Setup:
-1. FlightAware: create an AeroAPI account on the Personal tier (it includes a monthly free allowance; a card
-   is required) and copy the API key into Netlify as `AEROAPI_KEY`.
+1. rapidapi.com → sign up → search "AeroDataBox" → Pricing → subscribe to the free Basic plan. Copy the
+   X-RapidAPI-Key from the endpoint page into Netlify as `AERODATABOX_KEY`.
 2. Firebase console → Project settings → Cloud Messaging → Web Push certificates → Generate key pair. Copy the
    public key into Netlify as `FCM_VAPID_KEY`. Check that "Firebase Cloud Messaging API (V1)" is enabled.
 3. Redeploy, then on each phone: menu → Flight alerts → Turn on → Send a test.

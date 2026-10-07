@@ -4950,6 +4950,14 @@ $('#alTest').addEventListener('click', async () => {
   catch (x){ alFail(x); } finally { b.disabled = false; }
 });
 document.addEventListener('click', e => { if (e.target.closest('[data-alerts]')) openAlerts(); });
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-fcheck]'); if (!b) return;
+  b.disabled = true; b.textContent = 'Checking…';
+  try { const r = await api('/api/flight-check', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ bookingId: b.dataset.fcheck }) }); const j = await r.json();
+    toast(j.cached ? 'Checked a few minutes ago; showing that.' : 'Status updated'); }
+  catch (x){ toast(x.message); }
+  finally { b.disabled = false; b.textContent = 'Check status now'; }
+});
 
 // --- viewing ---
 const fmtDT = s => s ? shortDate(s.slice(0, 10)) + (s.length > 10 ? ' ' + s.slice(11, 16) : '') : '';
@@ -5033,6 +5041,7 @@ function openBooking(id){
       ${files.map((f, i) => `<button class="btn" type="button" data-bkfile="${i}">${files.length === 1 ? 'Open ' + (isPdf(f.mime, f.name) ? 'PDF' : 'file') : esc((f.name || 'File ' + (i + 1)).replace(/\.[a-z0-9]+$/i, '').slice(0, 28))}</button>`).join('')}
       ${exp ? `<button class="btn" type="button" data-bkvexp="${esc(exp.id)}">Expense ${eur.format(exp.amount)}</button>` : b.price ? `<button class="btn" type="button" data-bkexp>Add ${money(b.price, b.currency || 'EUR')} as expense</button>` : ''}
       ${t && !(state.page === 'trips' && state.openTrip === t.id) ? `<button class="btn" type="button" data-bktrip="${esc(t.id)}">Open trip</button>` : ''}
+      ${b.type === 'flight' && (b.start || '') >= addDays(today(), -1) ? `<button class="btn" type="button" data-fcheck="${esc(b.id)}">Check status now</button>` : ''}
     </div>
     ${!exp && cands.length ? `<label class="f">Or link an expense already in the ledger<select data-bklink><option value="">Choose…</option>${cands.map(c => `<option value="${esc(c.i.id)}">${esc(expLabel(c.i))}</option>`).join('')}</select></label>` : ''}`;
   const del = $('#bkvDel'); del.classList.remove('armed'); del.textContent = 'Delete';
