@@ -12,51 +12,29 @@
 
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { driveClient } from '../lib/drive.mjs';
 
-export const COLLECTIONS = ['expenses', 'income', 'transfers', 'accounts', 'checkins', 'invSnapshots', 'trips', 'settings'];
+export const COLLECTIONS = ['expenses', 'income', 'transfers', 'accounts', 'checkins', 'invSnapshots', 'trips', 'bookings', 'settings'];
 const FOLDER = 'S&A Ledger backups';
 const KEEP = 30;
-const DRIVE = 'https://www.googleapis.com/drive/v3/files';
 
 // Core logic, separated from Firebase and the network so it can be tested.
 export async function run({ env = process.env, readAll, saveStatus, fetch: f = fetch, now = () => new Date() } = {}) {
-  for (const k of ['GDRIVE_CLIENT_ID', 'GDRIVE_CLIENT_SECRET', 'GDRIVE_REFRESH_TOKEN'])
-    if (!env[k]) throw new Error(k + ' is not set');
   const at = now();
   const collections = await readAll();
   const counts = Object.fromEntries(Object.entries(collections).map(([k, v]) => [k, v.length]));
   const body = JSON.stringify({ app: 'S&A Ledger', version: 1, exportedAt: at.toISOString(), collections });
 
-  const tr = await f('https://oauth2.googleapis.com/token', {
-    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: env.GDRIVE_CLIENT_ID, client_secret: env.GDRIVE_CLIENT_SECRET, refresh_token: env.GDRIVE_REFRESH_TOKEN, grant_type: 'refresh_token' }),
-  });
-  const tj = await tr.json();
-  if (!tr.ok || !tj.access_token) throw new Error('Google sign-in failed: ' + (tj.error_description || tj.error || tr.status));
-  const auth = { authorization: 'Bearer ' + tj.access_token };
-  const api = async (url, opt = {}) => {
-    const r = await f(url, { ...opt, headers: { ...auth, ...(opt.headers || {}) } });
-    if (!r.ok) throw new Error('Drive ' + (opt.method || 'GET') + ' failed: ' + r.status + ' ' + (await r.text()).slice(0, 200));
-    return r.status === 204 ? null : r.json();
-  };
-
-  const q = encodeURIComponent(`name='${FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  let folder = (await api(`${DRIVE}?q=${q}&fields=files(id)`)).files?.[0]?.id;
-  if (!folder) folder = (await api(`${DRIVE}?fields=id`, { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: FOLDER, mimeType: 'application/vnd.google-apps.folder' }) })).id;
+  const drive = await driveClient(env, f);
+  const folder = await drive.folder(FOLDER);
 
   const name = `sa-ledger-backup-${at.toISOString().slice(0, 10)}.json`;
-  const boundary = 'sa' + at.getTime();
-  const multipart = `--${boundary}\r\ncontent-type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name, parents: [folder], mimeType: 'application/json' })}\r\n`
-    + `--${boundary}\r\ncontent-type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
-  const file = await api('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name', {
-    method: 'POST', headers: { 'content-type': `multipart/related; boundary=${boundary}` }, body: multipart });
+  const file = await drive.upload({ name, mime: 'application/json', data: body, parent: folder });
 
   // Keep the newest 30.
-  const lq = encodeURIComponent(`'${folder}' in parents and trashed=false`);
-  const all = (await api(`${DRIVE}?q=${lq}&orderBy=createdTime desc&pageSize=200&fields=files(id,name)`)).files || [];
+  const all = (await drive.list(`'${folder}' in parents and trashed=false`, '&orderBy=createdTime desc&pageSize=200&fields=files(id,name)')).files || [];
   const old = all.filter(x => x.name.startsWith('sa-ledger-backup-')).slice(KEEP);
-  for (const x of old) await api(`${DRIVE}/${x.id}`, { method: 'DELETE' });
+  for (const x of old) await drive.remove(x.id);
 
   const status = { lastAt: at.toISOString(), file: file.name, bytes: body.length, counts, kept: Math.min(all.length, KEEP) };
   if (saveStatus) await saveStatus(status);

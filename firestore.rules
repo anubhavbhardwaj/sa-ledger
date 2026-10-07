@@ -80,7 +80,8 @@ service cloud.firestore {
       allow create, update: if isMember() && validTrip();
     }
 
-    // Shared settings: 'budgets', 'fire' and 'fireInr' (FIRE plans in euros and rupees) and 'fx' (rate on the 1st of each month).
+    // Shared settings: 'budgets', 'fire' and 'fireInr' (FIRE plans in euros and rupees), 'fx' (rate on the 1st of each month)
+    // and 'bookings' (the address booking emails are forwarded to).
     function validBudgets() {
       let d = request.resource.data;
       return d.keys().hasOnly(['items','total','updatedAt','updatedBy'])
@@ -94,6 +95,10 @@ service cloud.firestore {
         && optNum(d, 'expenses') && optNum(d, 'inflation') && optNum(d, 'fireYear')
         && optNum(d, 'withdrawal') && optNum(d, 'savings') && optNum(d, 'returnPct');
     }
+    function validBookingSettings() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['email','updatedAt','updatedBy']) && str(d.email, 120);
+    }
     function validFxMonths() {
       let d = request.resource.data;
       return d.keys().hasOnly(['months','updatedAt','updatedBy']) && d.months is map;
@@ -104,7 +109,8 @@ service cloud.firestore {
       allow write: if isMember() && (
            (id == 'budgets' && validBudgets())
         || ((id == 'fire' || id == 'fireInr') && validFire())
-        || (id == 'fx' && validFxMonths()));
+        || (id == 'fx' && validFxMonths())
+        || (id == 'bookings' && validBookingSettings()));
     }
 
     // Money moved between own accounts (incl. investing and card payments). Not spending.
@@ -184,6 +190,51 @@ service cloud.firestore {
     // Captured payment notifications. Only the capture function (server, admin access) creates them;
     // the app reads them and deletes each one once it's added or dismissed.
     match /inbox/{id} {
+      allow read, delete: if isMember();
+      allow create, update: if false;
+    }
+
+    // Tickets, boarding passes and hotel confirmations. codes holds the scanned QR/barcodes as small images;
+    // the original file stays in Google Drive (fileId).
+    function isDT(v) { return v is string && v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2})?$'); }
+    function validBooking() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['tripId','type','title','provider','ref','number','travellers','start','end','from','to','address',
+                               'seat','details','price','currency','codes','fileId','fileName','fileMime','source','expenseId',
+                               'createdAt','createdBy','updatedBy'])
+        && d.keys().hasAll(['type','title'])
+        && d.type in ['flight','train','bus','ferry','hotel','car','event','restaurant','other']
+        && str(d.title, 120) && d.title.size() > 0
+        && (!('tripId' in d) || str(d.tripId, 60))
+        && (!('provider' in d) || str(d.provider, 80))
+        && (!('ref' in d) || str(d.ref, 40))
+        && (!('number' in d) || str(d.number, 20))
+        && (!('travellers' in d) || (d.travellers is list && d.travellers.size() <= 9))
+        && (!('start' in d) || isDT(d.start))
+        && (!('end' in d) || isDT(d.end))
+        && (!('from' in d) || str(d.from, 80))
+        && (!('to' in d) || str(d.to, 80))
+        && (!('address' in d) || str(d.address, 200))
+        && (!('seat' in d) || str(d.seat, 60))
+        && (!('details' in d) || str(d.details, 300))
+        && (!('price' in d) || (d.price is number && d.price >= 0 && d.price < 1000000))
+        && (!('currency' in d) || (d.currency is string && d.currency.size() == 3))
+        && (!('codes' in d) || (d.codes is list && d.codes.size() <= 8))
+        && (!('fileId' in d) || str(d.fileId, 100))
+        && (!('fileName' in d) || str(d.fileName, 160))
+        && (!('fileMime' in d) || str(d.fileMime, 60))
+        && (!('source' in d) || d.source in ['upload','email','share','paste'])
+        && (!('expenseId' in d) || str(d.expenseId, 60));
+    }
+
+    match /bookings/{id} {
+      allow read, delete: if isMember();
+      allow create, update: if isMember() && validBooking();
+    }
+
+    // Forwarded booking emails. Only the inbound function (server, admin access) creates them;
+    // the app reads each one and deletes it once it's saved as bookings or dismissed.
+    match /bookingInbox/{id} {
       allow read, delete: if isMember();
       allow create, update: if false;
     }

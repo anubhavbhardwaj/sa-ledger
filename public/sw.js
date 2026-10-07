@@ -1,6 +1,6 @@
 // S&A Ledger service worker: makes the app installable and lets it open offline.
 // Your expense data is NOT cached here; Firestore keeps its own offline copy.
-const VERSION = 'sa-ledger-v1';
+const VERSION = 'sa-ledger-v2';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -9,14 +9,28 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== 'share-inbox').map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
+// Files shared to the app from another app (share sheet → S&A Ledger): park them for the page, then open it.
+async function receiveShare(req) {
+  try {
+    const fd = await req.formData(), c = await caches.open('share-inbox'), stamp = Date.now();
+    const files = fd.getAll('file').filter(f => f && typeof f === 'object' && f.size);
+    for (const [i, f] of files.slice(0, 5).entries())
+      await c.put(`/__share/${stamp}-${i}`, new Response(f, { headers: { 'content-type': f.type || 'application/octet-stream', 'x-name': encodeURIComponent(f.name || 'shared file') } }));
+    const text = ['title', 'text', 'url'].map(k => fd.get(k)).filter(v => typeof v === 'string' && v.trim()).join('\n');
+    if (text) await c.put(`/__share/${stamp}-text`, new Response(text, { headers: { 'content-type': 'text/plain', 'x-kind': 'text', 'x-name': 'shared text' } }));
+  } catch {}
+  return Response.redirect('/#share', 303);
+}
+
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (req.method === 'POST' && url.origin === location.origin && url.pathname === '/share-target') { e.respondWith(receiveShare(req)); return; }
+  if (req.method !== 'GET') return;
 
   // The app page: always try the network first so updates show up, fall back to cache offline.
   if (req.mode === 'navigate') {
@@ -29,6 +43,7 @@ self.addEventListener('fetch', e => {
   // Firebase SDK files and fonts: serve from cache, refresh in the background.
   const cacheable = url.origin === location.origin
     || url.href.startsWith('https://www.gstatic.com/firebasejs/')
+    || url.href.startsWith('https://cdn.jsdelivr.net/npm/pdfjs-dist@')
     || url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
   if (!cacheable) return; // Firestore and login traffic go straight to the network.
 

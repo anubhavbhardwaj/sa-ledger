@@ -189,6 +189,65 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .copt[aria-selected="true"],.copt:hover{background:var(--sunk)}
 .copt.cur{font-weight:600}
 .cnew{font-size:12px;color:var(--muted);padding:6px 10px}
+/* bookings */
+.itin{display:grid}
+.itin .day{font:600 11.5px/1 var(--f-body);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:12px 6px 6px}
+.itin .day:first-child{padding-top:2px}
+.bk{display:grid;grid-template-columns:44px 26px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 6px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;cursor:pointer;color:var(--ink);font:inherit;width:100%;border-radius:0}
+.bk:hover{background:var(--ground)}
+.bk .tm{font:500 12.5px var(--f-mono);color:var(--ink-2)}
+.bk .ic{font-size:18px;text-align:center;line-height:1}
+.bk .ti{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.bk .sub{display:block;font-size:12.5px;color:var(--muted);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk.past{opacity:.62}
+.bk.co .ti{font-weight:500}
+.chip{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600;white-space:nowrap}
+.bkdlg{width:min(640px,calc(100vw - 20px))}
+.bkdlg form{max-height:calc(100dvh - 40px);overflow:auto}
+.bkdrop{border:2px dashed var(--line);border-radius:12px;padding:18px;display:grid;gap:10px;justify-items:center;text-align:center}
+.bkdrop.over{border-color:var(--accent);background:var(--accent-soft)}
+.bkprog{display:flex;gap:10px;align-items:center;padding:18px 4px;color:var(--ink-2)}
+.bkspin{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:bkspin .8s linear infinite;flex:none}
+@keyframes bkspin{to{transform:rotate(360deg)}}
+.bkcard{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:10px}
+.bkcard.off{opacity:.5}
+.bkcard .hd{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.bkcard .hd label{display:flex;gap:8px;align-items:center;font-weight:600;cursor:pointer}
+.fields .full{grid-column:1/-1}
+.codes{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+.codes .cd{position:relative}
+.codes img{height:76px;max-width:200px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px;cursor:zoom-in;display:block}
+.codes .cd button{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer;line-height:18px;padding:0}
+.bkbox{display:grid;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.bkfwd{font-size:12.5px;color:var(--muted);margin:0}
+.bkfwd code{font:12.5px var(--f-mono);background:var(--sunk);padding:1px 6px;border-radius:4px;color:var(--ink);word-break:break-all}
+.bkinbox{display:grid;gap:8px}
+.bkinbox .it{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.bkinbox .it .s{min-width:0}
+.bkinbox .it .s b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bkinbox .it .s small{color:var(--muted)}
+.bkview{display:grid;gap:14px}
+.bkview .head{display:flex;gap:10px;align-items:flex-start}
+.bkview .head .ic{font-size:26px;line-height:1}
+.bkview .route{font:700 20px/1.2 var(--f-display)}
+.bkbig{display:grid;gap:8px;justify-items:center}
+.bkbig img{width:min(100%,340px);background:#fff;padding:10px;border-radius:10px;border:1px solid var(--line);image-rendering:pixelated;cursor:zoom-in}
+.bkbig img.wide{width:100%}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 14px;font-size:14px;margin:0}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;overflow-wrap:anywhere}
+#codeView{padding:16px;border:0;margin:0;width:100vw;height:100dvh;max-width:none;max-height:none;border-radius:0;background:#fff;cursor:zoom-out}
+#codeView[open]{display:grid;place-items:center;align-content:center;gap:14px}
+#codeView::backdrop{background:#fff}
+#codeView img{width:min(92vw,92vh,560px);image-rendering:pixelated}
+#codeView img.wide{width:96vw;max-width:900px}
+#codeView p{margin:0;color:#333;font:13px var(--f-mono);text-align:center;max-width:92vw;overflow-wrap:anywhere}
+.pdfdlg{padding:0;border:0;max-width:none;max-height:none;margin:0;width:100vw;height:100dvh;border-radius:0;background:var(--sunk)}
+.pdfdlg .bar{position:sticky;top:0;display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--line);z-index:1}
+.pdfdlg .bar strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pdfdlg .pages{display:grid;gap:12px;justify-items:center;padding:12px;overflow:auto;height:calc(100dvh - 58px)}
+.pdfdlg canvas,.pdfdlg .pages img{width:min(100%,900px);height:auto;background:#fff;box-shadow:var(--shadow)}
+.nextup{display:grid;gap:4px}
 /* inbox */
 .inboxbtn{position:relative;gap:6px}
 .inboxbtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:var(--surface);font-size:11px;line-height:18px;text-align:center;font-weight:700}
@@ -571,6 +630,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <div class="pmenu" id="profMenu" role="menu" hidden>
         <div class="pm-head">Signed in as <strong id="whoName"></strong></div>
         <a class="pm-item" role="menuitem" href="#trips"><span>Trips</span><small id="pmTrips"></small></a>
+        <button class="pm-item" role="menuitem" type="button" data-addbk=""><span>Add booking</span><small>ticket, PDF or screenshot</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
         <hr>
         <button class="pm-item" role="menuitem" type="button" data-pm="import"><span>Import CSV</span><small>into expenses</small></button>
@@ -593,6 +653,8 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <div style="display:grid;gap:18px">
       <div class="install" id="installBar" hidden></div>
       <div class="banner" id="inboxBar" hidden></div>
+      <div class="banner" data-bkinboxbar hidden></div>
+      <section class="panel" id="nextUp" hidden></section>
       <section class="panel" id="todoCard" hidden></section>
       <div class="pagehead"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
       <section class="kpis" id="kpis" aria-label="Summary"></section>
@@ -655,9 +717,10 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <div><button class="btn ghost" type="button" data-back>← Back</button></div>
         <div class="pagehead">
           <div><h1>Trips</h1><p>Visits, holidays and office travel. Link any expense to a trip, whenever it was paid.</p></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="repeatVisit" type="button">Repeat last visit</button><button class="btn primary" id="newTrip" type="button">+ New trip</button></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="repeatVisit" type="button">Repeat last visit</button><button class="btn" type="button" data-addbk="">+ Booking</button><button class="btn primary" id="newTrip" type="button">+ New trip</button></div>
         </div>
         <div class="banner" id="tripSetup" hidden></div>
+        <div class="banner" data-bkinboxbar hidden></div>
         <section class="kpis" id="tripKpis" aria-label="Trip summary"></section>
         <div id="tripList" style="display:grid;gap:18px"></div>
       </div>
@@ -931,6 +994,46 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   </form>
 </dialog>
 
+<dialog id="bkDlg" class="bkdlg">
+  <form id="bkForm" novalidate>
+    <h3 id="bkTitle">Add booking</h3>
+    <div id="bkPick" style="display:grid;gap:14px">
+      <div class="bkdrop" id="bkDrop">
+        <p style="margin:0">A ticket, boarding pass or confirmation: PDF or screenshot. The details and any QR code are read automatically.</p>
+        <button class="btn primary" type="button" id="bkChoose">Choose file</button>
+        <input type="file" id="bkFile" accept="application/pdf,.pdf,image/*" multiple hidden>
+      </div>
+      <label class="f">Or paste the confirmation email<textarea id="bkPaste" rows="3" placeholder="Paste the text of a booking email" style="resize:vertical"></textarea></label>
+      <div class="bkinbox" id="bkInboxList"></div>
+      <p class="bkfwd" id="bkFwd"></p>
+    </div>
+    <div class="bkprog" id="bkBusy" hidden><span class="bkspin"></span><span id="bkBusyText">Reading…</span></div>
+    <div id="bkReview" hidden style="display:grid;gap:12px"></div>
+    <p class="err" id="bkErr" hidden></p>
+    <div class="dlg-actions">
+      <button class="btn danger" type="button" id="bkDismiss" hidden>Dismiss email</button>
+      <div class="right"><button class="btn" type="button" id="bkCancel">Cancel</button><button class="btn" type="button" id="bkRead" hidden>Read text</button><button class="btn primary" type="submit" id="bkSave" hidden>Save</button></div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="bkvDlg">
+  <form method="dialog" style="display:grid;gap:14px;padding:20px;max-height:calc(100dvh - 40px);overflow:auto">
+    <div class="bkview" id="bkvBody"></div>
+    <div class="dlg-actions">
+      <button class="btn danger" type="button" id="bkvDel">Delete</button>
+      <div class="right"><button class="btn" type="button" id="bkvEdit">Edit</button><button class="btn primary" type="submit">Close</button></div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="pdfDlg" class="pdfdlg" aria-label="Booking file">
+  <div class="bar"><strong id="pdfName">Booking</strong><span style="display:flex;gap:8px"><a class="btn small" id="pdfDl" download>Download</a><button class="btn small" type="button" id="pdfClose">Close</button></span></div>
+  <div class="pages" id="pdfPages"></div>
+</dialog>
+
+<dialog id="codeView" aria-label="Ticket code"><img alt="Ticket code"><p></p></dialog>
+
 <div id="tip" hidden></div>
 <div class="toast" id="toast" hidden></div>
 
@@ -1011,6 +1114,8 @@ const TR_KEYS = ['amount','date','from','to','comment','createdAt','createdBy','
 const pickDoc = (keys, it, over = {}) => { const o = {}; for (const k of keys){ const v = k in over ? over[k] : it[k]; if (v !== undefined && v !== null && v !== '') o[k] = v; } return o; };
 const tripsCol = collection(fs, "trips");
 const inboxCol = collection(fs, "inbox");
+const bookingsCol = collection(fs, "bookings");
+const bkInboxCol = collection(fs, "bookingInbox");
 const TRIP_TYPE = { visit:'Visit', holiday:'Holiday', other:'Other', office:'Office' };
 const TRIP_KIND = { visit:'Visits', holiday:'Holidays', other:'Other trips', office:'Office trips' };
 const TRIP_DOT = { visit:'var(--s1)', holiday:'var(--s2)', other:'var(--s3)', office:'var(--s7)' };
@@ -1038,7 +1143,7 @@ const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' +
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], bkInbox:[], bkSettings:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -1048,7 +1153,7 @@ onAuthStateChanged(auth, user => {
   state.user = user;
   unsubs.forEach(f => f()); unsubs = [];
   if (!user){
-    state.items = []; state.income = []; state.trips = []; state.transfers = []; state.accounts = []; state.checkins = []; state.snaps = []; pfCache = null; state.ready = false; state.tripsReady = false;
+    state.items = []; state.income = []; state.trips = []; state.transfers = []; state.accounts = []; state.checkins = []; state.snaps = []; state.bookings = []; state.bkInbox = []; pfCache = null; state.ready = false; state.tripsReady = false;
     $('#app').hidden = true; $('#login').hidden = false; $('#l-user').focus();
     return;
   }
@@ -1103,13 +1208,23 @@ onAuthStateChanged(auth, user => {
     state.fxMonths = merged;
     state.fire = fire ? fire.data() : {};
     const fi = snap.docs.find(x => x.id === 'fireInr'); state.fireInr = fi ? fi.data() : {};
+    const bs = snap.docs.find(x => x.id === 'bookings'); state.bkSettings = bs ? bs.data() : {};
     pfCache = null; render();
   }, onErr('budgets')));
+  unsubs.push(onSnapshot(bookingsCol, snap => {
+    state.bookings = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    render();
+  }, () => {}));
+  unsubs.push(onSnapshot(bkInboxCol, snap => {
+    state.bkInbox = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => String(b.receivedAt).localeCompare(String(a.receivedAt)));
+    renderBkInbox();
+  }, () => {}));
   unsubs.push(onSnapshot(tripsCol, snap => {
     state.trips = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     state.tripsReady = true; derive(); render();
   }, onErr('trips')));
   route();
+  if (state.wantShare){ state.wantShare = false; takeShared(); }
 });
 
 $('#loginForm').addEventListener('submit', async e => {
@@ -1194,7 +1309,10 @@ function route(){
   const h = location.hash.replace('#','');
   if (h === 'add'){ history.replaceState(null, '', '#overview'); if (state.user) setTimeout(openAdd, 0); }
   if (h === 'accounts'){ state.wv = 'cash'; history.replaceState(null, '', '#wealth'); }
-  state.page = h === 'accounts' ? 'wealth' : PAGES.includes(h) ? h : 'overview';
+  // Something shared to the app (see sw.js): open it as a booking once signed in.
+  if (h === 'share'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(takeShared, 0); else state.wantShare = true; }
+  if (h === 'booking'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(() => bkOpen({ source: 'upload' }), 0); }
+  state.page = h === 'accounts' ? 'wealth' : h === 'share' || h === 'booking' ? 'trips' : PAGES.includes(h) ? h : 'overview';
   if (state.page !== 'trips') state.openTrip = null;
   if (state.page !== 'wealth') state.openAcc = null;
   $('#months').hidden = state.page === 'trips' || state.page === 'wealth';
@@ -1217,7 +1335,7 @@ function render(){
   const n = activeFilters().length + (state.q ? 1 : 0);
   $('#fbadge').hidden = !n; $('#fbadge').textContent = n;
   $('#fbadge2').hidden = !n; $('#fbadge2').textContent = n;
-  if (state.page === 'overview') renderOverview(ms);
+  if (state.page === 'overview'){ renderOverview(ms); renderNextUp(); }
   if (state.page === 'transactions') renderTransactions();
   if (state.page === 'visualizations') renderVisualizations();
   if (state.page === 'trips') renderTrips();
@@ -1895,7 +2013,7 @@ function setCur(cur, rate){
 function openAdd(kind, tripId){
   state.editKind = null; state.touched = new Set(); state.autoUndo = null; state.autoStore = null; $('#autoHint').hidden = true;
   if (typeof kind !== 'string') kind = (state.page === 'transactions' && state.txKind === 'income') ? 'income' : 'expense';
-  state.editing = null; state.fromInbox = null;
+  state.editing = null; state.fromInbox = null; state.bkExpenseFor = null; state.bkExpNext = null;
   const mine = arr => arr.find(i => i.createdBy === usernameOf(state.user)) || arr[0] || {};
   const lastE = mine(state.items), lastI = mine(state.income);
   FIELDS.forEach(k => F(k).value = '');
@@ -1921,7 +2039,7 @@ function openAdd(kind, tripId){
 function openEdit(id, kind = 'expense'){
   const list = kind === 'income' ? state.income : kind === 'transfer' ? state.transfers : state.items;
   const it = list.find(i => i.id === id); if (!it) return;
-  state.editing = id; state.autoUndo = null; $('#autoHint').hidden = true;
+  state.editing = id; state.autoUndo = null; state.bkExpenseFor = null; state.bkExpNext = null; $('#autoHint').hidden = true;
   FIELDS.forEach(k => F(k).value = it[k] ?? '');
   F('to').value = '';
   if (kind === 'transfer'){ F('account').value = it.from || ''; F('to').value = it.to || ''; }
@@ -2020,7 +2138,8 @@ $('#form').addEventListener('submit', async e => {
       await putEdit('expenses', { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
       toast(state.editKind !== state.kind ? 'Changed to ' + state.kind : 'Saved changes');
     } else {
-      await addDoc(expensesCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
+      const ref = await addDoc(expensesCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
+      if (state.bkExpenseFor && ref) linkBkExpense(ref.id);
       if (state.period !== 'all') state.period = date.slice(0,7);
       state.txKind = 'expense'; render();
       toast('Added ' + eur.format(amount) + ' at ' + rec.store);
@@ -2208,7 +2327,7 @@ function tripCard(t){
   return `<button type="button" class="tcard" data-trip="${esc(t.id)}">
     <span class="top"><span class="ttype"><i style="background:${TRIP_DOT[t.type]}"></i>${TRIP_TYPE[t.type]}</span><span class="tmeta">${fmtRange(t.start, t.end)}</span></span>
     <span class="tname">${esc(t.name)}${t.closed ? ' <span class="tag">finished</span>' : ''}</span>
-    <span class="tmeta">${esc(t.traveller)} · ${ex.length} entr${ex.length===1?'y':'ies'}${cats[0] ? ' · mostly ' + esc(cats[0].key) : ''}</span>
+    <span class="tmeta">${esc(t.traveller)} · ${ex.length} entr${ex.length===1?'y':'ies'}${(n => n ? ' · ' + n + ' booking' + (n===1?'':'s') : '')(state.bookings.filter(b => b.tripId === t.id).length)}${cats[0] ? ' · mostly ' + esc(cats[0].key) : ''}</span>
     <span class="ttotal">${eur.format(total)}</span>${mix}${budget}
   </button>`;
 }
@@ -2283,6 +2402,7 @@ function renderTripDetail(t){
       <div style="display:flex;justify-content:flex-end"><button class="btn primary" type="button" id="attachGo" disabled>Attach selected</button></div>`
       : `<p class="empty" style="margin:0">No unlinked expenses ${t.start && !state.attachAll ? 'around these dates. Try “Show all dates”.' : 'match.'}</p>`}
     </section>` : ''}
+    ${bkPanel(t)}
     <div class="grid">
       <section class="panel span-5"><header><h2>By category</h2></header>
         <div class="hbars">${cats.length ? cats.map(c => `<div class="hbar" style="cursor:default"><span class="name">${esc(c.key)}</span><span class="track"><span class="fill" style="width:${(c.total/maxC*100).toFixed(1)}%"></span></span><span class="amt">${eur.format(c.total)}<span class="pct">${(c.total/total*100).toFixed(0)}%</span></span></div>`).join('') : '<div class="empty">Nothing linked yet.</div>'}</div>
@@ -4194,9 +4314,556 @@ document.addEventListener('click', async e => {
   finally { b.disabled = false; }
 });
 
+// ---------- bookings: tickets, boarding passes, hotel confirmations ----------
+// A PDF or screenshot is read right here in the browser (pdf.js for text, the built-in BarcodeDetector for
+// QR/Aztec/PDF417 codes); the server only asks the AI to sort the text into bookings and keeps the original
+// file in Google Drive. Forwarded emails arrive in bookingInbox and go through the same steps.
+const BK_KEYS = ['tripId','type','title','provider','ref','number','travellers','start','end','from','to','address','seat','details','price','currency','codes','fileId','fileName','fileMime','source','expenseId','createdAt','createdBy','updatedBy'];
+const BK_TYPES = { flight:['✈️','Flight'], train:['🚆','Train'], bus:['🚌','Bus'], ferry:['⛴️','Ferry'], hotel:['🏨','Stay'], car:['🚗','Car rental'], event:['🎫','Event'], restaurant:['🍽️','Restaurant'], other:['📌','Other'] };
+const BK_CAT = { flight:'Transportation', train:'Transportation', bus:'Transportation', ferry:'Transportation', car:'Transportation', hotel:'Accommodation' };
+// The legacy build carries polyfills, so it also runs on phones whose browser is a version or two behind.
+const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284/legacy/build/';
+const BK_MAX_FILE = 4 * 1024 * 1024;
+const PDF_RES = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284/';
+const pdfOpen = async (pdfjs, blob) => pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()),
+  cMapUrl: PDF_RES + 'cmaps/', cMapPacked: true, standardFontDataUrl: PDF_RES + 'standard_fonts/', wasmUrl: PDF_RES + 'wasm/', iccUrl: PDF_RES + 'iccs/' }).promise;
+let pdfjsP = null;
+function loadPdfjs(){
+  return pdfjsP ||= import(PDFJS + 'pdf.min.mjs').then(m => { m.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.mjs'; return m; })
+    .catch(() => { pdfjsP = null; throw new Error('Couldn’t load the PDF reader. Check your connection and try again.'); });
+}
+async function api(path, opt = {}){
+  const u = state.user || auth.currentUser; if (!u) throw new Error('Not signed in.');
+  const r = await fetch(path, { ...opt, headers: { ...(opt.headers || {}), authorization: 'Bearer ' + await u.getIdToken() } });
+  if (!r.ok){ let m = ''; try { m = (await r.json()).error; } catch {} throw new Error(m || (r.status === 404 ? 'The server part isn’t deployed yet.' : 'Server error ' + r.status)); }
+  return r;
+}
+const bkFiles = new Map();
+async function fileBlob(id){
+  if (!bkFiles.has(id)) bkFiles.set(id, api('/api/booking-file?id=' + encodeURIComponent(id)).then(r => r.blob()).catch(e => { bkFiles.delete(id); throw e; }));
+  return bkFiles.get(id);
+}
+
+// --- reading files ---
+let bdP = null;
+function barcodeDetector(){
+  if (!('BarcodeDetector' in window)) return Promise.resolve(null);
+  return bdP ||= (async () => { try {
+    const have = await BarcodeDetector.getSupportedFormats();
+    const want = ['qr_code','aztec','pdf417','data_matrix','code_128'].filter(f => have.includes(f));
+    return want.length ? new BarcodeDetector({ formats: want }) : null;
+  } catch { return null; } })();
+}
+function cropCode(src, bb, format){
+  const pad = Math.max(bb.width, bb.height) * 0.08;
+  const x = Math.max(0, bb.x - pad), y = Math.max(0, bb.y - pad);
+  const w = Math.min(src.width - x, bb.width + 2 * pad), h = Math.min(src.height - y, bb.height + 2 * pad);
+  const k = Math.min(1, (/pdf417|code_128/.test(format) ? 720 : 480) / w);
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(src, x, y, w, h, 0, 0, c.width, c.height);
+  return c.toDataURL('image/png');
+}
+async function findCodes(canvas, page){
+  const det = await barcodeDetector(); if (!det) return [];
+  let found = []; try { found = await det.detect(canvas); } catch { return []; }
+  return found.filter(c => c.rawValue && c.boundingBox && c.boundingBox.width > 20)
+    .map(c => ({ page, format: c.format, text: c.rawValue, img: cropCode(canvas, c.boundingBox, c.format) }));
+}
+async function renderPage(page, width){
+  const vp = page.getViewport({ scale: width / page.getViewport({ scale: 1 }).width });
+  const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  await page.render({ canvasContext: g, viewport: vp }).promise;
+  return c;
+}
+function toJpeg(c, max = 1600){
+  const k = Math.min(1, max / Math.max(c.width, c.height)), d = document.createElement('canvas');
+  d.width = Math.round(c.width * k); d.height = Math.round(c.height * k);
+  const g = d.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, d.width, d.height); g.drawImage(c, 0, 0, d.width, d.height);
+  return d.toDataURL('image/jpeg', 0.82);
+}
+const isPdf = (mime, name) => /pdf/i.test(mime || '') || /\.pdf$/i.test(name || '');
+async function readBlob(blob, name){
+  if (isPdf(blob.type, name)){
+    const pdfjs = await loadPdfjs();
+    const pdf = await pdfOpen(pdfjs, blob);
+    let text = '', first = null; const codes = [];
+    for (let p = 1; p <= Math.min(pdf.numPages, 8); p++){
+      const page = await pdf.getPage(p);
+      text += (await page.getTextContent()).items.map(i => (i.str || '') + (i.hasEOL ? '\n' : ' ')).join('') + '\n\n';
+      const c = await renderPage(page, 1600);
+      if (p === 1) first = c;
+      codes.push(...await findCodes(c, p));
+    }
+    pdf.destroy();
+    return { text, codes, image: text.replace(/\s/g, '').length < 40 && first ? toJpeg(first) : null };
+  }
+  if (/^image\//.test(blob.type)){
+    const bmp = await createImageBitmap(blob);
+    const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0);
+    return { text: '', codes: await findCodes(c, 1), image: toJpeg(c) };
+  }
+  return { text: await blob.text(), codes: [] };
+}
+
+// --- the add/review dialog ---
+function bkShow(mode){
+  $('#bkPick').hidden = mode !== 'pick'; $('#bkBusy').hidden = mode !== 'busy'; $('#bkReview').hidden = mode !== 'review';
+  $('#bkRead').hidden = mode !== 'pick'; $('#bkSave').hidden = mode !== 'review';
+}
+const bkBusy = t => { bkShow('busy'); $('#bkBusyText').textContent = t; };
+function bkOpen(init = {}){
+  state.bk = { items: [], codes: [], sources: [], ...init };
+  $('#bkTitle').textContent = init.editId ? 'Edit booking' : 'Add booking';
+  $('#bkErr').hidden = true; $('#bkPaste').value = ''; $('#bkDismiss').hidden = !init.inboxId;
+  $('#bkSave').disabled = false;
+  bkShow('pick'); renderBkPick();
+  if (!$('#bkDlg').open) $('#bkDlg').showModal();
+}
+function bkFail(x){ bkShow('pick'); renderBkPick(); $('#bkErr').textContent = x.message || String(x); $('#bkErr').hidden = false; }
+
+// sources: [{ name, mime, blob } | { name, mime, id }] (id = already kept in Drive)
+async function bkProcess(sources, { text: extra = '', subject, date } = {}){
+  const S = state.bk; S.sources = sources; S.subject = subject; S.date = date;
+  $('#bkErr').hidden = true;
+  const live = () => state.bk === S && $('#bkDlg').open;
+  const texts = extra.trim() ? [extra.trim()] : [], codes = [];
+  let image = null;
+  for (const [i, s] of sources.entries()){
+    bkBusy(sources.length > 1 ? `Reading ${s.name} (${i + 1} of ${sources.length})…` : `Reading ${s.name}…`);
+    if (!s.blob) s.blob = await fileBlob(s.id);
+    if (!live()) return;
+    const r = await readBlob(s.blob, s.name);
+    if (r.text.trim()) texts.push(`[File ${s.name}]\n${r.text}`);
+    r.codes.forEach(c => { if (!codes.some(x => x.text === c.text)) codes.push({ ...c, file: i }); });
+    if (!image && r.image) image = r.image;
+  }
+  if (!live()) return;
+  bkBusy(codes.length ? `Found ${codes.length} ticket code${codes.length === 1 ? '' : 's'}. Reading the details…` : 'Reading the details…');
+  let items = [];
+  S.aiErr = '';
+  try {
+    const plain = texts.join('\n\n');
+    const r = await api('/api/extract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+      text: plain, codes: codes.map(({ page, format, text }) => ({ page, format, text })), name: sources[0]?.name, subject, date,
+      image: plain.replace(/\s/g, '').length < 60 && image ? image : undefined }) });
+    items = (await r.json()).bookings || [];
+  } catch (x){ S.aiErr = x.message; }
+  if (!live()) return;
+  if (!items.length) items = [{ type: 'other', title: subject ? subject.replace(/^(fwd?|wg|tr|re):\s*/i, '').slice(0, 120) : (sources[0]?.name || '').replace(/\.[a-z0-9]+$/i, ''), codes: [] }];
+  // Codes the AI didn't place: one per booking when the counts match, otherwise on the first.
+  const used = new Set(items.flatMap(b => b.codes || []));
+  const loose = codes.map((_, i) => i).filter(i => !used.has(i));
+  if (loose.length){
+    if (!used.size && loose.length === items.length) items.forEach((b, i) => b.codes = [loose[i]]);
+    else items[0].codes = [...(items[0].codes || []), ...loose];
+  }
+  S.items = items; S.codes = codes;
+  bkReviewRender();
+}
+
+const splitDT = s => [s ? s.slice(0, 10) : '', s && s.length > 10 ? s.slice(11, 16) : ''];
+const bkCity = s => String(s || '').replace(/\s*\([^)]*\)/g, '').replace(/\s+(airport|flughafen|aeroporto|hbf|hauptbahnhof|centrale|termini|central station)\b.*$/i, '').trim();
+function bkTripType(items){ return /^(rome|roma|munich|münchen|muenchen|ingolstadt)\b/i.test(bkCity(items.find(b => b.to)?.to)) ? 'visit' : 'holiday'; }
+function bkTripName(items){
+  const on = items.filter(b => b.on !== false);
+  const c = bkCity(on.find(b => b.to && b.type !== 'hotel')?.to) || on.find(b => b.type === 'hotel')?.title || '';
+  return c ? (bkTripType(on) === 'visit' ? c + ' visit' : c) : 'Trip';
+}
+function bkRange(items){
+  const ds = items.flatMap(b => [b.start, b.end]).filter(Boolean).map(d => d.slice(0, 10)).sort();
+  return [ds[0] || '', ds[ds.length - 1] || ''];
+}
+function bkTripFor(items){
+  const dupTrip = items.map(bkDup).find(x => x && x.tripId)?.tripId;
+  if (dupTrip && state.tripMap[dupTrip]) return dupTrip;
+  const d = bkRange(items.filter(b => b.on !== false))[0] || bkRange(items)[0]; if (!d) return null;
+  const t = state.trips.find(t => t.start && d >= addDays(t.start, -2) && d <= addDays(t.end || t.start, 1));
+  return t ? t.id : null;
+}
+function bkTraveller(items){
+  const n = items.flatMap(b => b.travellers || []).join(' ').toLowerCase(), a = /anubhav/.test(n), s = /sulekha/.test(n);
+  return a && s ? 'Both' : s ? 'Sulekha' : a ? 'Anubhav' : (cap(usernameOf(state.user)) === 'Sulekha' ? 'Sulekha' : 'Anubhav');
+}
+function bkDup(b){
+  if (!b.start) return null;
+  return state.bookings.find(x => x.id !== state.bk?.editId && x.type === b.type && (x.start || '').slice(0, 10) === b.start.slice(0, 10)
+    && (x.ref && b.ref ? x.ref === b.ref : true) && (x.title === b.title || (x.from && x.from === b.from && x.to === b.to))) || null;
+}
+// Priced bookings as expenses: one per provider and currency (the two Lufthansa legs together, the hotel apart).
+function bkPriced(items){
+  const g = new Map();
+  for (const b of items.filter(b => b.on !== false && b.price > 0 && !b.expenseId)){
+    const k = (b.provider || b.title).toLowerCase() + '|' + (b.currency || 'EUR');
+    if (!g.has(k)) g.set(k, { cur: b.currency || 'EUR', total: 0, items: [] });
+    const x = g.get(k); x.items.push(b); x.total = Math.round((x.total + b.price) * 100) / 100;
+  }
+  return [...g.values()];
+}
+
+function bkReviewRender(){
+  const S = state.bk; bkShow('review');
+  const opts = (sel, list) => list.map(([v, l]) => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(l)}</option>`).join('');
+  const inp = (b, k, label, cls = '') => `<label class="f ${cls}">${label}<input data-k="${k}" value="${esc(b[k] ?? '')}" autocomplete="off"></label>`;
+  const cards = S.items.map((b, i) => {
+    const dup = bkDup(b); if (dup && b.on === undefined) b.on = false;
+    const [sd, st] = splitDT(b.start), [ed, et] = splitDT(b.end), h = b.type === 'hotel' || b.type === 'car';
+    const curs = CURRENCIES.includes(b.currency || 'EUR') ? CURRENCIES : [...CURRENCIES, b.currency];
+    return `<div class="bkcard ${b.on === false ? 'off' : ''}" data-bi="${i}">
+      <div class="hd"><label>${S.editId ? '' : `<input type="checkbox" data-bkon ${b.on === false ? '' : 'checked'}>`}<span>${(BK_TYPES[b.type] || BK_TYPES.other)[0]} ${esc(b.title || 'Booking')}</span></label>${dup ? '<span class="tag">already saved</span>' : ''}</div>
+      <div class="fields">
+        <label class="f">Type<select data-k="type">${opts(b.type, Object.entries(BK_TYPES).map(([k, [ic, l]]) => [k, ic + ' ' + l]))}</select></label>
+        ${inp(b, 'ref', 'Booking reference')}
+        ${inp(b, 'title', 'Title', 'full')}
+        <label class="f">${h ? (b.type === 'hotel' ? 'Check-in' : 'Pick-up') : 'Departs'}<input type="date" data-k="sd" value="${sd}"></label>
+        <label class="f">Time<input type="time" data-k="st" value="${st}"></label>
+        <label class="f">${h ? (b.type === 'hotel' ? 'Check-out' : 'Return') : 'Arrives'}<input type="date" data-k="ed" value="${ed}"></label>
+        <label class="f">Time<input type="time" data-k="et" value="${et}"></label>
+        ${b.type === 'hotel' ? '' : inp(b, 'from', 'From') + inp(b, 'to', 'To')}
+        ${inp(b, 'seat', b.type === 'hotel' ? 'Room' : 'Seat / coach')}${inp(b, 'provider', 'Provider')}
+        <label class="f full">Travellers<input data-k="travellers" value="${esc((b.travellers || []).join(', '))}" autocomplete="off"></label>
+        ${['hotel','car','event','restaurant','other'].includes(b.type) || b.address ? inp(b, 'address', 'Address', 'full') : ''}
+        ${inp(b, 'details', 'Details for the day (terminal, platform, check-in…)', 'full')}
+        <label class="f">Price<input type="number" step="0.01" min="0" inputmode="decimal" data-k="price" value="${b.price ?? ''}"></label>
+        <label class="f">Currency<select data-k="currency">${opts(b.currency || 'EUR', curs.map(c => [c, c]))}</select></label>
+      </div>
+      ${(b.codes || []).length ? `<div class="codes">${b.codes.map(ci => S.codes[ci] ? `<span class="cd"><img src="${S.codes[ci].img}" alt="${esc(S.codes[ci].format)} code" data-codeview="${ci}"><button type="button" data-codeoff="${i}:${ci}" aria-label="Remove this code">×</button></span>` : '').join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+  if (S.tripSel === undefined) S.tripSel = bkTripFor(S.items) || '__new';
+  const trips = [...state.trips].sort((a, b) => (b.start || '').localeCompare(a.start || ''));
+  const [rs, re] = bkRange(S.items.filter(b => b.on !== false));
+  const P = S.editId ? [] : bkPriced(S.items);
+  const pLabel = x => esc(x.items[0].provider || x.items[0].title) + ' ' + money(x.total, x.cur);
+  const nOn = S.items.filter(b => b.on !== false).length;
+  $('#bkReview').innerHTML = `
+    ${S.aiErr ? `<div class="banner" style="background:var(--warn-soft);border-color:transparent"><span>Couldn’t read the details automatically (${esc(S.aiErr)}). Fill them in below${S.codes.length ? '; the ticket code was found' : ''}.</span></div>` : ''}
+    ${!S.editId && S.sources.length && !S.codes.length && !('BarcodeDetector' in window) ? `<p class="hint muted" style="margin:0;font-size:12.5px">This browser can’t scan QR codes; open the app on your phone to pick them up, or use “Open PDF” at the gate.</p>` : ''}
+    ${cards}
+    <div class="bkbox"><div class="fields">
+      <label class="f full">Trip<select id="bkTrip"><option value="__new" ${S.tripSel === '__new' ? 'selected' : ''}>New trip from these bookings</option><option value="" ${S.tripSel === '' ? 'selected' : ''}>No trip</option>${trips.map(t => `<option value="${esc(t.id)}" ${t.id === S.tripSel ? 'selected' : ''}>${esc(tripLabel(t))}</option>`).join('')}</select></label>
+      ${S.tripSel === '__new' ? `<label class="f">Trip name<input id="bkTName" value="${esc(S.tName ?? bkTripName(S.items))}" autocomplete="off"></label>
+        <label class="f">Trip type<select id="bkTType">${opts(S.tType || bkTripType(S.items), Object.entries(TRIP_TYPE))}</select></label>
+        <p class="full muted" style="margin:0;font-size:12.5px">${rs ? 'Dates ' + fmtRange(rs, re !== rs ? re : '') + ', ' : ''}${bkTraveller(S.items)} travelling. Budget and the rest can be set on the trip later.</p>` : ''}
+    </div>
+    ${P.length ? `<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="bkExp" ${S.exp === false ? '' : 'checked'}> <span>Then add ${P.length === 1 ? pLabel(P[0]) + ' as an expense' : P.length + ' expenses: ' + P.map(pLabel).join(', ')} (you check ${P.length === 1 ? 'it' : 'each'} before saving)</span></label>` : ''}
+    </div>`;
+  $('#bkSave').textContent = S.editId ? 'Save changes' : nOn > 1 ? `Save ${nOn} bookings` : 'Save booking';
+}
+function bkCollect(){
+  const S = state.bk; if (!S || $('#bkReview').hidden) return;
+  $$('#bkReview [data-bi]').forEach(card => {
+    const b = S.items[+card.dataset.bi], v = k => { const el = card.querySelector(`[data-k="${k}"]`); return el ? el.value.trim() : null; };
+    const on = card.querySelector('[data-bkon]'); if (on) b.on = on.checked;
+    b.type = v('type') || 'other';
+    for (const k of ['ref','title','from','to','seat','provider','address','details']){ const x = v(k); if (x !== null) b[k] = x; }
+    b.travellers = (v('travellers') || '').split(/\s*[,;]\s*/).filter(Boolean);
+    b.start = v('sd') ? v('sd') + (v('st') ? 'T' + v('st') : '') : '';
+    b.end = v('ed') ? v('ed') + (v('et') ? 'T' + v('et') : '') : '';
+    const p = parseFloat(v('price')); b.price = p > 0 ? Math.round(p * 100) / 100 : undefined; b.currency = v('currency') || 'EUR';
+  });
+  if ($('#bkTrip')) S.tripSel = $('#bkTrip').value;
+  if ($('#bkTName')) S.tName = $('#bkTName').value;
+  if ($('#bkTType')) S.tType = $('#bkTType').value;
+  if ($('#bkExp')) S.exp = $('#bkExp').checked;
+}
+$('#bkReview').addEventListener('change', e => {
+  if (e.target.matches('[data-k="type"], [data-k="price"], [data-k="currency"], [data-k="sd"], [data-k="ed"], #bkTrip, [data-bkon]')){ bkCollect(); bkReviewRender(); }
+});
+$('#bkReview').addEventListener('click', e => {
+  const off = e.target.closest('[data-codeoff]'); if (!off) return;
+  bkCollect(); const [i, ci] = off.dataset.codeoff.split(':').map(Number);
+  state.bk.items[i].codes = state.bk.items[i].codes.filter(x => x !== ci); bkReviewRender();
+});
+
+$('#bkForm').addEventListener('submit', async e => {
+  e.preventDefault(); const S = state.bk; if (!S || $('#bkReview').hidden) return;
+  bkCollect();
+  const items = S.items.filter(b => b.on !== false), err = $('#bkErr'); err.hidden = true;
+  const fail = m => { err.textContent = m; err.hidden = false; };
+  if (!items.length) return fail('Tick at least one booking to save.');
+  if (items.some(b => !b.title)) return fail('Give each booking a title.');
+  if (items.some(b => b.end && b.start && b.end < b.start)) return fail('An arrival or check-out is before its start.');
+  const btn = $('#bkSave'), me = usernameOf(state.user); btn.disabled = true;
+  try {
+    let tripId = S.tripSel;
+    if (tripId === '__new'){
+      btn.textContent = 'Creating trip…';
+      const [start, end] = bkRange(items);
+      const rec = { name: (S.tName ?? bkTripName(items)).trim().slice(0, 80) || 'Trip', type: S.tType || bkTripType(items), traveller: bkTraveller(items), createdAt: new Date().toISOString(), createdBy: me };
+      if (start) rec.start = start; if (end && end > start) rec.end = end;
+      tripId = (await addDoc(tripsCol, rec)).id;
+    }
+    // Keep the originals in Drive (forwarded emails' files are there already).
+    const fileOf = {}, notes = [];
+    for (const [i, s] of S.sources.entries()){
+      if (s.id){ fileOf[i] = { id: s.id, name: s.name, mime: s.mime }; continue; }
+      if (!s.blob) continue;
+      if (s.blob.size > BK_MAX_FILE){ notes.push(s.name + ' is over 4 MB, so no copy was kept'); continue; }
+      btn.textContent = 'Keeping a copy in Drive…';
+      try {
+        const r = await api('/api/booking-file', { method: 'POST', headers: { 'content-type': s.blob.type || (isPdf('', s.name) ? 'application/pdf' : 'application/octet-stream'), 'x-file-name': encodeURIComponent(s.name) }, body: s.blob });
+        const j = await r.json(); fileOf[i] = { id: j.id, name: j.name, mime: j.mime }; bkFiles.set(j.id, Promise.resolve(s.blob));
+      } catch (x){ notes.push('the file wasn’t kept in Drive (' + x.message + ')'); }
+    }
+    btn.textContent = 'Saving…';
+    const old = S.editId ? state.bookings.find(x => x.id === S.editId) || {} : {};
+    const batch = writeBatch(fs), ids = [];
+    for (const it of items){
+      const fi = (it.codes || []).map(ci => S.codes[ci]?.file).find(f => f != null) ?? 0;
+      const f = fileOf[fi] || fileOf[0];
+      const d = { ...it, tripId: tripId || '', travellers: it.travellers?.length ? it.travellers : null,
+        codes: (it.codes || []).map(ci => S.codes[ci]).filter(Boolean).slice(0, 8).map(c => ({ format: String(c.format || '').slice(0, 20), text: String(c.text || '').slice(0, 2000), img: c.img })),
+        fileId: f ? f.id : old.fileId, fileName: f ? f.name : old.fileName, fileMime: f ? f.mime : old.fileMime,
+        source: old.source || S.source || 'upload', expenseId: old.expenseId, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || me,
+        updatedBy: S.editId ? me : null };
+      const ref = S.editId ? doc(fs, 'bookings', S.editId) : doc(bookingsCol);
+      batch.set(ref, pickDoc(BK_KEYS, d)); ids.push(ref.id);
+    }
+    await batch.commit();
+    if (S.inboxId) try { await deleteDoc(doc(fs, 'bookingInbox', S.inboxId)); } catch {}
+    $('#bkDlg').close(); state.bk = null;
+    toast((S.editId ? 'Booking saved' : `Saved ${items.length} booking${items.length === 1 ? '' : 's'}`) + (notes.length ? '. Note: ' + notes.join('; ') : ''));
+    if (tripId){ state.openTrip = tripId; state.attachOpen = false; if (state.page !== 'trips') location.hash = 'trips'; else render(); }
+    if (!S.editId && S.exp !== false) bkOfferExpense(items, ids, tripId, S.date);
+  } catch (x){ fail(writeError(x)); }
+  finally { btn.disabled = false; if (state.bk === S) btn.textContent = S.editId ? 'Save changes' : 'Save'; }
+});
+
+function bkOfferExpense(items, ids, tripId, date, queue, of){
+  queue = queue || bkPriced(items); of = of || queue.length;
+  const [P, ...rest] = queue; if (!P) return;
+  const main = P.items[0];
+  openAdd('expense', tripId || undefined);
+  // After this one is saved, the next provider's expense opens.
+  if (rest.length) state.bkExpNext = () => bkOfferExpense(items, ids, tripId, date, rest, of);
+  $('#dlgTitle').textContent = 'Add booking as expense' + (of > 1 ? ` (${of - rest.length} of ${of})` : '');
+  F('store').value = main.provider || main.title;
+  applyLearned();
+  if (!F('category').value && BK_CAT[main.type]) F('category').value = BK_CAT[main.type];
+  F('comment').value = [P.items.map(b => b.title).join(' + '), main.ref ? 'ref ' + main.ref : ''].filter(Boolean).join(' · ').slice(0, 300);
+  F('amount').value = P.total;
+  const d = date && !isNaN(new Date(date)) ? localDate(new Date(date).toISOString()) : today();
+  F('date').value = d > today() ? today() : d;
+  setCur(P.cur);
+  setMore(true);
+  state.bkExpenseFor = P.items.map(b => ids[items.indexOf(b)]).filter(Boolean);
+}
+async function linkBkExpense(expId){
+  const ids = state.bkExpenseFor || [], next = state.bkExpNext; state.bkExpenseFor = null; state.bkExpNext = null;
+  if (next) setTimeout(next, 350);
+  for (const id of ids){
+    const b = state.bookings.find(x => x.id === id);
+    if (b) try { await setDoc(doc(fs, 'bookings', id), pickDoc(BK_KEYS, { ...b, expenseId: expId, updatedBy: usernameOf(state.user) })); } catch {}
+  }
+}
+
+// --- forwarded emails ---
+function renderBkInbox(){
+  const n = state.bkInbox.length, it = state.bkInbox[0];
+  $$('[data-bkinboxbar]').forEach(bar => { bar.hidden = !n;
+    bar.innerHTML = n ? `<div class="left"><strong>${n} forwarded booking${n === 1 ? '' : 's'} to add</strong><span class="note" style="font-size:12.5px;color:var(--muted)">${esc(it.subject || 'Email')}, ${ago(it.receivedAt)}</span></div><button class="btn primary" type="button" data-bkinbox="${esc(it.id)}">Review</button>` : ''; });
+  if ($('#bkDlg').open && !$('#bkPick').hidden) renderBkPick();
+}
+function renderBkPick(){
+  $('#bkInboxList').innerHTML = state.bkInbox.length && !state.bk?.editId ? `<strong style="font-size:13px">Forwarded emails</strong>` + state.bkInbox.map(it => `<div class="it"><span class="s"><b>${esc(it.subject || '(no subject)')}</b><small>${ago(it.receivedAt)} · ${it.files?.length ? it.files.length + ' attachment' + (it.files.length === 1 ? '' : 's') : 'email text only'}${it.fileError ? ' · attachments not kept: ' + esc(it.fileError) : ''}</small></span><span style="display:flex;gap:6px"><button class="btn small" type="button" data-bkidis="${esc(it.id)}">Dismiss</button><button class="btn primary small" type="button" data-bkinbox="${esc(it.id)}">Read</button></span></div>`).join('') : '';
+  const em = state.bkSettings?.email;
+  $('#bkFwd').innerHTML = em ? `Or forward confirmation emails to <code>${esc(em)}</code> <button type="button" class="linkbtn" data-bkcopy>Copy</button> · <button type="button" class="linkbtn" data-bkemail>Change</button>`
+    : `Prefer forwarding emails? <button type="button" class="linkbtn" data-bkemail>Add your forwarding address</button>`;
+}
+async function bkFromInbox(id){
+  const it = state.bkInbox.find(x => x.id === id); if (!it) return;
+  bkOpen({ inboxId: id, source: 'email' });
+  try { await bkProcess((it.files || []).map(f => ({ id: f.id, name: f.name, mime: f.mime })), { text: (it.subject ? 'Subject: ' + it.subject + '\n\n' : '') + (it.text || ''), subject: it.subject, date: it.date || it.receivedAt }); }
+  catch (x){ bkFail(x); }
+}
+async function bkDismissInbox(id){
+  const it = state.bkInbox.find(x => x.id === id); if (!it) return;
+  await deleteDoc(doc(fs, 'bookingInbox', id));
+  for (const f of it.files || []) api('/api/booking-file?id=' + encodeURIComponent(f.id), { method: 'DELETE' }).catch(() => {});
+  toast('Dismissed');
+}
+async function bkFromFiles(files){
+  const sources = [...files].slice(0, 5).map(f => ({ name: f.name || 'shared file', mime: f.type, blob: f }));
+  if (!sources.length) return;
+  try { await bkProcess(sources); } catch (x){ bkFail(x); }
+}
+// Files shared to the app from another app (Android share sheet), parked by the service worker.
+async function takeShared(){
+  if (!('caches' in window)) return;
+  let c, keys;
+  try { c = await caches.open('share-inbox'); keys = await c.keys(); } catch { return; }
+  if (!keys.length) return;
+  const files = []; let text = '';
+  for (const k of keys){
+    const r = await c.match(k); await c.delete(k); if (!r) continue;
+    const name = decodeURIComponent(r.headers.get('x-name') || 'shared');
+    if (r.headers.get('x-kind') === 'text') text += (await r.text()) + '\n';
+    else { const b = await r.blob(); files.push(new File([b], name, { type: b.type })); }
+  }
+  bkOpen({ source: 'share' });
+  try { if (files.length) await bkProcess(files.map(f => ({ name: f.name, mime: f.type, blob: f })), { text }); else if (text.trim()) await bkProcess([], { text }); }
+  catch (x){ bkFail(x); }
+}
+
+$('#bkChoose').addEventListener('click', () => $('#bkFile').click());
+$('#bkFile').addEventListener('change', e => { const f = [...e.target.files]; e.target.value = ''; bkFromFiles(f); });
+$('#bkDrop').addEventListener('dragover', e => { e.preventDefault(); $('#bkDrop').classList.add('over'); });
+$('#bkDrop').addEventListener('dragleave', () => $('#bkDrop').classList.remove('over'));
+$('#bkDrop').addEventListener('drop', e => { e.preventDefault(); $('#bkDrop').classList.remove('over'); bkFromFiles(e.dataTransfer.files); });
+$('#bkRead').addEventListener('click', async () => {
+  const t = $('#bkPaste').value.trim();
+  if (t.length < 30){ $('#bkErr').textContent = 'Paste the booking email first, or choose a file.'; $('#bkErr').hidden = false; return; }
+  state.bk.source = 'paste';
+  try { await bkProcess([], { text: t }); } catch (x){ bkFail(x); }
+});
+$('#bkCancel').addEventListener('click', () => { $('#bkDlg').close(); state.bk = null; });
+$('#bkDismiss').addEventListener('click', async () => {
+  const id = state.bk?.inboxId; if (!id) return;
+  try { await bkDismissInbox(id); $('#bkDlg').close(); state.bk = null; } catch (x){ toast(writeError(x)); }
+});
+
+// --- viewing ---
+const fmtDT = s => s ? shortDate(s.slice(0, 10)) + (s.length > 10 ? ' ' + s.slice(11, 16) : '') : '';
+const wday = d => new Date(d.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-IE', { weekday: 'short' });
+function bkWhen(b){
+  if (!b.start) return '';
+  if (!b.end) return wday(b.start) + ' ' + fmtDT(b.start);
+  if (b.end.slice(0, 10) === b.start.slice(0, 10)) return wday(b.start) + ' ' + fmtDT(b.start) + (b.end.length > 10 ? '–' + b.end.slice(11, 16) : '');
+  return wday(b.start) + ' ' + fmtDT(b.start) + ' → ' + wday(b.end) + ' ' + fmtDT(b.end);
+}
+// Each booking on its day; stays and rentals also on their last day.
+function bkItinerary(list, { dayLabels = true, from = '', to = '9999' } = {}){
+  const ev = [];
+  for (const b of list){
+    ev.push({ b, at: b.start || '9999', co: false });
+    if ((b.type === 'hotel' || b.type === 'car') && b.end && b.end.slice(0, 10) !== (b.start || '').slice(0, 10)) ev.push({ b, at: b.end, co: true });
+  }
+  ev.sort((x, y) => x.at.localeCompare(y.at));
+  const td = today(); let day = null, out = '';
+  if (from) ev.splice(0, ev.length, ...ev.filter(e => e.at.slice(0, 10) >= from && e.at.slice(0, 10) <= to));
+  for (const e of ev){
+    const d = e.at === '9999' ? 'No date' : e.at.slice(0, 10), b = e.b;
+    if (dayLabels && d !== day){ day = d; out += `<div class="day">${d === 'No date' ? d : new Date(d + 'T12:00:00').toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'short' })}${d === td ? ' · today' : d === addDays(td, 1) ? ' · tomorrow' : ''}</div>`; }
+    const tm = e.at.length > 10 ? e.at.slice(11, 16) : '';
+    const title = e.co ? (b.type === 'hotel' ? 'Check out · ' : 'Return car · ') + esc(b.title) : (b.type === 'hotel' ? 'Check in · ' : '') + esc(b.title);
+    const route = b.from && b.to && !b.title.includes(bkCity(b.to)) ? esc(b.from) + ' → ' + esc(b.to) : '';
+    const sub = e.co ? esc(b.address || b.ref || '') : [route, !['hotel','car'].includes(b.type) && b.end && b.end.length > 10 ? 'arr ' + b.end.slice(11, 16) : '', b.seat ? esc(b.seat) : '', b.type === 'hotel' ? esc(b.address || '') : '', b.ref ? esc(b.ref) : ''].filter(Boolean).join(' · ');
+    out += `<button type="button" class="bk ${d < td ? 'past' : ''} ${e.co ? 'co' : ''}" data-bkopen="${esc(b.id)}"><span class="tm">${dayLabels ? tm : (d === td ? 'Today' : d === addDays(td, 1) ? 'Tmrw' : shortDate(d)) + (tm ? '<br>' + tm : '')}</span><span class="ic" aria-hidden="true">${(BK_TYPES[b.type] || BK_TYPES.other)[0]}</span><span class="ti">${title}<span class="sub">${sub || '&nbsp;'}</span></span>${!e.co && (b.codes || []).length ? '<span class="chip">Ticket</span>' : !e.co && b.fileId ? '<span class="chip">PDF</span>' : '<span></span>'}</button>`;
+  }
+  return out;
+}
+function bkPanel(t){
+  const bl = state.bookings.filter(b => b.tripId === t.id);
+  return `<section class="panel"><header><h2>Itinerary</h2><span class="right"><button class="btn small" type="button" data-addbk="${esc(t.id)}">+ Booking</button></span></header>
+    ${bl.length ? `<div class="itin">${bkItinerary(bl)}</div>` : `<p class="empty" style="margin:0">Add tickets and hotel confirmations: choose a PDF or screenshot${state.bkSettings?.email ? ', or forward the email' : ''}. Flights, trains and stays line up here by day, with their QR codes ready to show.</p>`}</section>`;
+}
+// Overview: what's on in the next two days.
+function renderNextUp(){
+  const el = $('#nextUp'); if (!el) return;
+  const td = today(), lim = addDays(td, 2);
+  const soon = state.bookings.filter(b => {
+    const s = (b.start || '').slice(0, 10), e = (b.end || b.start || '').slice(0, 10);
+    return s && ((s >= td && s <= lim) || (['hotel','car'].includes(b.type) && s < td && e >= td));
+  }).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 4);
+  el.hidden = !soon.length;
+  if (soon.length) el.innerHTML = `<header><h2>Coming up</h2><span class="hint">Tap for tickets</span></header><div class="itin">${bkItinerary(soon, { dayLabels: false, from: td, to: lim })}</div>`;
+}
+function openBooking(id){
+  const b = state.bookings.find(x => x.id === id); if (!b) return;
+  state.viewBk = id;
+  const [ic, tl] = BK_TYPES[b.type] || BK_TYPES.other, t = b.tripId && state.tripMap[b.tripId];
+  const exp = b.expenseId && state.items.find(i => i.id === b.expenseId);
+  const rows = [['When', bkWhen(b)], ['Reference', esc(b.ref)], ['Number', esc(b.number)], [b.type === 'hotel' ? 'Room' : 'Seat', esc(b.seat)], ['Travellers', esc((b.travellers || []).join(', '))],
+    ['Address', b.address ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}" target="_blank" rel="noopener">${esc(b.address)}</a>` : ''],
+    ['Details', esc(b.details)], ['Provider', esc(b.provider)], ['Price', b.price ? money(b.price, b.currency || 'EUR') : ''], ['Trip', t ? esc(t.name) : '']].filter(r => r[1]);
+  $('#bkvBody').innerHTML = `
+    <div class="head"><span class="ic" aria-hidden="true">${ic}</span><div><div class="muted" style="font-size:12px">${tl}</div>
+      <div class="route">${b.from && b.to ? esc(b.from) + ' → ' + esc(b.to) : esc(b.title)}</div>${b.from && b.to ? `<div class="muted" style="font-size:13px">${esc(b.title)}</div>` : ''}</div></div>
+    ${(b.codes || []).length ? `<div class="bkbig">${b.codes.map((c, i) => `<img src="${c.img}" class="${/pdf417|code_128/.test(c.format) ? 'wide' : ''}" alt="Ticket code" data-bkcode="${i}">`).join('')}<span class="muted" style="font-size:12px">Tap the code to show it full screen</span></div>` : ''}
+    <dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${b.fileId ? `<button class="btn" type="button" data-bkfile>Open ${isPdf(b.fileMime, b.fileName) ? 'PDF' : 'file'}</button>` : ''}
+      ${exp ? `<button class="btn" type="button" data-bkvexp="${esc(exp.id)}">Expense ${eur.format(exp.amount)}</button>` : b.price ? `<button class="btn" type="button" data-bkexp>Add ${money(b.price, b.currency || 'EUR')} as expense</button>` : ''}
+      ${t && !(state.page === 'trips' && state.openTrip === t.id) ? `<button class="btn" type="button" data-bktrip="${esc(t.id)}">Open trip</button>` : ''}
+    </div>`;
+  const del = $('#bkvDel'); del.classList.remove('armed'); del.textContent = 'Delete';
+  $('#bkvDlg').showModal();
+}
+function showCode(c){
+  const v = $('#codeView'), img = v.querySelector('img');
+  img.src = c.img; img.className = /pdf417|code_128/.test(c.format) ? 'wide' : '';
+  v.querySelector('p').textContent = (c.format || '').replace('_', ' ').toUpperCase();
+  v.showModal();
+  if (navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { v.addEventListener('close', () => l.release().catch(() => {}), { once: true }); }).catch(() => {});
+}
+$('#codeView').addEventListener('click', () => $('#codeView').close());
+async function openBkFile(b){
+  const dl = $('#pdfDlg'), pages = $('#pdfPages');
+  $('#pdfName').textContent = b.fileName || 'Booking';
+  pages.innerHTML = '<div class="bkprog"><span class="bkspin"></span>Loading…</div>';
+  $('#pdfDl').removeAttribute('href'); dl.showModal();
+  try {
+    const blob = await fileBlob(b.fileId);
+    const url = URL.createObjectURL(blob); $('#pdfDl').href = url; $('#pdfDl').download = b.fileName || 'booking';
+    if (isPdf(blob.type || b.fileMime, b.fileName)){
+      const pdfjs = await loadPdfjs();
+      const pdf = await pdfOpen(pdfjs, blob);
+      pages.innerHTML = '';
+      const w = Math.max(320, Math.min(900, pages.clientWidth - 24)) * Math.min(2, devicePixelRatio || 1);
+      for (let p = 1; p <= pdf.numPages && dl.open; p++) pages.appendChild(await renderPage(await pdf.getPage(p), w));
+      pdf.destroy();
+    } else pages.innerHTML = `<img src="${url}" alt="${esc(b.fileName || 'Booking')}">`;
+  } catch (x){
+    pages.innerHTML = `<p class="err" style="max-width:520px">${esc(x.message)}</p><a class="btn" href="https://drive.google.com/file/d/${encodeURIComponent(b.fileId)}/view" target="_blank" rel="noopener">Open in Google Drive</a>`;
+  }
+}
+$('#pdfClose').addEventListener('click', () => $('#pdfDlg').close());
+$('#bkvEdit').addEventListener('click', () => {
+  const b = state.bookings.find(x => x.id === state.viewBk); if (!b) return;
+  $('#bkvDlg').close();
+  bkOpen({ editId: b.id, tripSel: b.tripId || '', items: [{ ...b, codes: (b.codes || []).map((_, i) => i) }], codes: (b.codes || []).map(c => ({ ...c })) });
+  bkReviewRender();
+});
+$('#bkvDel').addEventListener('click', async () => {
+  const btn = $('#bkvDel');
+  if (!btn.classList.contains('armed')){ btn.classList.add('armed'); btn.textContent = 'Confirm delete'; return; }
+  const b = state.bookings.find(x => x.id === state.viewBk); if (!b) return;
+  btn.disabled = true;
+  try {
+    await deleteDoc(doc(fs, 'bookings', b.id));
+    if (b.fileId && !state.bookings.some(x => x.id !== b.id && x.fileId === b.fileId)) api('/api/booking-file?id=' + encodeURIComponent(b.fileId), { method: 'DELETE' }).catch(() => {});
+    $('#bkvDlg').close(); toast('Booking deleted' + (b.expenseId ? '. Its expense stays in the ledger.' : ''));
+  } catch (x){ toast(writeError(x)); }
+  finally { btn.disabled = false; }
+});
+document.addEventListener('click', async e => {
+  const t = e.target;
+  const ab = t.closest('[data-addbk]'); if (ab){ bkOpen({ source: 'upload', ...(ab.dataset.addbk ? { tripSel: ab.dataset.addbk } : {}) }); return; }
+  const op = t.closest('[data-bkopen]'); if (op){ openBooking(op.dataset.bkopen); return; }
+  const ib = t.closest('[data-bkinbox]'); if (ib){ bkFromInbox(ib.dataset.bkinbox); return; }
+  const idis = t.closest('[data-bkidis]'); if (idis){ idis.disabled = true; try { await bkDismissInbox(idis.dataset.bkidis); } catch (x){ toast(writeError(x)); idis.disabled = false; } return; }
+  const cv = t.closest('[data-codeview]'); if (cv){ showCode(state.bk.codes[+cv.dataset.codeview]); return; }
+  const b = state.viewBk && $('#bkvDlg').open ? state.bookings.find(x => x.id === state.viewBk) : null;
+  const bc = t.closest('[data-bkcode]'); if (bc && b){ showCode(b.codes[+bc.dataset.bkcode]); return; }
+  if (t.closest('[data-bkfile]') && b){ openBkFile(b); return; }
+  if (t.closest('[data-bkexp]') && b){ $('#bkvDlg').close(); bkOfferExpense([b], [b.id], b.tripId, b.createdAt, [{ cur: b.currency || 'EUR', total: b.price, items: [b] }]); return; }
+  const ve = t.closest('[data-bkvexp]'); if (ve){ $('#bkvDlg').close(); openEdit(ve.dataset.bkvexp, 'expense'); return; }
+  const bt = t.closest('[data-bktrip]'); if (bt){ $('#bkvDlg').close(); state.openTrip = bt.dataset.bktrip; state.attachOpen = false; if (state.page !== 'trips') location.hash = 'trips'; else render(); window.scrollTo(0, 0); return; }
+  if (t.closest('[data-bkcopy]')){ try { await navigator.clipboard.writeText(state.bkSettings.email); toast('Address copied'); } catch { toast(state.bkSettings.email); } return; }
+  if (t.closest('[data-bkemail]')){
+    const v = (prompt('Your Postmark inbound address (Postmark → your server → Settings → Inbound). Booking emails forwarded there show up here.', state.bkSettings?.email || '') || '').trim();
+    if (!v) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){ toast('That doesn’t look like an email address.'); return; }
+    try { await setDoc(doc(fs, 'settings', 'bookings'), { email: v.slice(0, 120), updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) }); toast('Forwarding address saved'); }
+    catch (x){ toast(writeError(x)); }
+  }
+});
+
 // ---------- backup & restore ----------
 const BK_COLS = { expenses:() => state.items, income:() => state.income, transfers:() => state.transfers, accounts:() => state.accounts,
-  checkins:() => state.checkins, invSnapshots:() => state.snaps, trips:() => state.trips };
+  checkins:() => state.checkins, invSnapshots:() => state.snaps, trips:() => state.trips, bookings:() => state.bookings };
 const DERIVED = ['tripKind','tripName','kind'];
 function backupData(){
   const collections = {};
@@ -4206,6 +4873,7 @@ function backupData(){
   if (state.fire && Object.keys(state.fire).length) settings.push({ id:'fire', ...state.fire });
   if (state.fireInr && Object.keys(state.fireInr).length) settings.push({ id:'fireInr', ...state.fireInr });
   if (Object.keys(state.fxMonths).length) settings.push({ id:'fx', months: state.fxMonths });
+  if (state.bkSettings?.email) settings.push({ id:'bookings', ...state.bkSettings });
   collections.settings = settings;
   return { app:'S&A Ledger', version:1, exportedAt: new Date().toISOString(), collections };
 }
@@ -4216,13 +4884,13 @@ function downloadBackup(){
   const n = Object.values(data.collections).reduce((s, v) => s + v.length, 0);
   toast(`Backup downloaded: ${n} records`);
 }
-const RS_LABEL = { expenses:'expenses', income:'income', transfers:'transfers', accounts:'accounts', checkins:'check-ins', invSnapshots:'monthly investment values', trips:'trips', settings:'settings' };
+const RS_LABEL = { expenses:'expenses', income:'income', transfers:'transfers', accounts:'accounts', checkins:'check-ins', invSnapshots:'monthly investment values', trips:'trips', bookings:'bookings', settings:'settings' };
 $('#rsFile').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   let data;
   try { data = JSON.parse(await f.text()); if (data.app !== 'S&A Ledger' || !data.collections) throw 0; }
   catch { toast('That file isn’t an S&A Ledger backup.'); return; }
-  const have = { expenses:state.items, income:state.income, transfers:state.transfers, accounts:state.accounts, checkins:state.checkins, invSnapshots:state.snaps, trips:state.trips };
+  const have = { expenses:state.items, income:state.income, transfers:state.transfers, accounts:state.accounts, checkins:state.checkins, invSnapshots:state.snaps, trips:state.trips, bookings:state.bookings };
   const rows = Object.entries(data.collections).filter(([c, v]) => RS_LABEL[c] && Array.isArray(v) && v.length).map(([c, v]) => {
     const ids = new Set((have[c] || []).map(x => x.id)), missing = c === 'settings' ? null : v.filter(x => !ids.has(x.id)).length;
     return `<li><span class="ok">•</span><span>${v.length} ${RS_LABEL[c]}</span><span class="n">${missing === null ? 'replaces current' : missing ? missing + ' not here now' : 'all already here'}</span></li>`; });
@@ -4237,7 +4905,7 @@ $('#rsForm').addEventListener('submit', async e => {
   const writes = [];
   for (const [c, v] of Object.entries(data.collections)){
     if (!RS_LABEL[c] || !Array.isArray(v)) continue;
-    for (const d of v){ if (!d || !d.id) continue; if (c === 'settings' && !['budgets','fire','fireInr','fx'].includes(d.id)) continue;
+    for (const d of v){ if (!d || !d.id) continue; if (c === 'settings' && !['budgets','fire','fireInr','fx','bookings'].includes(d.id)) continue;
       const { id, ...rest } = d; DERIVED.forEach(k => delete rest[k]); writes.push([c, id, rest]); }
   }
   $('#rsSave').disabled = true; $('#rsSave').textContent = 'Restoring…';

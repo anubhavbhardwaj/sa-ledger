@@ -38,3 +38,24 @@ The "Ask AI" button sends a compact summary of the ledger, budgets, accounts, in
 in the browser, to `netlify/functions/ask.mjs`. The function checks the Firebase sign-in (only the two members),
 adds the instructions and streams the answer from Groq. Set `GROQ_API_KEY` in Netlify (and optionally
 `GROQ_MODEL`, default `openai/gpt-oss-120b`). The key never reaches the browser.
+
+## Bookings (tickets, boarding passes, hotels)
+
+Trips have an itinerary. Add a booking from a trip ("+ Booking"), the Trips page, the menu, by sharing a PDF or
+screenshot to the installed app (Android share sheet), or by forwarding the confirmation email.
+
+- The browser reads the PDF (pdf.js from jsdelivr) and scans QR/Aztec/PDF417 codes with the built-in
+  BarcodeDetector (Chrome on Android and macOS; not Firefox, Safari or Chrome on Windows). Each code is kept as a
+  small image on the booking, ready to show full screen.
+- `netlify/functions/extract.mjs` (`/api/extract`) asks Groq to sort the text into bookings (one per flight leg,
+  train, stay…). Screenshots and scanned PDFs go to a vision model (`GROQ_VISION_MODEL`, default
+  `meta-llama/llama-4-scout-17b-16e-instruct`). Uses the same `GROQ_API_KEY`.
+- `netlify/functions/booking-file.mjs` (`/api/booking-file`) keeps the original file in Google Drive, folder
+  "S&A Ledger bookings", using the same `GDRIVE_*` variables as the backup. Files up to 4 MB.
+- Forwarded emails: `netlify/functions/inbound.mjs` (`/api/inbound`) receives Postmark's inbound webhook.
+  1. Create a free Postmark account and a server; open the server's **Default Inbound Stream → Settings**.
+  2. Set the webhook URL to `https://<your-site>/api/inbound?token=<INBOUND_TOKEN>`.
+  3. In Netlify add `INBOUND_TOKEN` (a long random string) and `BOOKING_SENDERS` (comma-separated addresses
+     allowed to forward, for example both of yours).
+  4. Copy the inbound address (`…@inbound.postmarkapp.com`) into the app: Add booking → "Add your forwarding
+     address". Gmail auto-forward filters work too (the original sender is accepted when Gmail marks the forward).
