@@ -32,7 +32,7 @@ export async function handle(req, { env = process.env, save, fetch: f = fetch, n
   const url = new URL(req.url);
   const want = String(env.INBOUND_TOKEN || '').trim(), got = String(url.searchParams.get('token') || '').trim();
   if (!want) return json(503, { error: 'INBOUND_TOKEN is not set for functions in Netlify (or the site was not redeployed after adding it).' });
-  if (got !== want) return json(403, { error: `Wrong token: the script sent ${got.length} characters starting "${got.slice(0, 3)}", Netlify has ${want.length} starting "${want.slice(0, 3)}".` });
+  if (got !== want) return json(403, { error: `Wrong token: the script sent ${got.length} characters, Netlify expects ${want.length}.` });
   let m; try { m = await req.json(); } catch { return json(400, { error: 'Bad request' }); }
 
   // A forward from one of you, or a Gmail auto-forward filter (which keeps the airline as sender but adds X-Forwarded-For).
