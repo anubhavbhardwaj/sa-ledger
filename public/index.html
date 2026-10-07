@@ -646,7 +646,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <button class="pm-item pm-alert" role="menuitem" type="button" data-addbk="" id="pmBkInbox" hidden><span>Forwarded bookings</span><small id="pmBkInboxN"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-addbk=""><span>Add booking</span><small>ticket, PDF or screenshot</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
-        <button class="pm-item" role="menuitem" type="button" data-pm="alerts"><span>Flight alerts</span><small id="pmAlerts">off on this phone</small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="alerts"><span>Notifications</span><small id="pmAlerts">off on this phone</small></button>
         <hr>
         <button class="pm-item" role="menuitem" type="button" data-pm="import"><span>Import CSV</span><small>into expenses</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="export"><span>Export CSV</span><small>current transactions view</small></button>
@@ -1051,7 +1051,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 
 <dialog id="alDlg">
   <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:460px">
-    <h3>Flight alerts</h3>
+    <h3>Notifications</h3>
     <div id="alBody" style="display:grid;gap:10px;font-size:14px"></div>
     <p class="err" id="alErr" hidden></p>
     <div class="dlg-actions"><button class="btn danger" type="button" id="alOff" hidden>Turn off here</button>
@@ -1254,6 +1254,7 @@ onAuthStateChanged(auth, user => {
   }, onErr('trips')));
   route();
   if (state.wantShare){ state.wantShare = false; takeShared(); }
+  if (state.wantAdd){ state.wantAdd = false; setTimeout(openAdd, 300); }
   refreshAlerts();
 });
 
@@ -1337,7 +1338,7 @@ const periodName = () => state.period === 'all' ? 'All time' : monthLabel(state.
 // ---------- routing ----------
 function route(){
   const h = location.hash.replace('#','');
-  if (h === 'add'){ history.replaceState(null, '', '#overview'); if (state.user) setTimeout(openAdd, 0); }
+  if (h === 'add'){ history.replaceState(null, '', '#overview'); if (state.user) setTimeout(openAdd, 0); else state.wantAdd = true; }
   if (h === 'accounts'){ state.wv = 'cash'; history.replaceState(null, '', '#wealth'); }
   // Something shared to the app (see sw.js): open it as a booking once signed in.
   if (h === 'share'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(takeShared, 0); else state.wantShare = true; }
@@ -4907,7 +4908,7 @@ async function fcmToken(){
 }
 async function saveToken(token){
   const u = state.user || auth.currentUser;
-  await setDoc(doc(fs, 'pushTokens', token), { email: u.email.toLowerCase(), user: ME(), createdAt: new Date().toISOString(), device: navigator.userAgent.slice(0, 120) });
+  await setDoc(doc(fs, 'pushTokens', token), { email: u.email.toLowerCase(), user: ME(), createdAt: new Date().toISOString(), device: navigator.userAgent.slice(0, 120), daily: lsGet('dailyReminder', true) !== false });
   lsSet('alertsToken', token);
 }
 async function enableAlerts(){
@@ -4932,7 +4933,8 @@ async function refreshAlerts(){
 function openAlerts(){
   const on = alertsOn();
   $('#alBody').innerHTML = `<p style="margin:0">${on ? '<strong>On for this phone.</strong> ' : ''}This phone will get a notification when:</p>
-    <ul style="margin:0;padding-left:18px;display:grid;gap:4px"><li>a flight of either of you is delayed 15+ minutes, back on time, or cancelled</li><li>your own flight gets its gate</li><li>the other one’s plane takes off and lands</li></ul>
+    <ul style="margin:0;padding-left:18px;display:grid;gap:4px"><li>a flight of either of you is delayed 15+ minutes, back on time, or cancelled</li><li>your own flight gets its gate</li><li>the other one’s plane takes off and lands</li><li>at 21:00, if you haven’t added anything that day or something is waiting for review</li></ul>
+    <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="alDaily" ${lsGet('dailyReminder', true) !== false ? 'checked' : ''}> Evening reminder at 21:00</label>
     <p class="muted" style="margin:0;font-size:12.5px">Turn it on separately on each phone, signed in as yourself. ${isIOS ? 'On an iPhone it works from the app added to the Home Screen. ' : ''}Status is checked about 10 times per flight: from 3 hours before departure, more often in the last hour, and around the landing.</p>`;
   $('#alOn').hidden = on; $('#alOff').hidden = !on; $('#alTest').hidden = !on; $('#alErr').hidden = true;
   if (!$('#alDlg').open) $('#alDlg').showModal();
@@ -4940,10 +4942,15 @@ function openAlerts(){
 const alFail = x => { $('#alErr').textContent = x.message || String(x); $('#alErr').hidden = false; };
 $('#alOn').addEventListener('click', async () => {
   const b = $('#alOn'); b.disabled = true; b.textContent = 'Turning on…';
-  try { await enableAlerts(); refreshAlerts(); openAlerts(); toast('Flight alerts on for this phone'); if (state.page === 'overview') renderNextUp(); }
+  try { await enableAlerts(); refreshAlerts(); openAlerts(); toast('Notifications on for this phone'); if (state.page === 'overview') renderNextUp(); }
   catch (x){ alFail(x); } finally { b.disabled = false; b.textContent = 'Turn on'; }
 });
-$('#alOff').addEventListener('click', async () => { await disableAlerts(); refreshAlerts(); openAlerts(); toast('Flight alerts off for this phone'); });
+$('#alBody').addEventListener('change', async e => {
+  if (e.target.id !== 'alDaily') return;
+  lsSet('dailyReminder', e.target.checked);
+  if (alertsOn()) try { await saveToken(lsGet('alertsToken', null)); toast(e.target.checked ? 'Evening reminder on for this phone' : 'Evening reminder off for this phone'); } catch (x){ alFail(x); }
+});
+$('#alOff').addEventListener('click', async () => { await disableAlerts(); refreshAlerts(); openAlerts(); toast('Notifications off for this phone'); });
 $('#alTest').addEventListener('click', async () => {
   const b = $('#alTest'); b.disabled = true;
   try { const r = await api('/api/push', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"test":true}' }); const j = await r.json(); toast(`Test sent to ${j.sent} phone${j.sent === 1 ? '' : 's'} of yours`); }

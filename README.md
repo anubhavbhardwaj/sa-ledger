@@ -82,3 +82,10 @@ Setup:
 2. Firebase console → Project settings → Cloud Messaging → Web Push certificates → Generate key pair. Copy the
    public key into Netlify as `FCM_VAPID_KEY`. Check that "Firebase Cloud Messaging API (V1)" is enabled.
 3. Redeploy, then on each phone: menu → Flight alerts → Turn on → Send a test.
+
+### Evening reminder
+
+`netlify/functions/daily.mjs` runs at 21:00 Berlin/Rome time (scheduled at 19:00 and 20:00 UTC; it acts on the one
+that is 21:00 locally). Each of you gets a nudge if you haven't added anything that day, or if captured payments or
+forwarded bookings are waiting. Quiet when the day is logged and nothing is pending. Switch it off per phone in
+menu → Notifications.

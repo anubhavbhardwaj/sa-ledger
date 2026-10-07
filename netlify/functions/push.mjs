@@ -12,7 +12,7 @@ export async function handle(req, { env = process.env, verify = verifyToken, loa
   const m = await member(req, verify); if (m.res) return m.res;
   const tokens = await loadTokens(m.email);
   if (!tokens.length) return json(400, { error: 'This account has no phone signed up for alerts yet. Turn alerts on first.' });
-  const dead = await sendTo(tokens, { title: 'Flight alerts are on', body: 'You’ll hear about delays, gates, take-offs and landings here.', tag: 'test' }, send);
+  const dead = await sendTo(tokens, { title: 'Notifications are on', body: 'Flight alerts and the 21:00 reminder will show up like this.', tag: 'test' }, send);
   if (dead.length) await dropTokens(dead);
   return json(200, { sent: tokens.length - dead.length, phones: tokens.length });
 }

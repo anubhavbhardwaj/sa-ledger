@@ -246,11 +246,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Phones signed up for flight alerts. Document id is the phone's push token; each person manages their own.
+    // Phones signed up for notifications (flight alerts, and the 21:00 reminder when daily is not false).
+    // Document id is the phone's push token; each person manages their own.
     function validPushToken() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['email','user','createdAt','device'])
+      return d.keys().hasOnly(['email','user','createdAt','device','daily'])
         && d.email == request.auth.token.email
+        && (!('daily' in d) || d.daily is bool)
         && str(d.user, 20) && str(d.createdAt, 40)
         && (!('device' in d) || str(d.device, 200));
     }
