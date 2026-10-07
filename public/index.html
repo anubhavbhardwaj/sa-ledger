@@ -1274,6 +1274,7 @@ onAuthStateChanged(auth, user => {
   route();
   if (state.wantShare){ state.wantShare = false; takeShared(); }
   if (state.wantAdd){ state.wantAdd = false; setTimeout(openAdd, 300); }
+  if (state.wantBkInbox){ state.wantBkInbox = false; setTimeout(openBkInboxFromLink, 600); }
   refreshAlerts();
 });
 
@@ -1361,8 +1362,10 @@ function route(){
   if (h === 'accounts'){ state.wv = 'cash'; history.replaceState(null, '', '#wealth'); }
   // Something shared to the app (see sw.js): open it as a booking once signed in.
   if (h === 'share'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(takeShared, 0); else state.wantShare = true; }
+  // From a "New booking to add" notification: open the forwarded booking (or the list when there are several).
+  if (h === 'bookings'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(openBkInboxFromLink, 0); else state.wantBkInbox = true; }
   if (h === 'booking'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(() => bkOpen({ source: 'upload' }), 0); }
-  state.page = h === 'accounts' ? 'wealth' : h === 'share' || h === 'booking' ? 'trips' : PAGES.includes(h) ? h : 'overview';
+  state.page = h === 'accounts' ? 'wealth' : h === 'share' || h === 'booking' || h === 'bookings' ? 'trips' : PAGES.includes(h) ? h : 'overview';
   if (state.page !== 'trips') state.openTrip = null;
   if (state.page !== 'wealth') state.openAcc = null;
   $('#months').hidden = state.page === 'trips' || state.page === 'wealth';
@@ -4835,6 +4838,11 @@ function renderBkPick(){
   const em = state.bkSettings?.email;
   $('#bkFwd').innerHTML = em ? `Or forward confirmation emails to <code>${esc(em)}</code> <button type="button" class="linkbtn" data-bkcopy>Copy</button> · <button type="button" class="linkbtn" data-bkemail>Change</button>`
     : `Prefer forwarding emails? <button type="button" class="linkbtn" data-bkemail>Add your forwarding address</button>`;
+}
+// The inbox may still be loading when the app opens from a notification: wait a moment for it.
+async function openBkInboxFromLink(tries = 0){
+  if (!state.bkInbox.length && tries < 10) return setTimeout(() => openBkInboxFromLink(tries + 1), 300);
+  if (state.bkInbox.length === 1) bkFromInbox(state.bkInbox[0].id); else bkOpen({ source: 'email' });
 }
 async function bkFromInbox(id){
   const it = state.bkInbox.find(x => x.id === id); if (!it) return;

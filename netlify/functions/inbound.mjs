@@ -11,6 +11,7 @@
 import { firestore, json, MEMBERS } from '../lib/members.mjs';
 import { driveClient, BOOKINGS_FOLDER as FOLDER } from '../lib/drive.mjs';
 import { beat } from '../lib/health.mjs';
+import { sendTo, PEOPLE } from '../lib/push.mjs';
 
 
 const MAX_TEXT = 30000;
@@ -29,7 +30,7 @@ export function htmlToText(h) {
 
 const allowed = env => (env.BOOKING_SENDERS || MEMBERS[0]).split(/[,\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
 
-export async function handle(req, { env = process.env, save, heartbeat, fetch: f = fetch, now = () => new Date() } = {}) {
+export async function handle(req, { env = process.env, save, heartbeat, notify, fetch: f = fetch, now = () => new Date() } = {}) {
   if (req.method !== 'POST') return json(405, { error: 'Use POST' });
   const url = new URL(req.url);
   const want = String(env.INBOUND_TOKEN || '').trim(), got = String(url.searchParams.get('token') || '').trim();
@@ -98,12 +99,29 @@ export async function handle(req, { env = process.env, save, heartbeat, fetch: f
   if (skipped.length) item.skipped = skipped.map(s => String(s).slice(0, 140)).slice(0, 10);
   if (fileError) item.fileError = fileError;
   await save(id, item);
+  // Phone notification: to whoever forwarded it when that's one of you, else to both.
+  if (notify) try {
+    const who = PEOPLE[from] ? [PEOPLE[from]] : Object.values(PEOPLE);
+    const subject = item.subject.replace(/^((fwd?|wg|tr|re|i):\s*)+/i, '').trim() || 'Forwarded email';
+    await notify(who, { title: 'New booking to add', body: subject.slice(0, 120) + (files.length ? ' · ' + files.length + ' attachment' + (files.length === 1 ? '' : 's') : '') + '. Tap to review.', tag: 'bkinbox-' + id, url: '/#bookings' });
+  } catch (e) { console.error('inbound notify failed', e?.message); }
   if (heartbeat) await heartbeat('inbound', fileError ? { ok: false, error: 'Attachments not kept: ' + fileError } : { info: item.subject.slice(0, 80) });
   return json(200, { ok: true, id, files: files.length });
 }
 
 export default async (req) => {
-  try { return await handle(req, { save: (id, item) => firestore().collection('bookingInbox').doc(id).set(item), heartbeat: (job, d) => beat(firestore(), job, d) }); }
+  try {
+    return await handle(req, {
+      save: (id, item) => firestore().collection('bookingInbox').doc(id).set(item),
+      heartbeat: (job, d) => beat(firestore(), job, d),
+      notify: async (people, msg) => {
+        const db = firestore(), tokens = (await db.collection('pushTokens').get()).docs.map(d => ({ id: d.id, ...d.data() })).filter(t => people.includes(PEOPLE[t.email]));
+        if (!tokens.length) return;
+        const dead = await sendTo(tokens, msg);
+        await Promise.all(dead.map(id => db.collection('pushTokens').doc(id).delete()));
+      },
+    });
+  }
   catch (e) { console.error('inbound failed', e); return json(500, { error: 'failed' }); }
 };
 
