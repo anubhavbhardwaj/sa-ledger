@@ -19,28 +19,38 @@ function midnight(now) {
   return new Date(day + 'T00:00:00Z');
 }
 
-export function message(person, { added, inbox, bookings }) {
+// "Return flight (Munich visit) by tomorrow" for things to book that are due within 3 days or overdue.
+export function dueLines(toBook, trips, today) {
+  const add = (d, k) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + k); return x.toISOString().slice(0, 10); };
+  return toBook.filter(x => !x.done && x.byDate && x.byDate <= add(today, 3) && trips[x.tripId])
+    .sort((a, b) => a.byDate.localeCompare(b.byDate))
+    .map(x => `${x.what} (${trips[x.tripId].name}) ${x.byDate < today ? 'is overdue' : x.byDate === today ? 'by today' : x.byDate === add(today, 1) ? 'by tomorrow' : 'by ' + x.byDate.slice(8) + '.' + x.byDate.slice(5, 7) + '.'}`);
+}
+
+export function message(person, { added, inbox, bookings, due = [] }) {
   const waiting = [inbox ? `${inbox} captured payment${inbox === 1 ? '' : 's'}` : '', bookings ? `${bookings} forwarded booking${bookings === 1 ? '' : 's'}` : ''].filter(Boolean);
-  if (added && !waiting.length) return null;                // logged the day, nothing pending: stay quiet
+  if (added && !waiting.length && !due.length) return null;  // logged the day, nothing pending: stay quiet
   const w = waiting.length ? waiting.join(' and ') + (inbox + bookings > 1 ? ' are' : ' is') + ' waiting.' : '';
+  const d = due.length ? ' To book: ' + due.slice(0, 3).join('; ') + (due.length > 3 ? ` and ${due.length - 3} more` : '') + '.' : '';
   return {
-    title: added ? 'Things to review' : 'Anything to add today?',
-    body: added ? `You added ${added} today. ${w}` : `Nothing added today, ${person}. ${w || 'Tap to add today’s spending.'}`.trim(),
-    url: waiting.length ? '/#overview' : '/#add', tag: 'daily',
+    title: added ? (due.length && !waiting.length ? 'Bookings due soon' : 'Things to review') : 'Anything to add today?',
+    body: (added ? `You added ${added} today. ${w}` : `Nothing added today, ${person}. ${w || (d ? '' : 'Tap to add today’s spending.')}`).trim() + d,
+    url: waiting.length || due.length ? '/#overview' : '/#add', tag: 'daily',
   };
 }
 
-export async function run({ now = new Date(), force = false, loadTokens, countAdded, countInbox, countBookings, dropTokens, send }) {
+export async function run({ now = new Date(), force = false, loadTokens, countAdded, countInbox, countBookings, loadToBook = async () => ({ toBook: [], trips: {} }), dropTokens, send }) {
   if (!force && local(now, { hour: '2-digit', hourCycle: 'h23' }) !== '21') return { skipped: 'not 21:00 in ' + TZ };
   const tokens = (await loadTokens()).filter(t => t.daily !== false);
   if (!tokens.length) return { sent: 0 };
   const since = midnight(now).toISOString();
-  const [inbox, bookings] = await Promise.all([countInbox(), countBookings()]);
+  const [inbox, bookings, tb] = await Promise.all([countInbox(), countBookings(), loadToBook()]);
+  const due = dueLines(tb.toBook, tb.trips, local(now, { year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-'));
   const out = { sent: 0, quiet: [] };
   for (const person of Object.values(PEOPLE)) {
     const mine = tokens.filter(t => PEOPLE[t.email] === person);
     if (!mine.length) continue;
-    const msg = message(person, { added: await countAdded(USERNAME[person], since), inbox, bookings });
+    const msg = message(person, { added: await countAdded(USERNAME[person], since), inbox, bookings, due });
     if (!msg) { out.quiet.push(person); continue; }
     const dead = await sendTo(mine, msg, send);
     out.sent += mine.length - dead.length;
@@ -62,6 +72,10 @@ export default async () => {
       },
       countInbox: async () => (await db.collection('inbox').get()).size,
       countBookings: async () => (await db.collection('bookingInbox').get()).size,
+      loadToBook: async () => ({
+        toBook: (await db.collection('toBook').where('done', '==', false).get()).docs.map(d => d.data()),
+        trips: Object.fromEntries((await db.collection('trips').get()).docs.map(d => [d.id, d.data()])),
+      }),
       dropTokens: ids => Promise.all(ids.map(id => db.collection('pushTokens').doc(id).delete())),
     });
     console.log('daily', JSON.stringify(res));

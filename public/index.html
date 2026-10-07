@@ -267,6 +267,18 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .hrow.ok i{background:var(--good)} .hrow.warn i{background:var(--warn)} .hrow.bad i{background:var(--danger)}
 .hrow small{display:block;color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
 .hrow.bad small.e{color:var(--danger)}
+.tblist{display:grid}
+.tbrow{display:grid;grid-template-columns:22px 24px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 2px;border-bottom:1px solid var(--line)}
+.tbrow input{width:18px;height:18px;accent-color:var(--accent)}
+.tbrow .ic{font-size:17px;text-align:center}
+.tbrow .tbmain{cursor:pointer;min-width:0}
+.tbrow .tbmain small{display:block;color:var(--muted);font-size:12.5px}
+.tbrow.done strong{text-decoration:line-through;color:var(--muted);font-weight:500}
+.tbl.warn{color:var(--warn);font-weight:600} .tbl.bad{color:var(--danger);font-weight:600}
+.tbform{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:10px;margin-bottom:10px}
+.tbchips{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.tbdone summary{cursor:pointer;color:var(--muted);font-size:13px;padding:8px 2px}
+.tbcount{color:var(--warn);font-weight:600}
 /* inbox */
 .inboxbtn{position:relative;gap:6px}
 .inboxbtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:var(--surface);font-size:11px;line-height:18px;text-align:center;font-weight:700}
@@ -1154,6 +1166,7 @@ const pickDoc = (keys, it, over = {}) => { const o = {}; for (const k of keys){ 
 const tripsCol = collection(fs, "trips");
 const inboxCol = collection(fs, "inbox");
 const bookingsCol = collection(fs, "bookings");
+const toBookCol = collection(fs, "toBook");
 const bkInboxCol = collection(fs, "bookingInbox");
 const TRIP_TYPE = { visit:'Visit', holiday:'Holiday', other:'Other', office:'Office' };
 const TRIP_KIND = { visit:'Visits', holiday:'Holidays', other:'Other trips', office:'Office trips' };
@@ -1182,7 +1195,7 @@ const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' +
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], toBook:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -1258,6 +1271,10 @@ onAuthStateChanged(auth, user => {
     state.flightStatus = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
     if (state.page === 'overview') renderNextUp();
     if ($('#bkvDlg').open && state.viewBk) openBooking(state.viewBk);
+  }, () => {}));
+  unsubs.push(onSnapshot(toBookCol, snap => {
+    state.toBook = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    render();
   }, () => {}));
   unsubs.push(onSnapshot(bookingsCol, snap => {
     state.bookings = snap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -2380,7 +2397,7 @@ function tripCard(t){
   return `<button type="button" class="tcard" data-trip="${esc(t.id)}">
     <span class="top"><span class="ttype"><i style="background:${TRIP_DOT[t.type]}"></i>${TRIP_TYPE[t.type]}</span><span class="tmeta">${fmtRange(t.start, t.end)}</span></span>
     <span class="tname">${esc(t.name)}${t.closed ? ' <span class="tag">finished</span>' : ''}</span>
-    <span class="tmeta">${esc(t.traveller)} · ${ex.length} entr${ex.length===1?'y':'ies'}${(n => n ? ' · ' + n + ' booking' + (n===1?'':'s') : '')(state.bookings.filter(b => b.tripId === t.id).length)}${cats[0] ? ' · mostly ' + esc(cats[0].key) : ''}</span>
+    <span class="tmeta">${esc(t.traveller)} · ${ex.length} entr${ex.length===1?'y':'ies'}${(n => n ? ' · ' + n + ' booking' + (n===1?'':'s') : '')(state.bookings.filter(b => b.tripId === t.id).length)}${(n => n ? ' · <span class="tbcount">' + n + ' to book</span>' : '')(state.toBook.filter(x => x.tripId === t.id && !x.done).length)}${cats[0] ? ' · mostly ' + esc(cats[0].key) : ''}</span>
     <span class="ttotal">${eur.format(total)}</span>${mix}${budget}
   </button>`;
 }
@@ -2455,6 +2472,7 @@ function renderTripDetail(t){
       <div style="display:flex;justify-content:flex-end"><button class="btn primary" type="button" id="attachGo" disabled>Attach selected</button></div>`
       : `<p class="empty" style="margin:0">No unlinked expenses ${t.start && !state.attachAll ? 'around these dates. Try “Show all dates”.' : 'match.'}</p>`}
     </section>` : ''}
+    ${tbPanel(t)}
     ${bkPanel(t)}
     <div class="grid">
       <section class="panel span-5"><header><h2>By category</h2></header>
@@ -4776,6 +4794,12 @@ $('#bkForm').addEventListener('submit', async e => {
       if (linkOf.has(it) && d.tripId) expTrip.set(linkOf.get(it), d.tripId);
     }
     // A linked expense that isn't in a trip yet joins the booking's trip.
+    // A matching "to book" item (same trip and type, same day if it has one) is ticked off.
+    for (const it of items){
+      const tid = tripOfItem.get(it); if (!tid) continue;
+      const x = state.toBook.find(x => !x.done && x.tripId === tid && tbFam(x.type) === tbFam(it.type) && (!x.forDate || !it.start || x.forDate === it.start.slice(0, 10)));
+      if (x){ x.done = true; batch.set(doc(fs, 'toBook', x.id), pickDoc(TB_KEYS, { ...x, done: true, bookingId: ids[items.indexOf(it)], updatedBy: me })); }
+    }
     for (const [eid, tid] of expTrip){ const ex = state.items.find(i => i.id === eid); if (ex && !ex.tripId) batch.set(doc(fs, 'expenses', eid), expenseDoc(ex, { tripId: tid })); }
     await batch.commit();
     if (S.inboxId) try { await deleteDoc(doc(fs, 'bookingInbox', S.inboxId)); } catch {}
@@ -5068,6 +5092,91 @@ function bkItinerary(list, { dayLabels = true, from = '', to = '9999' } = {}){
   }
   return out;
 }
+// --- to book: what still needs booking for a trip, for which date and by when ---
+const tbFam = t => ['flight','train','bus','ferry'].includes(t) ? 'travel' : t;   // a train can replace a planned flight
+const TB_KEYS = ['tripId','what','type','forDate','byDate','price','note','done','bookingId','createdAt','createdBy','updatedBy'];
+const daysTo = d => Math.round((new Date(d + 'T12:00:00') - new Date(today() + 'T12:00:00')) / 864e5);
+function tbDue(x){
+  if (!x.byDate) return 'no deadline';
+  const n = daysTo(x.byDate);
+  return n < 0 ? `<span class="tbl bad">${-n} day${n === -1 ? '' : 's'} overdue</span>` : n === 0 ? '<span class="tbl bad">book today</span>' : n === 1 ? '<span class="tbl warn">book by tomorrow</span>'
+    : `<span class="tbl ${n <= 7 ? 'warn' : ''}">book by ${shortDate(x.byDate)} · ${n} days</span>`;
+}
+// Sensible deadlines: flights about 6 weeks ahead, trains and stays about 3, the rest 2; never before today.
+const TB_LEAD = { flight: 42, train: 21, hotel: 21, car: 21, bus: 14, ferry: 14, event: 14, restaurant: 7, other: 14 };
+const tbBy = (type, forDate) => { if (!forDate) return ''; const d = addDays(forDate, -(TB_LEAD[type] || 14)); return d < today() ? today() : d; };
+function tbPanel(t){
+  const list = state.toBook.filter(x => x.tripId === t.id).sort((a, b) => (a.done - b.done) || (a.byDate || '9').localeCompare(b.byDate || '9'));
+  const open = list.filter(x => !x.done), done = list.filter(x => x.done);
+  const ed = state.tbEdit && state.tbEdit.tripId === t.id ? state.tbEdit : null;
+  const row = x => `<div class="tbrow ${x.done ? 'done' : ''}">
+      <input type="checkbox" data-tbdone="${esc(x.id)}" ${x.done ? 'checked' : ''} aria-label="Booked">
+      <span class="ic" aria-hidden="true">${(BK_TYPES[x.type] || BK_TYPES.other)[0]}</span>
+      <span class="tbmain" data-tbedit="${esc(x.id)}" role="button" tabindex="0"><strong>${esc(x.what)}</strong>
+        <small>${x.forDate ? 'for ' + wday(x.forDate) + ' ' + shortDate(x.forDate) + ' · ' : ''}${x.done ? (x.bookingId ? 'booked, in the itinerary' : 'booked') : tbDue(x)}${x.price ? ' · about ' + eur0.format(x.price) : ''}${x.note ? ' · ' + esc(x.note) : ''}</small></span>
+      ${x.done ? '' : `<button class="btn small" type="button" data-tbbook="${esc(x.id)}" title="Add the booking (PDF, screenshot or email)">+ Booking</button>`}
+    </div>`;
+  const form = ed ? `<div class="tbform" id="tbForm">
+      <div class="fields">
+        <label class="f full">What to book<input id="tbWhat" value="${esc(ed.what || '')}" placeholder="e.g. Return flight Rome → Munich" autocomplete="off"></label>
+        <label class="f">Type<select id="tbType">${Object.entries(BK_TYPES).map(([k, [ic, l]]) => `<option value="${k}" ${k === (ed.type || 'flight') ? 'selected' : ''}>${ic} ${l}</option>`).join('')}</select></label>
+        <label class="f">Expected price (€)<input id="tbPrice" type="number" min="0" step="1" inputmode="decimal" value="${ed.price || ''}"></label>
+        <label class="f">For (date)<input id="tbFor" type="date" value="${ed.forDate || ''}"></label>
+        <label class="f">Book by<input id="tbBy" type="date" value="${ed.byDate || ''}"></label>
+        <label class="f full">Note<input id="tbNote" value="${esc(ed.note || '')}" placeholder="e.g. window seat, flexible fare" autocomplete="off"></label>
+      </div>
+      <p class="err" id="tbErr" hidden></p>
+      <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap">
+        ${ed.id ? '<button class="btn danger small" type="button" id="tbDel">Delete</button>' : '<span></span>'}
+        <span style="display:flex;gap:8px"><button class="btn small" type="button" id="tbCancel">Cancel</button><button class="btn primary small" type="button" id="tbSave">${ed.id ? 'Save' : 'Add'}</button></span>
+      </div></div>` : '';
+  // One-tap starters for what most trips need.
+  const chips = !ed && t.start ? [['flight', 'Outbound journey', t.start], t.end && t.end !== t.start ? ['flight', 'Return journey', t.end] : null, t.type !== 'visit' ? ['hotel', 'Place to stay', t.start] : null]
+    .filter(c => c && !list.some(x => x.what === c[1]) && !state.bookings.some(b => b.tripId === t.id && (b.start || '').slice(0, 10) === c[2] && tbFam(b.type) === tbFam(c[0]))) : [];
+  return `<section class="panel"><header><h2>To book</h2><span class="right"><button class="btn small" type="button" data-tbnew="${esc(t.id)}">+ Add</button></span></header>
+    ${form}
+    ${open.length ? `<div class="tblist">${open.map(row).join('')}</div>` : !ed ? `<p class="empty" style="margin:0 0 6px">Nothing left to book${list.length ? '. ' : '. Add what still needs booking, with the date it’s for and a deadline.'}</p>` : ''}
+    ${chips.length ? `<div class="tbchips">${chips.map(([type, what, d]) => `<button class="btn small" type="button" data-tbchip="${esc(t.id)}|${type}|${esc(what)}|${d}">+ ${esc(what)} (${shortDate(d)})</button>`).join('')}</div>` : ''}
+    ${done.length ? `<details class="tbdone"><summary>${done.length} booked</summary><div class="tblist">${done.map(row).join('')}</div></details>` : ''}
+  </section>`;
+}
+function tbCollect(){
+  const v = id => $('#' + id)?.value.trim() || '';
+  const ed = state.tbEdit; if (!ed || !$('#tbForm')) return ed;
+  Object.assign(ed, { what: v('tbWhat'), type: v('tbType') || 'other', forDate: v('tbFor'), byDate: v('tbBy'), note: v('tbNote'), price: parseFloat(v('tbPrice')) > 0 ? Math.round(parseFloat(v('tbPrice'))) : null });
+  return ed;
+}
+async function tbSave(){
+  const ed = tbCollect(), err = $('#tbErr'), me = usernameOf(state.user);
+  if (!ed.what){ err.textContent = 'Say what to book.'; err.hidden = false; return; }
+  if (ed.byDate && ed.forDate && ed.byDate > ed.forDate){ err.textContent = 'The deadline is after the date it’s for.'; err.hidden = false; return; }
+  const old = ed.id ? state.toBook.find(x => x.id === ed.id) || {} : {};
+  const d = pickDoc(TB_KEYS, { ...old, ...ed, done: !!old.done, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || me, updatedBy: ed.id ? me : null });
+  try { if (ed.id) await setDoc(doc(fs, 'toBook', ed.id), d); else await addDoc(toBookCol, d); state.tbEdit = null; render(); toast(ed.id ? 'Saved' : 'Added to the list'); }
+  catch (x){ err.textContent = writeError(x); err.hidden = false; }
+}
+document.addEventListener('click', async e => {
+  const t = e.target;
+  const nw = t.closest('[data-tbnew]'); if (nw){ state.tbEdit = { tripId: nw.dataset.tbnew, type: 'flight' }; render(); $('#tbWhat')?.focus(); return; }
+  const ch = t.closest('[data-tbchip]'); if (ch){ const [tripId, type, what, d] = ch.dataset.tbchip.split('|'); state.tbEdit = { tripId, type, what, forDate: d, byDate: tbBy(type, d) }; render(); $('#tbWhat')?.focus(); return; }
+  const edt = t.closest('[data-tbedit]'); if (edt){ const x = state.toBook.find(y => y.id === edt.dataset.tbedit); if (x){ state.tbEdit = { ...x }; render(); } return; }
+  if (t.id === 'tbCancel'){ state.tbEdit = null; render(); return; }
+  if (t.id === 'tbSave'){ tbSave(); return; }
+  if (t.id === 'tbDel'){
+    if (!t.classList.contains('armed')){ t.classList.add('armed'); t.textContent = 'Confirm delete'; return; }
+    try { await deleteDoc(doc(fs, 'toBook', state.tbEdit.id)); state.tbEdit = null; render(); toast('Removed'); } catch (x){ toast(writeError(x)); } return;
+  }
+  const dn = t.closest('[data-tbdone]'); if (dn){ const x = state.toBook.find(y => y.id === dn.dataset.tbdone); if (!x) return;
+    try { await setDoc(doc(fs, 'toBook', x.id), pickDoc(TB_KEYS, { ...x, done: dn.checked, updatedBy: usernameOf(state.user) })); toast(dn.checked ? 'Marked as booked' : 'Back on the list'); } catch (x2){ toast(writeError(x2)); } return; }
+  const bk = t.closest('[data-tbbook]'); if (bk){ const x = state.toBook.find(y => y.id === bk.dataset.tbbook); if (x) bkOpen({ source: 'upload', tripSel: x.tripId }); return; }
+  const op = t.closest('[data-tbopen]'); if (op){ state.openTrip = op.dataset.tbopen; state.attachOpen = false; if (state.page !== 'trips') location.hash = 'trips'; else render(); window.scrollTo(0, 0); return; }
+});
+// Typing a "for" date suggests a deadline, until you set one yourself.
+document.addEventListener('change', e => {
+  if (e.target.id === 'tbFor' || e.target.id === 'tbType'){ const by = $('#tbBy'); if (by && (!by.value || by.dataset.auto !== '0')) by.value = tbBy($('#tbType').value, $('#tbFor').value); }
+  if (e.target.id === 'tbBy') e.target.dataset.auto = '0';
+});
+
 function bkPanel(t){
   const bl = state.bookings.filter(b => b.tripId === t.id);
   return `<section class="panel"><header><h2>Itinerary</h2><span class="right"><button class="btn small" type="button" data-addbk="${esc(t.id)}">+ Booking</button></span></header>
@@ -5096,8 +5205,11 @@ function renderNextUp(){
   // Trips starting soon with nothing booked yet.
   const bare = state.trips.filter(t => t.start && t.start >= td && t.start <= lim && !state.bookings.some(b => b.tripId === t.id));
   const tripNudge = bare.map(t => `<div class="bkact"><span><strong>${esc(t.name)}</strong> starts ${t.start === td ? 'today' : t.start === addDays(td, 1) ? 'tomorrow' : 'in 2 days'}. Add your tickets to have them here.</span><button class="btn small" type="button" data-addbk="${esc(t.id)}">+ Booking</button></div>`).join('');
-  el.hidden = !soon.length && !bare.length;
-  if (!el.hidden) el.innerHTML = `<header><h2>Coming up</h2><span class="hint">${soon.length ? 'Tap for details' : ''}</span></header>${acts}${tripNudge}${soon.length ? `<div class="itin">${bkItinerary(soon, { dayLabels: false, from: td, to: lim })}</div>` : ''}`;
+  // Things to book that are overdue or due within a week.
+  const due = state.toBook.filter(x => !x.done && x.byDate && x.byDate <= addDays(td, 7) && state.tripMap[x.tripId]).sort((a, b) => a.byDate.localeCompare(b.byDate));
+  const tbNudge = due.map(x => `<div class="bkact ${x.byDate < td ? 'warn' : ''}"><span><strong>Book ${esc(x.what)}</strong> for ${esc(state.tripMap[x.tripId].name)}${x.forDate ? ' (' + shortDate(x.forDate) + ')' : ''} · ${tbDue(x)}</span><button class="btn small" type="button" data-tbopen="${esc(x.tripId)}">Open trip</button></div>`).join('');
+  el.hidden = !soon.length && !bare.length && !due.length;
+  if (!el.hidden) el.innerHTML = `<header><h2>Coming up</h2><span class="hint">${soon.length ? 'Tap for details' : ''}</span></header>${tbNudge}${acts}${tripNudge}${soon.length ? `<div class="itin">${bkItinerary(soon, { dayLabels: false, from: td, to: lim })}</div>` : ''}`;
 }
 function openBooking(id){
   const b = state.bookings.find(x => x.id === id); if (!b) return;
@@ -5217,7 +5329,7 @@ document.addEventListener('click', async e => {
 
 // ---------- backup & restore ----------
 const BK_COLS = { expenses:() => state.items, income:() => state.income, transfers:() => state.transfers, accounts:() => state.accounts,
-  checkins:() => state.checkins, invSnapshots:() => state.snaps, trips:() => state.trips, bookings:() => state.bookings };
+  checkins:() => state.checkins, invSnapshots:() => state.snaps, trips:() => state.trips, bookings:() => state.bookings, toBook:() => state.toBook };
 const DERIVED = ['tripKind','tripName','kind'];
 function backupData(){
   const collections = {};
@@ -5238,13 +5350,13 @@ function downloadBackup(){
   const n = Object.values(data.collections).reduce((s, v) => s + v.length, 0);
   toast(`Backup downloaded: ${n} records`);
 }
-const RS_LABEL = { expenses:'expenses', income:'income', transfers:'transfers', accounts:'accounts', checkins:'check-ins', invSnapshots:'monthly investment values', trips:'trips', bookings:'bookings', settings:'settings' };
+const RS_LABEL = { expenses:'expenses', income:'income', transfers:'transfers', accounts:'accounts', checkins:'check-ins', invSnapshots:'monthly investment values', trips:'trips', bookings:'bookings', toBook:'things to book', settings:'settings' };
 $('#rsFile').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   let data;
   try { data = JSON.parse(await f.text()); if (data.app !== 'S&A Ledger' || !data.collections) throw 0; }
   catch { toast('That file isn’t an S&A Ledger backup.'); return; }
-  const have = { expenses:state.items, income:state.income, transfers:state.transfers, accounts:state.accounts, checkins:state.checkins, invSnapshots:state.snaps, trips:state.trips, bookings:state.bookings };
+  const have = { expenses:state.items, income:state.income, transfers:state.transfers, accounts:state.accounts, checkins:state.checkins, invSnapshots:state.snaps, trips:state.trips, bookings:state.bookings, toBook:state.toBook };
   const rows = Object.entries(data.collections).filter(([c, v]) => RS_LABEL[c] && Array.isArray(v) && v.length).map(([c, v]) => {
     const ids = new Set((have[c] || []).map(x => x.id)), missing = c === 'settings' ? null : v.filter(x => !ids.has(x.id)).length;
     return `<li><span class="ok">•</span><span>${v.length} ${RS_LABEL[c]}</span><span class="n">${missing === null ? 'replaces current' : missing ? missing + ' not here now' : 'all already here'}</span></li>`; });

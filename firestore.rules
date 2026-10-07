@@ -233,6 +233,26 @@ service cloud.firestore {
       allow create, update: if isMember() && validBooking();
     }
 
+    // What still needs booking for a trip: what, for which date, and by when.
+    function validToBook() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['tripId','what','type','forDate','byDate','price','note','done','bookingId','createdAt','createdBy','updatedBy'])
+        && d.keys().hasAll(['tripId','what'])
+        && str(d.tripId, 60) && str(d.what, 120) && d.what.size() > 0
+        && (!('type' in d) || d.type in ['flight','train','bus','ferry','hotel','car','event','restaurant','other'])
+        && (!('forDate' in d) || isDate(d.forDate))
+        && (!('byDate' in d) || isDate(d.byDate))
+        && (!('price' in d) || (d.price is number && d.price >= 0 && d.price < 1000000))
+        && (!('note' in d) || str(d.note, 300))
+        && (!('done' in d) || d.done is bool)
+        && (!('bookingId' in d) || str(d.bookingId, 60));
+    }
+
+    match /toBook/{id} {
+      allow read, delete: if isMember();
+      allow create, update: if isMember() && validToBook();
+    }
+
     // Forwarded booking emails. Only the inbound function (server, admin access) creates them;
     // the app reads each one and deletes it once it's saved as bookings or dismissed.
     match /bookingInbox/{id} {

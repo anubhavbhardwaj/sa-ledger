@@ -89,3 +89,10 @@ Setup:
 that is 21:00 locally). Each of you gets a nudge if you haven't added anything that day, or if captured payments or
 forwarded bookings are waiting. Quiet when the day is logged and nothing is pending. Switch it off per phone in
 menu → Notifications.
+
+## To book
+
+Each trip has a "To book" list (`toBook` collection): what to book, the date it's for and the date to book it by
+(suggested from the type: flights about 6 weeks ahead, trains and stays 3, the rest 2). Items due within a week or
+overdue show on the Overview, the 21:00 reminder lists those due within 3 days, and saving a matching booking in the
+trip ticks the item off and links it.
