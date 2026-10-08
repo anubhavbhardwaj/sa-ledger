@@ -39,11 +39,11 @@ export function due(b, st, now, light = false) {
     if (now < dep - 8 * HOUR || now > arr + 4 * HOUR) return false;
     return since >= (now < dep - 3 * HOUR ? 55 * MIN : 9 * MIN);
   }
-  // Sparing plan: from 3 h before, every ~90 min, every 25 min from 75 min before until take-off,
+  // Sparing plan: from 3 h before, every ~45 min, every 25 min from 75 min before until take-off,
   // then nothing until just before the expected landing, then every 15 min until it has landed.
   // Before the first lookup the time is local read as UTC (up to ~5 h late for India), so start earlier.
   if (now < dep - (st?.sched ? 3 : 5) * HOUR || now > arr + 3 * HOUR) return false;
-  if (!st?.departed) return since >= (now < dep - 75 * MIN ? 85 * MIN : 24 * MIN);
+  if (!st?.departed) return since >= (now < dep - 75 * MIN ? 44 * MIN : 24 * MIN);
   return now >= arr - 10 * MIN && since >= 14 * MIN;
 }
 
@@ -65,18 +65,26 @@ export function summarizeAeroApi(f) {
 
 // AeroDataBox times look like { utc: '2026-10-08 13:55Z', local: '2026-10-08 15:55+02:00' } (older: scheduledTimeUtc).
 const adbTime = (o, k) => { const v = o?.[k]?.utc ?? o?.[k + 'Utc']; if (!v) return null; const d = new Date(String(v).trim().replace(' ', 'T')); return isNaN(d) ? null : d.toISOString(); };
+// Departure delay: the airline's revised gate time first, then AeroDataBox's own prediction, then (if the
+// departure has no new time) the arrival's revised time, which airlines often update first.
 export function summarizeAdb(f) {
   const d = f.departure || {}, a = f.arrival || {}, st = String(f.status || '');
-  const sched = adbTime(d, 'scheduledTime'), depRev = adbTime(d, 'revisedTime') || adbTime(d, 'actualTime'), depRun = adbTime(d, 'runwayTime');
-  const aSched = adbTime(a, 'scheduledTime'), aRev = adbTime(a, 'revisedTime') || adbTime(a, 'actualTime'), aPred = adbTime(a, 'predictedTime'), aRun = adbTime(a, 'runwayTime');
+  const sched = adbTime(d, 'scheduledTime'), depRun = adbTime(d, 'runwayTime');
+  const depRev = adbTime(d, 'actualTime') || adbTime(d, 'revisedTime'), depPred = adbTime(d, 'predictedTime');
+  const aSched = adbTime(a, 'scheduledTime'), aRev = adbTime(a, 'actualTime') || adbTime(a, 'revisedTime'), aPred = adbTime(a, 'predictedTime'), aRun = adbTime(a, 'runwayTime');
   const landed = !!aRun || /arrived|landed/i.test(st);
   const departed = landed || !!depRun || /departed|en ?route|approaching/i.test(st);
-  const depEst = depRev || sched;
+  const mins = (x, y) => x && y ? Math.round((Date.parse(x) - Date.parse(y)) / MIN) : null;
+  let depEst = depRev || depPred || sched, delay = mins(depEst, sched) ?? 0, delaySource = depRev ? 'departure' : depPred ? 'predicted' : null;
+  const arrDelay = mins(aRev, aSched);
+  if (!depRev && !depPred && arrDelay > 0 && sched) { delay = arrDelay; depEst = new Date(Date.parse(sched) + arrDelay * MIN).toISOString(); delaySource = 'arrival'; }
+  const t = o => Object.fromEntries(['scheduledTime', 'revisedTime', 'predictedTime', 'actualTime', 'runwayTime'].map(k => [k, o?.[k]?.local || o?.[k]?.utc || null]).filter(x => x[1]));
   return {
     ident: String(f.number || '').replace(/\s+/g, ''), status: st, sched, depEst, arrEst: aRun || aRev || aPred || aSched,
-    delay: sched && depEst ? Math.round((Date.parse(depEst) - Date.parse(sched)) / MIN) : 0,
+    delay, delaySource, delayedNoTime: /delay/i.test(st) && delay < 5,
     departed, offAt: depRun || (departed ? depEst : null), landed, landedAt: aRun || (landed ? aRev || aSched : null),
-    cancelled: /cancel/i.test(st), diverted: /divert/i.test(st),
+    cancelled: /^cancell?ed$/i.test(st), diverted: /divert/i.test(st),
+    raw: { status: st, dep: t(d), arr: t(a), quality: [...(d.quality || []), ...(a.quality || [])].join(',') || null },
     gate: d.gate || null, terminal: d.terminal || null, arrGate: a.gate || null, arrTerminal: a.terminal || null,
     from: d.airport?.iata || null, to: a.airport?.iata || null, fromCity: d.airport?.municipalityName || d.airport?.shortName || d.airport?.name || null,
     toCity: a.airport?.municipalityName || a.airport?.shortName || a.airport?.name || null, fromTz: d.airport?.timeZone || 'UTC', toTz: a.airport?.timeZone || 'UTC',

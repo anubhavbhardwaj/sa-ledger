@@ -12,7 +12,9 @@ export async function handle(req, { env = process.env, verify = verifyToken, fet
   const b = await db.booking(id);
   if (!b || b.type !== 'flight') return json(404, { error: 'No such flight' });
   const st = (await db.loadStatus([id]))[id] || {};
-  if (st.checkedAt && now - Date.parse(st.checkedAt) < 5 * 60e3 && !st.error) return json(200, { ...st, cached: true });
+  // A tap on "Check status now" (force) always asks again unless it asked less than a minute ago.
+  const age = st.checkedAt ? now - Date.parse(st.checkedAt) : Infinity;
+  if (age < (body.force ? 60e3 : 5 * 60e3) && !st.error) return json(200, { ...st, cached: true });
   let tokens = null;
   const r = await checkFlight({ ...b, id }, { ...st, done: false }, { now, env, fetch: f, trips: await db.loadTrips(), saveStatus: db.saveStatus, send: db.send,
     tokens: async () => (tokens ||= await db.loadTokens()), dropTokens: db.dropTokens });
