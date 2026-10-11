@@ -549,6 +549,16 @@ a.kpilink:hover{background:var(--sunk)}
 .panel h2{font:700 15px/1.2 var(--f-display);margin:0}
 .panel .hint{font-size:12px;color:var(--muted);margin:0}
 .panel header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.wichips{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px}
+.wichip{display:inline-flex;gap:6px;align-items:baseline;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer}
+.wichip .am{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.wichip[aria-pressed="true"]{background:var(--sunk);color:var(--muted);text-decoration:line-through;border-style:dashed}
+.wichip[aria-pressed="true"] .am{text-decoration:line-through}
+.wilbl{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.wihead{display:grid;gap:4px;padding:14px 16px;border-radius:12px;background:var(--good-soft);margin-bottom:12px}
+.wihead .big{font-family:var(--f-display);font-size:26px;font-weight:700;color:var(--good)}
+.wileg{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin-top:6px}
+.wileg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 .span-4{grid-column:span 4}.span-7{grid-column:span 7}.span-5{grid-column:span 5}.span-6{grid-column:span 6}.span-12{grid-column:span 12}
 @media (max-width:860px){.span-7,.span-5,.span-6,.span-4{grid-column:span 12}}
 
@@ -838,6 +848,11 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <section class="panel span-4">
           <header><h2>By country</h2><span class="right" data-vzslot="country"></span></header>
           <div class="hbars" id="byCountry"></div>
+        </section>
+        <section class="panel span-12" id="wiPanel">
+          <header><h2>What if: room to invest</h2><span class="right"><span class="seg" role="radiogroup" aria-label="Average over" id="wiWin"></span></span></header>
+          <p class="muted" style="margin:0 0 10px;font-size:13px">Tap the categories or trips that will stop (like the wedding) to take them out. The numbers are monthly averages over full past months, independent of the month and filters above.</p>
+          <div id="wiBody"></div>
         </section>
       </div>
     </div>
@@ -1653,7 +1668,75 @@ function renderVisualizations(){
   renderBreakdown('spender', $('#bySpender'));
   renderBreakdown('account', $('#byAccount'));
   renderBreakdown('country', $('#byCountry'));
+  renderWhatIf();
 }
+
+// ---------- what if: take categories or trips out and see what could be invested instead ----------
+state.wi = { n: 6, cats: [], trips: [] };
+try { Object.assign(state.wi, JSON.parse(localStorage.getItem('whatIf') || '{}')); } catch {}
+const wiSave = () => { try { localStorage.setItem('whatIf', JSON.stringify(state.wi)); } catch {} };
+function wiMonths(n){
+  const [y, m] = today().split('-').map(Number), out = [];
+  for (let k = n; k >= 1; k--){ const d = new Date(y, m - 1 - k, 1); out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); }
+  return out;   // full months only, the current one is still running
+}
+function renderWhatIf(){
+  const el = $('#wiBody'); if (!el) return;
+  const N = [3, 6, 12].includes(+state.wi.n) ? +state.wi.n : 6, ms = wiMonths(N), inWin = r => ms.includes((r.date || '').slice(0, 7));
+  $('#wiWin').innerHTML = [3, 6, 12].map(n => `<button type="button" role="radio" data-wiwin="${n}" aria-checked="${n === N}">${n} months</button>`).join('');
+  const exp = state.items.filter(inWin);
+  if (!exp.length){ el.innerHTML = `<div class="empty">${state.ready ? 'No spending in the last ' + N + ' full months yet.' : 'Loading…'}</div>`; return; }
+  const cats = new Set(state.wi.cats), trips = new Set(state.wi.trips);
+  const out = r => cats.has(r.category || '—') || (r.tripId && trips.has(r.tripId));
+  const pm = v => v / N, f0 = v => eur0.format(Math.round(v));
+  const removed = exp.filter(out), kept = exp.filter(r => !out(r));
+  const income = pm(sum(state.income.filter(inWin)));
+  const tr = state.transfers.filter(inWin), invested = pm(sum(tr.filter(t => transferType(t) === 'Investment'))) - pm(sum(tr.filter(t => transferType(t) === 'Withdrawal')));
+  const spendAll = pm(sum(exp)), spendKept = pm(sum(kept)), freed = pm(sum(removed));
+  const room = income - spendKept;   // the most that could go to investments once those are gone
+  // Growth of the freed amount, at the FIRE return if set (else 7%), monthly contributions.
+  const rp = +state.fire?.returnPct > 0 ? +state.fire.returnPct : 7, r = rp / 1200;
+  const fv = yrs => r ? freed * ((1 + r) ** (12 * yrs) - 1) / r : freed * 12 * yrs;
+  const catG = group(exp, 'category'), tripG = group(exp.filter(x => x.tripId && state.tripMap[x.tripId]), 'tripId');
+  const chip = (attr, key, label, total) => `<button type="button" class="wichip" data-${attr}="${esc(key)}" aria-pressed="${attr === 'wicat' ? cats.has(key) : trips.has(key)}">${esc(label)}<span class="am">${f0(pm(total))}/mo</span></button>`;
+  // monthly bars: kept spending, removed spending on top, income as a tick
+  const vals = ms.map(m => { const e = exp.filter(x => x.date.startsWith(m)); return { m, kept: sum(e.filter(x => !out(x))), rem: sum(e.filter(out)), inc: sum(state.income.filter(x => x.date.startsWith(m))) }; });
+  const W = 640, H = 200, L = innerWidth <= 640 ? 88 : 62, R = 8, T = 10, B = 24, max = niceMax(Math.max(...vals.map(v => Math.max(v.kept + v.rem, v.inc)))), bw = (W - L - R) / N;
+  const y = v => T + (H - T - B) * (1 - v / max);
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Monthly spending with and without the removed items">`;
+  for (let t = 0; t <= 4; t++){ const v = max * t / 4; svg += `<line class="gridline" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${eur0.format(v)}</text>`; }
+  vals.forEach((v, i) => {
+    const x = L + i * bw + bw * .2, w = bw * .6;
+    if (v.kept > 0) svg += `<rect x="${x}" y="${y(v.kept)}" width="${w}" height="${(H - B) - y(v.kept)}" fill="var(--bar)"/>`;
+    if (v.rem > 0) svg += `<rect x="${x}" y="${y(v.kept + v.rem)}" width="${w}" height="${y(v.kept) - y(v.kept + v.rem)}" fill="var(--s2)" opacity=".75"/>`;
+    if (v.inc > 0) svg += `<line x1="${x - 4}" x2="${x + w + 4}" y1="${y(v.inc)}" y2="${y(v.inc)}" stroke="var(--c-inc)" stroke-width="3" stroke-linecap="round"/>`;
+    svg += `<rect x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T}" fill="transparent" data-tip="${monthLabel(v.m)}: income ${f0(v.inc)} · spending kept ${f0(v.kept)}${v.rem ? ' · taken out ' + f0(v.rem) : ''}"/>`;
+    svg += `<text x="${L + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle" style="fill:var(--muted)">${MON[+v.m.slice(5, 7) - 1]}</text>`;
+  });
+  svg += `<line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--muted)" stroke-width="1"/></svg>`;
+  el.innerHTML = `
+    <div class="wilbl">Categories</div><div class="wichips">${catG.map(g => chip('wicat', g.key, g.key, g.total)).join('')}</div>
+    ${tripG.length ? `<div class="wilbl">Trips</div><div class="wichips">${tripG.map(g => chip('witrip', g.key, state.tripMap[g.key].name, g.total)).join('')}</div>` : ''}
+    ${freed > 0 ? `<div class="wihead"><span class="wilbl" style="color:var(--good)">Freed up each month</span><span class="big">+${f0(freed)}</span>
+      <span style="font-size:13.5px">Investing it: ${f0(invested)} → <strong>${f0(invested + freed)}</strong> a month. Kept up for 5 years at ${rp}% a year that grows to about <strong>${f0(fv(5))}</strong>, for 10 years about <strong>${f0(fv(10))}</strong>.</span></div>`
+      : `<p class="muted" style="margin:0 0 12px;font-size:13px">Nothing taken out yet. Tap a category or trip above.</p>`}
+    <section class="kpis" style="margin-bottom:12px">
+      <div class="kpi"><span class="lbl">Income</span><span class="val">${income ? f0(income) : '—'}</span><span class="sub">${income ? 'a month, as logged' : 'no income logged in these months'}</span></div>
+      <div class="kpi"><span class="lbl">Spending now</span><span class="val">${f0(spendAll)}</span><span class="sub">a month</span></div>
+      <div class="kpi"><span class="lbl">Spending without them</span><span class="val">${f0(spendKept)}</span><span class="sub">${freed > 0 ? f0(freed) + ' less' : 'same as now'}</span></div>
+      <div class="kpi"><span class="lbl">Invested now</span><span class="val">${f0(invested)}</span><span class="sub">a month, transfers to investment accounts</span></div>
+      <div class="kpi"><span class="lbl">Most you could invest</span><span class="val ${income && room < invested ? 'neg' : ''}">${income ? f0(Math.max(0, room)) : '—'}</span><span class="sub">${income ? 'income minus the spending you kept' : 'add income to see this'}</span></div>
+    </section>
+    ${svg}
+    <div class="wileg"><span><i style="background:var(--bar)"></i>Spending kept</span><span><i style="background:var(--s2);opacity:.75"></i>Taken out</span><span><i style="background:var(--c-inc)"></i>Income</span></div>`;
+}
+document.addEventListener('click', e => {
+  const w = e.target.closest('[data-wiwin]'); if (w){ state.wi.n = +w.dataset.wiwin; wiSave(); renderWhatIf(); return; }
+  const c = e.target.closest('[data-wicat],[data-witrip]'); if (!c) return;
+  const list = c.dataset.wicat !== undefined ? 'cats' : 'trips', k = c.dataset.wicat ?? c.dataset.witrip;
+  state.wi[list] = state.wi[list].includes(k) ? state.wi[list].filter(x => x !== k) : [...state.wi[list], k];
+  wiSave(); renderWhatIf();
+});
 
 function renderBreakdown(key, el, max){
   const t = state.vz[key];
