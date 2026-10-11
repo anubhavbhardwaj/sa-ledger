@@ -853,8 +853,8 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
           <div class="hbars" id="byCountry"></div>
         </section>
         <section class="panel span-12" id="wiPanel">
-          <header><h2>What if</h2><span class="right"><span class="seg" role="radiogroup" aria-label="Period" id="wiWin"></span></span></header>
-          <p class="muted" style="margin:0 0 10px;font-size:13px">“Now” is what you spend per category each month, on average. Type what you would spend instead (0 for the wedding once it’s over) and see how much more, or less, you could invest each month.</p>
+          <header><h2 id="wiTitle">What if</h2></header>
+          <p class="muted" style="margin:0 0 10px;font-size:13px">What you spent per category in the month picked at the top. Type a lower amount where you could have spent less, and see how much more you could have invested that month.</p>
           <div id="wiBody"></div>
         </section>
       </div>
@@ -1674,43 +1674,38 @@ function renderVisualizations(){
   renderWhatIf();
 }
 
-// ---------- what if: per category, the monthly average now and a number you choose; the difference goes to investing ----------
-state.wi = { n: 6, what: {} };
-try { const x = JSON.parse(localStorage.getItem('whatIf2') || '{}'); if (x && typeof x === 'object') Object.assign(state.wi, x); } catch {}
-const WI_WIN = [3, 6, 12];
-if (!WI_WIN.includes(+state.wi.n)) state.wi.n = 6;
-const wiSave = () => { try { localStorage.setItem('whatIf2', JSON.stringify(state.wi)); } catch {} };
-function wiMonths(n){
-  const [y, m] = today().split('-').map(Number), out = [];
-  for (let k = n; k >= 1; k--){ const d = new Date(y, m - 1 - k, 1); out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); }
-  return out;   // full months only, the current one is still running
-}
-// Euros put into investments per month, from Wealth → Investments; else from transfers into investment accounts.
-function wiInvested(ms){
-  let pf = null;
+// ---------- what if: for the selected month, each category's spending and a number you choose; the difference goes to investing ----------
+state.wi = { what: {} };   // what[month][category] = amount typed
+try { const x = JSON.parse(localStorage.getItem('whatIf3') || '{}'); if (x && typeof x.what === 'object') state.wi = x; } catch {}
+const wiSave = () => { try { localStorage.setItem('whatIf3', JSON.stringify(state.wi)); } catch {} };
+// Euros put into investments in a month, from Wealth → Investments; else from transfers into investment accounts.
+function wiInvested(m){
+  let pf;
   if (state.home === 'EUR') pf = portfolio(); else { const keep = state.home; state.home = 'EUR'; pfCache = null; pf = portfolio(); state.home = keep; pfCache = null; }
-  const tl = pf.tl.filter(t => ms.includes(t.m));
-  if (tl.length) return { v: tl.reduce((s, t) => s + t.fresh, 0) / ms.length, from: 'Wealth → Investments' };
-  const tr = state.transfers.filter(t => ms.includes((t.date || '').slice(0, 7)));
-  return { v: (sum(tr.filter(t => transferType(t) === 'Investment')) - sum(tr.filter(t => transferType(t) === 'Withdrawal'))) / ms.length, from: 'transfers to investment accounts' };
+  const t = pf.tl.find(t => t.m === m);
+  if (t) return { v: t.fresh, from: 'Wealth → Investments' };
+  const tr = state.transfers.filter(x => (x.date || '').startsWith(m));
+  return { v: sum(tr.filter(x => transferType(x) === 'Investment')) - sum(tr.filter(x => transferType(x) === 'Withdrawal')), from: 'transfers to investment accounts' };
 }
-let wiRows = [];
+let wiRows = [], wiM = null;
 function renderWhatIf(){
   const el = $('#wiBody'); if (!el) return;
-  const N = +state.wi.n, ms = wiMonths(N);
-  $('#wiWin').innerHTML = WI_WIN.map(n => `<button type="button" role="radio" data-wiwin="${n}" aria-checked="${n === N}">${n} months</button>`).join('');
-  const exp = state.items.filter(r => ms.includes((r.date || '').slice(0, 7)));
-  if (!exp.length){ el.innerHTML = `<div class="empty">${state.ready ? 'No spending in the last ' + N + ' full months yet.' : 'Loading…'}</div>`; return; }
-  wiRows = group(exp, 'category').map(g => ({ cat: g.key, now: Math.round(g.total / N) }));
-  const inv = wiInvested(ms);
-  el.innerHTML = `<div class="mwrap"><table class="mini"><colgroup><col style="width:34%"><col style="width:20%"><col style="width:26%"><col style="width:20%"></colgroup><thead><tr><th>Category</th><th class="num">Now</th><th class="num">What if</th><th class="num">Invest</th></tr></thead><tbody>
-    ${wiRows.map((r, i) => { const w = state.wi.what[r.cat]; return `<tr><td>${esc(r.cat)}</td><td class="num">${eur0.format(r.now)}</td>
+  if (state.period === 'all'){ wiRows = []; $('#wiTitle').textContent = 'What if'; el.innerHTML = '<div class="empty">Pick a month at the top to see its categories.</div>'; return; }
+  wiM = state.period;
+  $('#wiTitle').textContent = 'What if · ' + monthLabel(wiM);
+  const exp = state.items.filter(r => (r.date || '').startsWith(wiM));
+  if (!exp.length){ wiRows = []; el.innerHTML = `<div class="empty">${state.ready ? 'No spending in ' + monthLabel(wiM) + '.' : 'Loading…'}</div>`; return; }
+  const W = state.wi.what[wiM] || {};
+  wiRows = group(exp, 'category').map(g => ({ cat: g.key, now: Math.round(g.total) }));
+  const inv = wiInvested(wiM);
+  el.innerHTML = `<div class="mwrap"><table class="mini"><colgroup><col style="width:34%"><col style="width:20%"><col style="width:26%"><col style="width:20%"></colgroup><thead><tr><th>Category</th><th class="num">Spent</th><th class="num">What if</th><th class="num">Invest</th></tr></thead><tbody>
+    ${wiRows.map((r, i) => { const w = W[r.cat]; return `<tr><td>${esc(r.cat)}</td><td class="num">${eur0.format(r.now)}</td>
       <td class="num"><input class="wiin ${w !== undefined && w !== r.now ? 'chg' : ''}" type="number" inputmode="decimal" min="0" step="10" data-wii="${i}" value="${w ?? r.now}" aria-label="What if for ${esc(r.cat)}"></td>
       <td class="num wid" data-wid="${i}"></td></tr>`; }).join('')}
     <tr class="witot"><td>Total</td><td class="num">${eur0.format(wiRows.reduce((s, r) => s + r.now, 0))}</td><td class="num" id="wiTotWhat"></td><td class="num wid" id="wiTotDiff"></td></tr></tbody></table></div>
-    <div class="wisum"><span>Invested each month</span><span class="big" id="wiInv"></span><span class="muted" style="font-size:12.5px" id="wiInvNote"></span>
+    <div class="wisum"><span>Invested in ${MON[+wiM.slice(5, 7) - 1]}</span><span class="big" id="wiInv"></span><span class="muted" style="font-size:12.5px" id="wiInvNote"></span>
       <button class="btn small" type="button" id="wiReset" style="margin-left:auto">Reset</button></div>
-    <p class="muted" style="margin:8px 0 0;font-size:12.5px">Averages over ${monthLabel(ms[0])} to ${monthLabel(ms[ms.length - 1])}. Invested now comes from ${inv.from}.</p>`;
+    <p class="muted" style="margin:8px 0 0;font-size:12.5px">Invested comes from ${inv.from}. The filters above don’t apply here.</p>`;
   el.dataset.inv = inv.v;
   wiUpdate();
 }
@@ -1720,27 +1715,28 @@ function wiUpdate(){
   const sign = d => d >= 0.5 ? `<span class="wid up">+${eur0.format(d)}</span>` : d <= -0.5 ? `<span class="wid down">−${eur0.format(-d)}</span>` : '<span class="muted">—</span>';
   let what = 0, diff = 0;
   wiRows.forEach((r, i) => {
-    const w = state.wi.what[r.cat] ?? r.now, d = r.now - w; what += w; diff += d;
+    const w = state.wi.what[wiM]?.[r.cat] ?? r.now, d = r.now - w; what += w; diff += d;
     const c = el.querySelector(`[data-wid="${i}"]`); if (c) c.innerHTML = sign(d);
   });
   $('#wiTotWhat').textContent = eur0.format(what);
   $('#wiTotDiff').innerHTML = sign(diff);
   const now = +el.dataset.inv || 0, next = Math.max(0, now + diff);
   $('#wiInv').innerHTML = Math.abs(diff) < 0.5 ? eur0.format(now) : `${eur0.format(now)} → <span class="${diff > 0 ? 'pos' : 'neg'}">${eur0.format(next)}</span>`;
-  $('#wiInvNote').textContent = Math.abs(diff) < 0.5 ? 'Change a number above to compare.' : `${diff > 0 ? '+' : '−'}${eur0.format(Math.abs(diff))} a month, ${diff > 0 ? '+' : '−'}${eur0.format(Math.abs(diff) * 12)} a year`;
+  $('#wiInvNote').textContent = Math.abs(diff) < 0.5 ? 'Change a number above to compare.' : `${eur0.format(Math.abs(diff))} ${diff > 0 ? 'more' : 'less'} invested that month`;
 }
 document.addEventListener('input', e => {
   const t = e.target.closest('[data-wii]'); if (!t) return;
   const r = wiRows[+t.dataset.wii]; if (!r) return;
   const v = t.value.trim() === '' ? 0 : Math.max(0, +t.value);
   if (!isFinite(v)) return;
-  if (v === r.now) delete state.wi.what[r.cat]; else state.wi.what[r.cat] = v;
+  const W = state.wi.what[wiM] ||= {};
+  if (v === r.now) delete W[r.cat]; else W[r.cat] = v;
+  if (!Object.keys(W).length) delete state.wi.what[wiM];
   t.classList.toggle('chg', v !== r.now);
   wiSave(); wiUpdate();
 });
 document.addEventListener('click', e => {
-  const w = e.target.closest('[data-wiwin]'); if (w){ state.wi.n = +w.dataset.wiwin; wiSave(); renderWhatIf(); return; }
-  if (e.target.closest('#wiReset')){ state.wi.what = {}; wiSave(); renderWhatIf(); }
+  if (e.target.closest('#wiReset')){ delete state.wi.what[wiM]; wiSave(); renderWhatIf(); }
 });
 
 function renderBreakdown(key, el, max){
