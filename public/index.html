@@ -549,6 +549,8 @@ a.kpilink:hover{background:var(--sunk)}
 .panel h2{font:700 15px/1.2 var(--f-display);margin:0}
 .panel .hint{font-size:12px;color:var(--muted);margin:0}
 .panel header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+#wiPanel,#wiBody{min-width:0}
+@media (max-width:640px){#wiBody .wiput,#wiBody .wisofar{display:none}#wiBody table.mini td,#wiBody table.mini th{padding:7px 5px}}
 .wichips{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px}
 .wichip{display:inline-flex;gap:6px;align-items:baseline;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer}
 .wichip .am{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
@@ -850,8 +852,8 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
           <div class="hbars" id="byCountry"></div>
         </section>
         <section class="panel span-12" id="wiPanel">
-          <header><h2>What if: room to invest</h2><span class="right"><span class="seg" role="radiogroup" aria-label="Average over" id="wiWin"></span></span></header>
-          <p class="muted" style="margin:0 0 10px;font-size:13px">Tap the categories or trips that will stop (like the wedding) to take them out. The numbers are monthly averages over full past months, independent of the month and filters above.</p>
+          <header><h2>What if: investments without these costs</h2><span class="right"><span class="seg" role="radiogroup" aria-label="Period" id="wiWin"></span></span></header>
+          <p class="muted" style="margin:0 0 10px;font-size:13px">Tap the categories or trips that will stop (like the wedding) to take them out, and see what your investments would be worth each month if that money had been invested instead. Independent of the month and filters above.</p>
           <div id="wiBody"></div>
         </section>
       </div>
@@ -1671,64 +1673,92 @@ function renderVisualizations(){
   renderWhatIf();
 }
 
-// ---------- what if: take categories or trips out and see what could be invested instead ----------
-state.wi = { n: 6, cats: [], trips: [] };
+// ---------- what if: take categories or trips out and see what the investments could be worth instead ----------
+// Month by month: the real portfolio value next to what it would be if the spending taken out had gone into
+// the investments in the same month and earned what the portfolio actually earned that month.
+state.wi = { n: 12, cats: [], trips: [] };
 try { Object.assign(state.wi, JSON.parse(localStorage.getItem('whatIf') || '{}')); } catch {}
+const WI_WIN = [6, 12, 24];
+if (!WI_WIN.includes(+state.wi.n)) state.wi.n = 12;
 const wiSave = () => { try { localStorage.setItem('whatIf', JSON.stringify(state.wi)); } catch {} };
 function wiMonths(n){
   const [y, m] = today().split('-').map(Number), out = [];
-  for (let k = n; k >= 1; k--){ const d = new Date(y, m - 1 - k, 1); out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); }
-  return out;   // full months only, the current one is still running
+  for (let k = n - 1; k >= 0; k--){ const d = new Date(y, m - 1 - k, 1); out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); }
+  return out;   // ends with the current month
+}
+// The portfolio timeline in euros, whatever home currency the Wealth page is showing.
+function pfEur(){
+  if (state.home === 'EUR') return portfolio();
+  const keep = state.home; state.home = 'EUR'; pfCache = null;
+  const p = portfolio(); state.home = keep; pfCache = null; return p;
 }
 function renderWhatIf(){
   const el = $('#wiBody'); if (!el) return;
-  const N = [3, 6, 12].includes(+state.wi.n) ? +state.wi.n : 6, ms = wiMonths(N), inWin = r => ms.includes((r.date || '').slice(0, 7));
-  $('#wiWin').innerHTML = [3, 6, 12].map(n => `<button type="button" role="radio" data-wiwin="${n}" aria-checked="${n === N}">${n} months</button>`).join('');
+  const N = +state.wi.n, ms = wiMonths(N), inWin = r => ms.includes((r.date || '').slice(0, 7));
+  $('#wiWin').innerHTML = WI_WIN.map(n => `<button type="button" role="radio" data-wiwin="${n}" aria-checked="${n === N}">${n} months</button>`).join('');
   const exp = state.items.filter(inWin);
-  if (!exp.length){ el.innerHTML = `<div class="empty">${state.ready ? 'No spending in the last ' + N + ' full months yet.' : 'Loading…'}</div>`; return; }
+  if (!exp.length){ el.innerHTML = `<div class="empty">${state.ready ? 'No spending in the last ' + N + ' months yet.' : 'Loading…'}</div>`; return; }
   const cats = new Set(state.wi.cats), trips = new Set(state.wi.trips);
   const out = r => cats.has(r.category || '—') || (r.tripId && trips.has(r.tripId));
-  const pm = v => v / N, f0 = v => eur0.format(Math.round(v));
-  const removed = exp.filter(out), kept = exp.filter(r => !out(r));
-  const income = pm(sum(state.income.filter(inWin)));
-  const tr = state.transfers.filter(inWin), invested = pm(sum(tr.filter(t => transferType(t) === 'Investment'))) - pm(sum(tr.filter(t => transferType(t) === 'Withdrawal')));
-  const spendAll = pm(sum(exp)), spendKept = pm(sum(kept)), freed = pm(sum(removed));
-  const room = income - spendKept;   // the most that could go to investments once those are gone
-  // Growth of the freed amount, at the FIRE return if set (else 7%), monthly contributions.
-  const rp = +state.fire?.returnPct > 0 ? +state.fire.returnPct : 7, r = rp / 1200;
-  const fv = yrs => r ? freed * ((1 + r) ** (12 * yrs) - 1) / r : freed * 12 * yrs;
+  const f0 = v => eur0.format(Math.round(v));
   const catG = group(exp, 'category'), tripG = group(exp.filter(x => x.tripId && state.tripMap[x.tripId]), 'tripId');
-  const chip = (attr, key, label, total) => `<button type="button" class="wichip" data-${attr}="${esc(key)}" aria-pressed="${attr === 'wicat' ? cats.has(key) : trips.has(key)}">${esc(label)}<span class="am">${f0(pm(total))}/mo</span></button>`;
-  // monthly bars: kept spending, removed spending on top, income as a tick
-  const vals = ms.map(m => { const e = exp.filter(x => x.date.startsWith(m)); return { m, kept: sum(e.filter(x => !out(x))), rem: sum(e.filter(out)), inc: sum(state.income.filter(x => x.date.startsWith(m))) }; });
-  const W = 640, H = 200, L = innerWidth <= 640 ? 88 : 62, R = 8, T = 10, B = 24, max = niceMax(Math.max(...vals.map(v => Math.max(v.kept + v.rem, v.inc)))), bw = (W - L - R) / N;
-  const y = v => T + (H - T - B) * (1 - v / max);
-  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Monthly spending with and without the removed items">`;
-  for (let t = 0; t <= 4; t++){ const v = max * t / 4; svg += `<line class="gridline" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${eur0.format(v)}</text>`; }
-  vals.forEach((v, i) => {
-    const x = L + i * bw + bw * .2, w = bw * .6;
-    if (v.kept > 0) svg += `<rect x="${x}" y="${y(v.kept)}" width="${w}" height="${(H - B) - y(v.kept)}" fill="var(--bar)"/>`;
-    if (v.rem > 0) svg += `<rect x="${x}" y="${y(v.kept + v.rem)}" width="${w}" height="${y(v.kept) - y(v.kept + v.rem)}" fill="var(--s2)" opacity=".75"/>`;
-    if (v.inc > 0) svg += `<line x1="${x - 4}" x2="${x + w + 4}" y1="${y(v.inc)}" y2="${y(v.inc)}" stroke="var(--c-inc)" stroke-width="3" stroke-linecap="round"/>`;
-    svg += `<rect x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T}" fill="transparent" data-tip="${monthLabel(v.m)}: income ${f0(v.inc)} · spending kept ${f0(v.kept)}${v.rem ? ' · taken out ' + f0(v.rem) : ''}"/>`;
-    svg += `<text x="${L + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle" style="fill:var(--muted)">${MON[+v.m.slice(5, 7) - 1]}</text>`;
+  const chip = (attr, key, label, total) => `<button type="button" class="wichip" data-${attr}="${esc(key)}" aria-pressed="${attr === 'wicat' ? cats.has(key) : trips.has(key)}">${esc(label)}<span class="am">${f0(total)}</span></button>`;
+  const chips = `<div class="wilbl">Categories · total over ${N} months</div><div class="wichips">${catG.map(g => chip('wicat', g.key, g.key, g.total)).join('')}</div>
+    ${tripG.length ? `<div class="wilbl">Trips</div><div class="wichips">${tripG.map(g => chip('witrip', g.key, state.tripMap[g.key].name, g.total)).join('')}</div>` : ''}`;
+
+  const pf = pfEur(), byM = Object.fromEntries(pf.tl.map(t => [t.m, t]));
+  const rp = +state.fire?.returnPct > 0 ? +state.fire.returnPct : 7;
+  let extra = 0, lastVal = null;
+  const rows = ms.map(m => {
+    const t = byM[m], taken = sum(exp.filter(x => x.date.startsWith(m) && out(x)));
+    const g = t && t.pct !== null && t.has ? t.pct : rp / 1200;   // what the portfolio earned that month, else the FIRE rate
+    extra = extra * (1 + g) + taken;
+    if (t) lastVal = t.tv;
+    const val = t ? t.tv : lastVal;
+    return { m, putIn: t ? t.fresh : 0, taken, val, could: val === null ? null : val + extra, extra, g, est: !(t && t.pct !== null && t.has) };
+  });
+  const last = rows[rows.length - 1], haveVal = rows.some(r => r.val !== null);
+  if (!haveVal){
+    el.innerHTML = chips + `<p class="muted" style="font-size:13px">No investment values for these months yet. Add them under Wealth → Investments to compare.${last.extra > 0 ? ` Taken out over these months: <strong>${f0(sum(exp.filter(out)))}</strong>.` : ''}</p>`;
+    return;
+  }
+  const took = rows.reduce((s, r) => s + r.taken, 0), growth = last.extra - took;
+  const head = took > 0
+    ? `<div class="wihead"><span class="wilbl" style="color:var(--good)">Your investments in ${monthLabel(last.m)}</span>
+        <span class="big">${f0(last.could)}</span>
+        <span style="font-size:13.5px">instead of <strong>${f0(last.val)}</strong>: <strong>+${f0(last.extra)}</strong>, from ${f0(took)} taken out${growth >= 1 ? ' plus ' + f0(growth) + ' it would have earned' : growth <= -1 ? ' minus ' + f0(-growth) + ' it would have lost' : ''}.</span></div>`
+    : `<p class="muted" style="margin:0 0 12px;font-size:13px">Nothing taken out yet. Tap a category or trip above.</p>`;
+
+  // Two lines: actual value and what it could have been, with the gap shaded.
+  const pts = rows.filter(r => r.val !== null), narrow = innerWidth <= 640;
+  const W = 640, H = 220, L = narrow ? 92 : 70, R = 10, T = 12, B = 26;
+  const lo = Math.min(...pts.map(r => r.val)), hi = Math.max(...pts.map(r => r.could));
+  const pad = (hi - lo) * .08 || hi * .05 || 1, y0 = Math.max(0, lo - pad), y1 = hi + pad;
+  const x = i => L + (W - L - R) * (rows.length > 1 ? i / (rows.length - 1) : .5), y = v => T + (H - T - B) * (1 - (v - y0) / (y1 - y0));
+  const ix = r => rows.indexOf(r);
+  const path = k => pts.map((r, j) => (j ? 'L' : 'M') + x(ix(r)).toFixed(1) + ',' + y(r[k]).toFixed(1)).join(' ');
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Investment value, actual and what it could have been">`;
+  for (let t = 0; t <= 4; t++){ const v = y0 + (y1 - y0) * t / 4; svg += `<line class="gridline" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${eur0.format(v)}</text>`; }
+  if (took > 0) svg += `<path d="${path('could')} ${[...pts].reverse().map(r => 'L' + x(ix(r)).toFixed(1) + ',' + y(r.val).toFixed(1)).join(' ')} Z" fill="var(--good)" opacity=".14"/>`
+    + `<path d="${path('could')}" fill="none" stroke="var(--good)" stroke-width="2.5" stroke-dasharray="6 4" stroke-linejoin="round"/>`;
+  svg += `<path d="${path('val')}" fill="none" stroke="var(--bar)" stroke-width="2.5" stroke-linejoin="round"/>`;
+  rows.forEach((r, i) => {
+    if (r.val !== null){
+      svg += `<circle cx="${x(i)}" cy="${y(r.val)}" r="3.5" fill="var(--surface)" stroke="var(--bar)" stroke-width="2"/>`;
+      svg += `<rect x="${x(i) - (W - L - R) / rows.length / 2}" y="${T}" width="${(W - L - R) / rows.length}" height="${H - T - B}" fill="transparent" data-tip="${monthLabel(r.m)}: value ${f0(r.val)}${took > 0 ? ' · could be ' + f0(r.could) + ' (+' + f0(r.extra) + ')' : ''}"/>`;
+    }
+    const every = rows.length > 12 ? (narrow ? 4 : 2) : narrow && rows.length > 6 ? 2 : 1;
+    if ((rows.length - 1 - i) % every === 0) svg += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" style="fill:var(--muted)">${MON[+r.m.slice(5, 7) - 1]}${r.m.endsWith('-01') ? " '" + r.m.slice(2, 4) : ''}</text>`;
   });
   svg += `<line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--muted)" stroke-width="1"/></svg>`;
-  el.innerHTML = `
-    <div class="wilbl">Categories</div><div class="wichips">${catG.map(g => chip('wicat', g.key, g.key, g.total)).join('')}</div>
-    ${tripG.length ? `<div class="wilbl">Trips</div><div class="wichips">${tripG.map(g => chip('witrip', g.key, state.tripMap[g.key].name, g.total)).join('')}</div>` : ''}
-    ${freed > 0 ? `<div class="wihead"><span class="wilbl" style="color:var(--good)">Freed up each month</span><span class="big">+${f0(freed)}</span>
-      <span style="font-size:13.5px">Investing it: ${f0(invested)} → <strong>${f0(invested + freed)}</strong> a month. Kept up for 5 years at ${rp}% a year that grows to about <strong>${f0(fv(5))}</strong>, for 10 years about <strong>${f0(fv(10))}</strong>.</span></div>`
-      : `<p class="muted" style="margin:0 0 12px;font-size:13px">Nothing taken out yet. Tap a category or trip above.</p>`}
-    <section class="kpis" style="margin-bottom:12px">
-      <div class="kpi"><span class="lbl">Income</span><span class="val">${income ? f0(income) : '—'}</span><span class="sub">${income ? 'a month, as logged' : 'no income logged in these months'}</span></div>
-      <div class="kpi"><span class="lbl">Spending now</span><span class="val">${f0(spendAll)}</span><span class="sub">a month</span></div>
-      <div class="kpi"><span class="lbl">Spending without them</span><span class="val">${f0(spendKept)}</span><span class="sub">${freed > 0 ? f0(freed) + ' less' : 'same as now'}</span></div>
-      <div class="kpi"><span class="lbl">Invested now</span><span class="val">${f0(invested)}</span><span class="sub">a month, transfers to investment accounts</span></div>
-      <div class="kpi"><span class="lbl">Most you could invest</span><span class="val ${income && room < invested ? 'neg' : ''}">${income ? f0(Math.max(0, room)) : '—'}</span><span class="sub">${income ? 'income minus the spending you kept' : 'add income to see this'}</span></div>
-    </section>
-    ${svg}
-    <div class="wileg"><span><i style="background:var(--bar)"></i>Spending kept</span><span><i style="background:var(--s2);opacity:.75"></i>Taken out</span><span><i style="background:var(--c-inc)"></i>Income</span></div>`;
+
+  const table = `<div class="mwrap" style="margin-top:10px"><table class="mini"><thead><tr><th>Month</th><th class="num wiput">Put in</th><th class="num">Taken out</th><th class="num">Value</th><th class="num">Could be</th></tr></thead><tbody>
+    ${[...rows].reverse().map(r => `<tr><td style="white-space:nowrap">${MON[+r.m.slice(5, 7) - 1]} '${r.m.slice(2, 4)}${r.m === ms[ms.length - 1] ? ' <span class="muted wisofar">so far</span>' : ''}</td><td class="num wiput">${r.putIn ? f0(r.putIn) : '—'}</td><td class="num">${r.taken ? '+' + f0(r.taken) : '—'}</td><td class="num">${r.val === null ? '—' : f0(r.val)}</td><td class="num">${r.could === null ? '—' : `<strong>${f0(r.could)}</strong>`}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  el.innerHTML = chips + head + svg
+    + `<div class="wileg"><span><i style="background:var(--bar)"></i>Investments, actual</span>${took > 0 ? '<span><i style="background:var(--good)"></i>If the taken-out spending had been invested</span>' : ''}</div>`
+    + `<p class="muted" style="margin:8px 0 0;font-size:12.5px">The extra money earns what your portfolio actually earned each month${rows.some(r => r.est && r.extra > 0) ? ` (${rp}% a year where a month has no value yet)` : ''}. Values come from Wealth → Investments, in euros.</p>`
+    + table;
 }
 document.addEventListener('click', e => {
   const w = e.target.closest('[data-wiwin]'); if (w){ state.wi.n = +w.dataset.wiwin; wiSave(); renderWhatIf(); return; }
