@@ -1335,7 +1335,7 @@ function tripStatus(t){
   if (!t.start) return 'nodate';
   const td = today(), end = t.end || t.start;
   if (td < t.start) return 'upcoming';
-  if (td > end) return 'past';
+  if (td > end || t.closed) return 'past';   // marked finished counts as done, even on its last day
   return 'ongoing';
 }
 function derive(){
@@ -2455,7 +2455,7 @@ function renderTripDetail(t){
       <div><span class="ttype"><i style="background:${TRIP_DOT[t.type]}"></i>${TRIP_TYPE[t.type]}</span><h1>${esc(t.name)}</h1><p>${fmtRange(t.start, t.end)} · ${esc(t.traveller)}${t.currency ? ' · local currency ' + t.currency : ''}${t.notes ? ' · ' + esc(t.notes) : ''}</p></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" type="button" data-edittrip="${esc(t.id)}">Edit trip</button>
-        ${+t.budget > 0 ? `<button class="btn" type="button" data-tripclose="${esc(t.id)}">${t.closed ? 'Reopen' : 'Mark as finished'}</button>` : ''}
+        ${t.closed || (t.start && t.start <= today()) ? `<button class="btn" type="button" data-tripclose="${esc(t.id)}">${t.closed ? 'Reopen' : 'Mark as finished'}</button>` : ''}
         <button class="btn" type="button" data-attach>${state.attachOpen ? 'Close attach' : 'Attach transactions'}</button>
         <button class="btn primary" type="button" data-addtotrip="${esc(t.id)}">+ Add expense</button>
       </div>
