@@ -14,7 +14,10 @@ Fields:
   type: one of ${TYPES.join(', ')}
   forDate: the date the booking is for, "YYYY-MM-DD" (the travel day, check-in day or event day), or null
   byDate: the deadline to book it, "YYYY-MM-DD", ONLY if the user says when to book it ("by end of October", "this week"), else null
-  price: expected price in euros as a number if the user mentions one, else null
+  price: expected price in euros as a number. Use the user's figure if they give one. Otherwise give a rough typical
+    estimate for what they describe (economy fare for that route and season, mid-range hotel for the number of nights,
+    normal ticket prices), for everyone travelling if the note says how many; null only if you can't judge at all
+  estimated: true when price is your estimate, false when the user gave it
   note: any other detail worth keeping (preferences, times, seats, flexibility), short, or null
 Resolve relative dates ("on the 15th", "next Friday", "the last day", "end of the month") using today's date and the trip dates given.
 "Back on the 15th" means the return on the 15th of the trip's month (or the next month if that is before the trip starts).
@@ -26,6 +29,7 @@ export function clean(list) {
     if (!x || typeof x !== 'object' || !String(x.what || '').trim()) return null;
     const o = { what: String(x.what).trim().slice(0, 120), type: TYPES.includes(x.type) ? x.type : 'other', forDate: isDate(x.forDate), byDate: isDate(x.byDate),
       price: +x.price > 0 && +x.price < 1e6 ? Math.round(+x.price) : null, note: x.note ? String(x.note).trim().slice(0, 300) : null };
+    o.estimated = !!(o.price && x.estimated === true);
     if (o.byDate && o.forDate && o.byDate > o.forDate) o.byDate = null;
     return o;
   }).filter(Boolean);

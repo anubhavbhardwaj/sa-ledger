@@ -271,6 +271,14 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .tbrow{display:grid;grid-template-columns:22px 24px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 2px;border-bottom:1px solid var(--line)}
 .tbrow input{width:18px;height:18px;accent-color:var(--accent)}
 .tbrow .ic{font-size:17px;text-align:center}
+.tbside{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+.tbcost{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--line);border-radius:8px;padding:0 7px;background:var(--surface);font-size:13px;color:var(--muted);position:relative}
+.tbrow .tbcost input{width:62px;height:30px;border:0;background:transparent;font:inherit;font-family:var(--f-mono);color:var(--ink);text-align:right;accent-color:auto;padding:0}
+.tbcost input:focus{outline:none}.tbcost:focus-within{outline:2px solid var(--accent);border-color:transparent}
+.tbcost i{font-style:normal;color:var(--warn);font-weight:700}
+.tbcostro{font-family:var(--f-mono);font-size:13px}
+.tbmoney{display:flex;justify-content:space-between;gap:10px;padding:10px 2px 2px;font-size:13.5px}
+@media (max-width:560px){.tbrow{grid-template-columns:22px 24px minmax(0,1fr)}.tbside{grid-column:3}.tbside{justify-content:flex-start}}
 .tbrow .tbmain{cursor:pointer;min-width:0}
 .tbrow .tbmain small{display:block;color:var(--muted);font-size:12.5px}
 .tbrow.done strong{text-decoration:line-through;color:var(--muted);font-weight:500}
@@ -533,6 +541,7 @@ a.kpilink{color:inherit;text-decoration:none}
 a.kpilink:hover{background:var(--sunk)}
 .kpi .val{font:700 26px/1.1 var(--f-display);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
 .kpi .sub{font-size:12.5px;color:var(--muted)}
+.kpi .sub.neg{color:var(--danger)}.kpi .sub.pos{color:var(--good)}
 .delta{display:inline-flex;align-items:center;gap:4px;font-weight:600;font-size:12.5px;padding:1px 8px;border-radius:999px}
 .delta.up{color:var(--up);background:var(--danger-soft)}
 .delta.down{color:var(--down);background:var(--accent-soft)}
@@ -2522,7 +2531,22 @@ function renderTripDetail(t){
   const total = sum(ex);
   const cats = group(ex, 'category'), who = group(ex, 'spender');
   const maxC = Math.max(1, ...cats.map(c => c.total));
-  const budget = +t.budget > 0 ? `<div class="kpi"><span class="lbl">Budget${t.closed ? ' · finished' : ''}</span><span class="val ${total > t.budget ? 'neg' : ''}">${eur0.format(t.budget)}</span><span class="sub">${total > t.budget ? eur.format(total - t.budget) + ' over' : eur.format(t.budget - total) + (t.closed ? ' left unspent' : ' left')}${!t.closed && total < t.budget && (t.end || t.start) >= today() ? ' · counted in this month’s forecast' : ''}</span></div>` : '';
+  // Money: spent (linked expenses), booked (bookings with a price that aren't an expense yet), still to book
+  // (estimates on the To book list), and what that adds up to against the budget.
+  const bks = state.bookings.filter(b => b.tripId === t.id && +b.price > 0);
+  const bkEur = b => { const c = (b.currency || 'EUR').toUpperCase(); return c === 'EUR' ? +b.price : state.fxLatest[c] ? +b.price * state.fxLatest[c] : null; };
+  const missingFx = [...new Set(bks.map(b => (b.currency || 'EUR').toUpperCase()).filter(c => c !== 'EUR' && !state.fxLatest[c]))];
+  if (missingFx.length && !state.fxLoading){ state.fxLoading = true; Promise.all(missingFx.map(c => getRate(c, today()).then(r => { state.fxLatest[c] = typeof r === 'number' ? r : r.rate; }).catch(() => {}))).finally(() => { state.fxLoading = false; if (state.openTrip === t.id && missingFx.some(c => state.fxLatest[c])) render(); }); }
+  const booked = bks.reduce((s, b) => s + (bkEur(b) || 0), 0), unpaid = bks.filter(b => !b.expenseId || !state.items.some(i => i.id === b.expenseId));
+  const unpaidSum = unpaid.reduce((s, b) => s + (bkEur(b) || 0), 0), tb = tbEstimate(t.id);
+  const expected = total + unpaidSum + tb.sum, hasBudget = +t.budget > 0;
+  const budget = `<div class="kpi"><span class="lbl">Budget${t.closed ? ' · finished' : ''}</span>${hasBudget
+      ? `<span class="val">${eur0.format(t.budget)}</span><span class="sub ${expected > t.budget ? 'neg' : 'pos'}">${expected > t.budget ? eur0.format(expected - t.budget) + ' over, as expected now' : eur0.format(t.budget - expected) + (t.closed ? ' left unspent' : ' left after everything')}</span>${!t.closed && total < t.budget && (t.end || t.start) >= today() ? '<span class="sub">counted in this month’s forecast</span>' : ''}`
+      : `<span class="val">—</span><span class="sub">No budget yet. <button class="linkbtn" type="button" data-edittrip="${esc(t.id)}">Set one</button></span>`}</div>`;
+  const money = `
+      <div class="kpi"><span class="lbl">Booked</span><span class="val">${eur0.format(booked)}</span><span class="sub">${bks.length ? `${bks.length} booking${bks.length === 1 ? '' : 's'} with a price${unpaid.length ? ` · ${eur0.format(unpaidSum)} not in expenses yet` : ' · all in expenses'}` : 'No prices on bookings yet'}${missingFx.some(c => !state.fxLatest[c]) ? ' · converting ' + missingFx.join(', ') + '…' : ''}</span></div>
+      <div class="kpi"><span class="lbl">Still to book</span><span class="val">${tb.n ? '≈ ' + eur0.format(tb.sum) : '—'}</span><span class="sub">${tb.n ? `${tb.n} item${tb.n === 1 ? '' : 's'}${tb.guessed ? ` · ${tb.guessed} rough AI estimate${tb.guessed === 1 ? '' : 's'}` : ''}${tb.missing ? ` · ${tb.missing} without an estimate` : ''}` : 'Nothing left on the list'}</span></div>
+      <div class="kpi"><span class="lbl">Expected total</span><span class="val">${eur0.format(expected)}</span><span class="sub">spent${unpaidSum ? ' + booked' : ''}${tb.sum ? ' + still to book' : ''}</span></div>`;
   // candidates for attaching
   let cand = [];
   if (state.attachOpen){
@@ -2545,9 +2569,10 @@ function renderTripDetail(t){
       </div>
     </div>
     <section class="kpis">
-      <div class="kpi"><span class="lbl">Total</span><span class="val">${eur.format(total)}</span><span class="sub">${ex.length} entr${ex.length===1?'y':'ies'}${t.currency && ex.some(e => e.currency === t.currency) ? ' · incl. ' + money(ex.filter(e => e.currency === t.currency).reduce((a,e) => a + (+e.origAmount||0), 0), t.currency) + ' paid in ' + t.currency : ''}</span></div>
-      <div class="kpi"><span class="lbl">Paid by</span><span class="val" style="font-size:18px">${who.length ? who.map(w => esc(w.key)).join(' & ') : '—'}</span><span class="sub">${who.map(w => esc(w.key) + ' ' + eur0.format(w.total)).join(' · ')}</span></div>
+      <div class="kpi"><span class="lbl">Spent</span><span class="val">${eur.format(total)}</span><span class="sub">${ex.length} entr${ex.length===1?'y':'ies'}${t.currency && ex.some(e => e.currency === t.currency) ? ' · incl. ' + money(ex.filter(e => e.currency === t.currency).reduce((a,e) => a + (+e.origAmount||0), 0), t.currency) + ' paid in ' + t.currency : ''}</span></div>
+      ${money}
       ${budget}
+      <div class="kpi"><span class="lbl">Paid by</span><span class="val" style="font-size:18px">${who.length ? who.map(w => esc(w.key)).join(' & ') : '—'}</span><span class="sub">${who.map(w => esc(w.key) + ' ' + eur0.format(w.total)).join(' · ')}</span></div>
     </section>
     ${state.attachOpen ? `<section class="panel">
       <header><h2>Attach transactions</h2><span class="hint">${t.start && !state.attachAll ? 'Unlinked expenses from 60 days before the trip to 7 days after' : 'All unlinked expenses'}</span></header>
@@ -5189,7 +5214,7 @@ function bkItinerary(list, { dayLabels = true, from = '', to = '9999' } = {}){
 }
 // --- to book: what still needs booking for a trip, for which date and by when ---
 const tbFam = t => ['flight','train','bus','ferry'].includes(t) ? 'travel' : t;   // a train can replace a planned flight
-const TB_KEYS = ['tripId','what','type','forDate','byDate','price','note','done','bookingId','createdAt','createdBy','updatedBy'];
+const TB_KEYS = ['tripId','what','type','forDate','byDate','price','priceEst','note','done','bookingId','createdAt','createdBy','updatedBy'];
 const daysTo = d => Math.round((new Date(d + 'T12:00:00') - new Date(today() + 'T12:00:00')) / 864e5);
 function tbDue(x){
   if (!x.byDate) return 'no deadline';
@@ -5200,6 +5225,11 @@ function tbDue(x){
 // Sensible deadlines: flights about 6 weeks ahead, trains and stays about 3, the rest 2; never before today.
 const TB_LEAD = { flight: 42, train: 21, hotel: 21, car: 21, bus: 14, ferry: 14, event: 14, restaurant: 7, other: 14 };
 const tbBy = (type, forDate) => { if (!forDate) return ''; const d = addDays(forDate, -(TB_LEAD[type] || 14)); return d < today() ? today() : d; };
+// What's left to book for a trip, from the estimates on the list.
+function tbEstimate(tripId){
+  const open = state.toBook.filter(x => x.tripId === tripId && !x.done);
+  return { sum: open.reduce((s, x) => s + (+x.price || 0), 0), n: open.length, missing: open.filter(x => !(+x.price > 0)).length, guessed: open.filter(x => x.priceEst && +x.price > 0).length };
+}
 function tbPanel(t){
   const list = state.toBook.filter(x => x.tripId === t.id).sort((a, b) => (a.done - b.done) || (a.byDate || '9').localeCompare(b.byDate || '9'));
   const open = list.filter(x => !x.done), done = list.filter(x => x.done);
@@ -5208,8 +5238,10 @@ function tbPanel(t){
       <input type="checkbox" data-tbdone="${esc(x.id)}" ${x.done ? 'checked' : ''} aria-label="Booked">
       <span class="ic" aria-hidden="true">${(BK_TYPES[x.type] || BK_TYPES.other)[0]}</span>
       <span class="tbmain" data-tbedit="${esc(x.id)}" role="button" tabindex="0"><strong>${esc(x.what)}</strong>
-        <small>${x.forDate ? 'for ' + wday(x.forDate) + ' ' + shortDate(x.forDate) + ' · ' : ''}${x.done ? (x.bookingId ? 'booked, in the itinerary' : 'booked') : tbDue(x)}${x.price ? ' · about ' + eur0.format(x.price) : ''}${x.note ? ' · ' + esc(x.note) : ''}</small></span>
-      ${x.done ? '' : `<button class="btn small" type="button" data-tbbook="${esc(x.id)}" title="Add the booking (PDF, screenshot or email)">+ Booking</button>`}
+        <small>${x.forDate ? 'for ' + wday(x.forDate) + ' ' + shortDate(x.forDate) + ' · ' : ''}${x.done ? (x.bookingId ? 'booked, in the itinerary' : 'booked') : tbDue(x)}${x.note ? ' · ' + esc(x.note) : ''}</small></span>
+      <span class="tbside">${x.done ? (x.price ? `<span class="muted tbcostro">${eur0.format(x.price)}</span>` : '')
+        : `<label class="tbcost" title="${x.priceEst ? 'Rough estimate from the AI; type your own' : 'Estimated cost'}"><span>€</span><input type="number" min="0" step="10" inputmode="decimal" data-tbprice="${esc(x.id)}" value="${x.price ?? ''}" placeholder="est." aria-label="Estimated cost of ${esc(x.what)}">${x.priceEst ? '<i>~</i>' : ''}</label>
+          <button class="btn small" type="button" data-tbbook="${esc(x.id)}" title="Add the booking (PDF, screenshot or email)">+ Booking</button>`}</span>
     </div>`;
   const form = ed ? `<div class="tbform" id="tbForm">
       <div class="fields">
@@ -5231,15 +5263,15 @@ function tbPanel(t){
   // Typed in plain words, filled in by the AI, checked here before anything is added.
   const ai = state.tbAi && state.tbAi.tripId === t.id ? state.tbAi : null;
   const quick = ed ? '' : `<div class="tbquick">
-      <textarea id="tbText" data-trip="${esc(t.id)}" rows="2" placeholder="Or just write it: flights Munich → Rome on 12 Nov and back on the 15th, book by end of October; hotel near Termini for 3 nights">${esc((state.tbText || {})[t.id] || '')}</textarea>
+      <textarea id="tbText" data-tbtrip="${esc(t.id)}" rows="2" placeholder="Or just write it: flights Munich → Rome on 12 Nov and back on the 15th, book by end of October; hotel near Termini for 3 nights">${esc((state.tbText || {})[t.id] || '')}</textarea>
       <button class="btn small" type="button" data-tbai="${esc(t.id)}" ${ai?.busy ? 'disabled' : ''}>${ai?.busy ? 'Reading…' : 'Fill in'}</button></div>
     ${ai?.err ? `<p class="err" style="margin:0">${esc(ai.err)}</p>` : ''}
     ${ai?.items?.length ? `<div class="tbpreview"><strong style="font-size:13px">Check and add:</strong>${ai.items.map((x, i) => `<label class="tbrow"><input type="checkbox" data-tbaii="${i}" ${x.skip ? '' : 'checked'}><span class="ic" aria-hidden="true">${(BK_TYPES[x.type] || BK_TYPES.other)[0]}</span>
-        <span class="tbmain"><strong>${esc(x.what)}</strong><small>${x.forDate ? 'for ' + wday(x.forDate) + ' ' + shortDate(x.forDate) + ' · ' : ''}${x.byDate ? 'book by ' + shortDate(x.byDate) + (x.suggested ? ' (suggested)' : '') : 'no deadline'}${x.price ? ' · about ' + eur0.format(x.price) : ''}${x.note ? ' · ' + esc(x.note) : ''}</small></span><span></span></label>`).join('')}
+        <span class="tbmain"><strong>${esc(x.what)}</strong><small>${x.forDate ? 'for ' + wday(x.forDate) + ' ' + shortDate(x.forDate) + ' · ' : ''}${x.byDate ? 'book by ' + shortDate(x.byDate) + (x.suggested ? ' (suggested)' : '') : 'no deadline'}${x.price ? ' · about ' + eur0.format(x.price) + (x.estimated ? ' (rough estimate)' : '') : ''}${x.note ? ' · ' + esc(x.note) : ''}</small></span><span></span></label>`).join('')}
       <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn small" type="button" data-tbaicancel>Cancel</button><button class="btn primary small" type="button" data-tbaiadd>Add ${ai.items.filter(x => !x.skip).length}</button></div></div>` : ''}`;
   return `<section class="panel"><header><h2>To book</h2><span class="right"><button class="btn small" type="button" data-tbnew="${esc(t.id)}">+ Add</button></span></header>
     ${form}${quick}
-    ${open.length ? `<div class="tblist">${open.map(row).join('')}</div>` : !ed ? `<p class="empty" style="margin:0 0 6px">Nothing left to book${list.length ? '. ' : '. Add what still needs booking, with the date it’s for and a deadline.'}</p>` : ''}
+    ${open.length ? `<div class="tblist">${open.map(row).join('')}</div>${(est => `<div class="tbmoney"><span class="muted">Estimated still to book${est.missing ? ` · ${est.missing} without an estimate` : ''}</span><strong>${eur0.format(est.sum)}</strong></div>`)(tbEstimate(t.id))}` : !ed ? `<p class="empty" style="margin:0 0 6px">Nothing left to book${list.length ? '. ' : '. Add what still needs booking, with the date it’s for and a deadline.'}</p>` : ''}
     ${chips.length ? `<div class="tbchips">${chips.map(([type, what, d]) => `<button class="btn small" type="button" data-tbchip="${esc(t.id)}|${type}|${esc(what)}|${d}">+ ${esc(what)} (${shortDate(d)})</button>`).join('')}</div>` : ''}
     ${done.length ? `<details class="tbdone"><summary>${done.length} booked</summary><div class="tblist">${done.map(row).join('')}</div></details>` : ''}
   </section>`;
@@ -5259,7 +5291,7 @@ async function tbSave(){
   if (ed.byDate && ed.forDate && ed.byDate > ed.forDate) return fail('The deadline is after the date it’s for.');
   const old = ed.id ? state.toBook.find(x => x.id === ed.id) || {} : {};
   const { err: _e, ...clean } = ed;
-  const d = pickDoc(TB_KEYS, { ...old, ...clean, done: !!old.done, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || me, updatedBy: ed.id ? me : null });
+  const d = pickDoc(TB_KEYS, { ...old, ...clean, priceEst: old.priceEst && old.price === clean.price ? true : null, done: !!old.done, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || me, updatedBy: ed.id ? me : null });
   try { if (ed.id) await setDoc(doc(fs, 'toBook', ed.id), d); else await addDoc(toBookCol, d); state.tbEdit = null; render(); toast(ed.id ? 'Saved' : 'Added to the list'); }
   catch (x){ fail(x?.code === 'permission-denied' ? 'Not saved: the database rules don’t allow the To book list yet. Publish the latest Firestore rules, then try again.' : writeError(x)); }
 }
@@ -5279,10 +5311,21 @@ document.addEventListener('click', async e => {
   const bk = t.closest('[data-tbbook]'); if (bk){ const x = state.toBook.find(y => y.id === bk.dataset.tbbook); if (x) bkOpen({ source: 'upload', tripSel: x.tripId }); return; }
   const op = t.closest('[data-tbopen]'); if (op){ state.openTrip = op.dataset.tbopen; state.attachOpen = false; if (state.page !== 'trips') location.hash = 'trips'; else render(); window.scrollTo(0, 0); return; }
 });
+// Estimated cost typed on a row: saved when the field is left (or Enter).
+document.addEventListener('change', async e => {
+  const inp = e.target.closest && e.target.closest('[data-tbprice]'); if (!inp) return;
+  const x = state.toBook.find(y => y.id === inp.dataset.tbprice); if (!x) return;
+  const v = inp.value.trim() === '' ? null : Math.round(parseFloat(inp.value));
+  if (v !== null && !(v >= 0 && v < 1e6)) { toast('That isn’t an amount.'); return; }
+  if (v === (x.price ?? null) && !x.priceEst) return;
+  try { await setDoc(doc(fs, 'toBook', x.id), pickDoc(TB_KEYS, { ...x, price: v, priceEst: null, updatedBy: usernameOf(state.user) })); toast('Estimate saved'); }
+  catch (x2){ toast(x2?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x2)); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest && e.target.closest('[data-tbprice]')) e.target.blur(); });
 // Keep what's typed in state, so a redraw (new data arriving) doesn't clear the form.
 document.addEventListener('input', e => {
   if (e.target.closest && e.target.closest('#tbForm')) tbCollect();
-  if (e.target.id === 'tbText'){ state.tbText ||= {}; state.tbText[e.target.dataset.trip] = e.target.value; }
+  if (e.target.id === 'tbText'){ state.tbText ||= {}; state.tbText[e.target.dataset.tbtrip] = e.target.value; }
 });
 document.addEventListener('click', async e => {
   const t = e.target;
@@ -5306,7 +5349,7 @@ document.addEventListener('click', async e => {
     const pick = items.filter(x => !x.skip); if (!pick.length) return;
     try {
       const b = writeBatch(fs);
-      pick.forEach(x => b.set(doc(toBookCol), pickDoc(TB_KEYS, { tripId, what: x.what, type: x.type, forDate: x.forDate, byDate: x.byDate, price: x.price, note: x.note, done: false, createdAt: now, createdBy: me })));
+      pick.forEach(x => b.set(doc(toBookCol), pickDoc(TB_KEYS, { tripId, what: x.what, type: x.type, forDate: x.forDate, byDate: x.byDate, price: x.price, priceEst: x.price && x.estimated ? true : null, note: x.note, done: false, createdAt: now, createdBy: me })));
       await b.commit();
       state.tbAi = null; (state.tbText || {})[tripId] = ''; render(); toast(`Added ${pick.length} to book`);
     } catch (x){ state.tbAi.err = x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules (with the To book list), then try again.' : writeError(x); render(); }
