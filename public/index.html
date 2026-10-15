@@ -3315,9 +3315,9 @@ function portfolio(){
   return pfCache = res;
 }
 // Euros put into investments in a month (or all time), across every investment account of both of you.
-// Per account and month: the amount on that month's value entry (Wealth → Investments) when there is one,
-// otherwise the transfers into it that month (so an account without monthly values, or not updated yet,
-// still counts). Opening balances are not new money. null when nothing at all was recorded.
+// Per account and month: the amount put in on that month's value entry (Wealth → Investments) when it has one,
+// otherwise the transfers into it that month (an account without monthly values, not updated yet, or whose
+// first entry is its opening balance still counts). null when nothing at all was recorded.
 function investedBy(period){
   const accs = state.accounts.filter(a => a.type === 'investment');
   const inP = m => period === 'all' || m === period;
@@ -3334,7 +3334,10 @@ function investedBy(period){
     }
     for (const m of months){
       const x = snaps[m];
-      const v = x ? (x.opening ? 0 : (+x.investment || 0) * monthRate(cur, m)) : tr[m] || 0;
+      // An opening entry is the starting balance, not new money, but transfers in that same month are. An entry
+      // saved before the month's transfer was logged (put in 0) shouldn't hide that transfer either.
+      const put = x && !x.opening ? (+x.investment || 0) * monthRate(cur, m) : 0;
+      const v = put || tr[m] || 0;
       any = true; by[own] = (by[own] || 0) + v;
     }
   }
