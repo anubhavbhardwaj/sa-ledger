@@ -13,6 +13,7 @@
 import { member, json, verifyToken, firestore } from '../lib/members.mjs';
 import { beat } from '../lib/health.mjs';
 
+export const VERSION = 'p4';   // shown in the app's search details, to tell which server version answered
 const TTL = 6 * 3600e3, MAX_LEGS = 8, MAX_OPTIONS = 12;
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isAirports = v => typeof v === 'string' && /^[A-Z]{3}(,[A-Z]{3}){0,5}$/.test(v);
@@ -62,7 +63,7 @@ export async function search(leg, ctx){
   const first = await searchOnce(leg, ctx);
   if (first.error) return { error: first.error };
   let parts = [first.json], found = first.found, split = 0;
-  if (!found){
+  if (!normalize(first.json).length){
     const each = (k) => leg[k].split(',').slice(0, 3).map(c => ({ ...leg, [k]: c }));
     const alts = leg.to.includes(',') ? each('to') : leg.from.includes(',') ? each('from') : [];
     if (alts.length){
@@ -74,7 +75,8 @@ export async function search(leg, ctx){
   }
   const pi = parts.find(j => j.price_insights)?.price_insights || null;
   const merged = { best_flights: parts.flatMap(j => j.best_flights || []), other_flights: parts.flatMap(j => j.other_flights || []) };
-  return { options: normalize(merged), found, split, note: found ? null : 'Google Flights returned no flights' + (split ? ` (also asked each airport: ${split} more searches)` : ''),
+  const options = normalize(merged);
+  return { options, found, split, note: options.length ? null : (found ? `Google listed ${found} but none had a price and times` : 'Google Flights returned no flights') + (split ? ` (also asked each airport: ${split} more searches)` : ''),
     insight: pi ? { level: pi.price_level || null, low: pi.lowest_price || null, typical: pi.typical_price_range || null } : null };
 }
 
@@ -131,7 +133,7 @@ export async function handle(req, { env = process.env, verify = verifyToken, fet
   const legs = (Array.isArray(body.legs) ? body.legs : []).slice(0, MAX_LEGS);
   if (!legs.some(l => l && isAirports(l.from) && isAirports(l.to) && isDate(l.date))) return json(400, { error: 'Nothing to search.' });
   const res = await Promise.all(legs.map(async l => !(l && isAirports(l.from) && isAirports(l.to) && isDate(l.date)) ? { ...l, error: 'Not a valid airport or date: ' + JSON.stringify(l).slice(0, 80) } : ({ ...l, ...await cached([l.from, l.to, l.date, adults].join('_').replace(/,/g, '-'), () => search(l, { key: env.SERPAPI_KEY, adults, fetch: f })) })));
-  return json(200, { legs: res, left: await left() });
+  return json(200, { legs: res, left: await left(), v: VERSION });
 }
 
 export default async (req) => {
