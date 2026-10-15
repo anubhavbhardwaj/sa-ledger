@@ -228,6 +228,9 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .plmore summary{cursor:pointer;color:var(--muted);font-size:13px;padding:4px 0}
 .plrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
 .plrow small{display:block;color:var(--muted)}
+.plai{display:grid;gap:8px;padding:12px;border:1px dashed var(--accent);border-radius:12px}
+.plai textarea{width:100%;box-sizing:border-box;font:inherit;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--ground);color:var(--ink);resize:vertical}
+.plwhy{font-size:13.5px;margin-top:4px}.plwhy strong{color:var(--accent)}
 .plplace{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
 .plplace strong{font-size:14.5px}.plplace small{display:block;color:var(--muted);font-size:12.5px}
 .plplace .pr{font:700 17px/1 var(--f-display);text-align:right}
@@ -5456,7 +5459,8 @@ function openPlan(tripId){
   const t = tripId ? state.tripMap[tripId] : null;
   const who = t ? (t.traveller === 'Anubhav' ? 'a' : t.traveller === 'Sulekha' ? 's' : 'both') : (usernameOf(state.user) === 'sulekha' ? 's' : 'both');
   const prev = state.plan && !tripId && !state.plan.tripId ? state.plan : null;
-  state.plan = prev || { tripId: t ? tripId : null, who, start: t?.start || '', end: t?.end || '', nights: 2, nonstop: false, eve: true,
+  let cond = ''; try { cond = localStorage.getItem('planCond') || ''; } catch {}
+  state.plan = prev || { tripId: t ? tripId : null, who, start: t?.start || '', end: t?.end || '', nights: 2, nonstop: false, eve: true, cond,
     off: {}, res: null, busy: false, err: '' };
   if (!prev && t?.start && t?.end) state.plan.nights = Math.max(0, Math.min(3, planDays(t.start, t.end) - 1));
   $('#planTitle').textContent = t ? 'Flights for ' + t.name : 'Plan a trip';
@@ -5589,10 +5593,53 @@ function planRenderMeet(P, el){
     ['Cheapest', by((x, y) => (x.price + x.hotel) - (y.price + y.hotel), (x, y) => y.together - x.together), ''],
     ['Most time together', by((x, y) => y.together - x.together, (x, y) => x.price - y.price), ''],
   ].filter(([, m], j, arr) => arr.findIndex(([, n]) => n === m) === j) : [];
-  el.innerHTML = head + (errs.length ? `<p class="err" style="margin:0">Some days couldn’t be searched: ${esc(errs.join('; '))}</p>` : '')
+  el.innerHTML = head + (errs.length ? `<p class="err" style="margin:0">Some days couldn’t be searched: ${esc(errs.join('; '))}</p>` : '') + (list.length ? planAiBox(P) : '')
     + (picks.length ? `<div class="plsec">${picks.map(([l, m, n], j) => planMeetCard(l, m, n, j === 0)).join('')}</div>`
       : `<p class="muted" style="margin:0">No flights line up for both of you${P.nonstop ? ' nonstop' : ''} with at least ${P.nights} night${P.nights === 1 ? '' : 's'}. Try fewer nights or another place.</p>`)
     + `<p class="muted" style="margin:8px 0 0;font-size:12px">Flight prices per person, one way each, from Google Flights${P.res.left != null ? ` · ${P.res.left} searches left this month` : ''}. Hotel is Google’s “from” price a night, for the nights you overlap.</p>`;
+}
+// --- "Ask AI to choose": the combinations found plus the conditions typed in plain words go to the model ---
+const planLegTxt = x => `${wday(x.dep)} ${shortDate(x.dep.slice(0, 10))} ${hhmm(x.dep)} ${x.from} → ${x.to} ${hhmm(x.arr)}${x.arr.slice(0, 10) !== x.dep.slice(0, 10) ? ' (next day)' : ''}, ${x.airline || '?'} ${x.numbers.join('/')}, ${x.stops ? x.stops + ' stop' + (x.via.length ? ' via ' + x.via.join('/') : '') : 'nonstop'}, ${x.minutes ? durTxt(x.minutes) : '?'}, €${x.price}${x.eve ? ', evening before the trip' : ''}`;
+function planCandidates(P){
+  // A short list keeps the request small (Groq's free tier limits tokens a minute): the best by value, plus the cheapest and longest.
+  const pick = (list, n) => { const by = f => [...list].sort(f); const k = Math.ceil(n / 2); return [...new Set([...by((x, y) => x.value - y.value).slice(0, n), ...by((x, y) => x.price - y.price).slice(0, k), ...by((x, y) => y.together - x.together).slice(0, k)])]; };
+  if (P.who === 'meet'){
+    return pick(planMeetCombos(P), 14).map((m, i) => ({ id: 'm' + i, m,
+      text: `Anubhav out: ${planLegTxt(m.a.o)} | Anubhav back: ${planLegTxt(m.a.r)} | Sulekha out: ${planLegTxt(m.b.o)} | Sulekha back: ${planLegTxt(m.b.r)} | flights €${m.price} for both${m.hotel ? `, hotel about €${m.hotel}` : ''} | together ${togetherTxt(m.together)}, ${m.nights} nights | first lands ${durTxt(Math.round(m.gap))} before the other` }));
+  }
+  const dirs = P.who === 'both' ? ['a', 's'] : [P.who];
+  return dirs.flatMap(d => pick(planCombos(P, d), dirs.length > 1 ? 10 : 16).map((c, i) => ({ id: d + i, d, c,
+    text: `${PLAN_DIRS[d].who} travels to ${PLAN_SIDES[PLAN_DIRS[d].to].city} | out: ${planLegTxt(c.o)} | back: ${planLegTxt(c.r)} | €${c.price} | together ${togetherTxt(c.together)}, ${planDays(c.o.date, c.r.date)} nights | door to door ${durTxt(c.travel)} of travel` })));
+}
+function planAiContext(P){
+  const ap = side => Object.entries(PLAN_SIDES[side].ap).filter(([c]) => !P.off[c]).map(([c, [n, m]]) => `${c} ${n} (${durTxt(m)} from ${PLAN_SIDES[side].city})`).join(', ');
+  return [`Today ${today()}. Free to travel from ${P.start} (${wday(P.start)}) to ${P.end} (${wday(P.end)})${P.eve ? `, also flights the evening before from ${PLAN_EVE}` : ''}; at least ${P.nights} nights.`,
+    P.who === 'meet' ? `They meet in ${P.dest.name}, ${P.dest.country || ''}, both flying there.` : P.who === 'both' ? 'Either Anubhav flies to Rome or Sulekha flies to Ingolstadt; compare both.' : `${PLAN_DIRS[P.who].who} flies to ${PLAN_SIDES[PLAN_DIRS[P.who].to].city}.`,
+    `Anubhav's airports: ${ap('ing')}. Sulekha's airports: ${ap('rome')}.`, P.nonstop ? 'Only nonstop flights were kept.' : ''].filter(Boolean).join('\n');
+}
+function planAiBox(P){
+  const A = P.ai || {};
+  let picks = '';
+  if (A.picks?.length) picks = A.picks.map((p, j) => { const x = A.cand[p.id]; if (!x) return '';
+    return `<div class="plwhy"><strong>${esc(p.label)}</strong> ${esc(p.why)}</div>` + (x.m ? planMeetCard('AI pick', x.m, '', j === 0) : planCard('AI pick', x.c, x.d, '', j === 0)); }).join('');
+  return `<div class="plai"><label class="f full" style="margin:0">What matters to you <span class="muted">(optional)</span>
+      <textarea id="planCond" rows="2" placeholder="e.g. I can only leave after 17:00 on Wednesday, rather Munich than Memmingen, Sulekha doesn’t want to land after 22:00, a bit more money is fine for more time together">${esc(P.cond || '')}</textarea></label>
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><span class="plmeta">The AI sees every combination found here and picks with your conditions in mind.</span>
+      <button class="btn small ${A.picks ? '' : 'primary'}" type="button" data-planai ${A.busy ? 'disabled' : ''}>${A.busy ? 'Thinking…' : A.picks ? 'Ask again' : '✦ Ask AI to choose'}</button></div>
+    ${A.err ? `<p class="err" style="margin:0">${esc(A.err)}</p>` : ''}
+    ${A.summary ? `<div class="plcmp">${esc(A.summary)}</div>` : ''}${picks}</div>`;
+}
+async function planAsk(){
+  const P = state.plan, cand = planCandidates(P);
+  if (!cand.length){ P.ai = { err: 'No flight combinations to choose from yet.' }; return planRender(); }
+  P.ai = { busy: true }; planRender();
+  try {
+    const r = await api('/api/trip-ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ context: planAiContext(P), conditions: P.cond || '', options: cand.map(({ id, text }) => ({ id, text })) }) });
+    const j = await r.json();
+    P.ai = { ...j, cand: Object.fromEntries(cand.map(x => [x.id, x])) };
+    if (!j.picks?.length) P.ai.err = j.summary ? '' : 'The AI didn’t pick anything. Try rewording the conditions.';
+  } catch (x){ P.ai = { err: x.message }; }
+  if (state.plan === P) planRender();
 }
 function planRender(){
   const P = state.plan, el = $('#planOut');
@@ -5621,7 +5668,7 @@ function planRender(){
     const [c, e] = best.a.price <= best.s.price ? ['a', 's'] : ['s', 'a'], diff = best[e].price - best[c].price;
     cmp = `<div class="plcmp">${diff < 5 ? 'About the same either way' : `<strong>${PLAN_DIRS[c].who} travelling is ${eur0.format(diff)} cheaper</strong>`}: best value ${eur0.format(best.a.price)} for Anubhav to Rome, ${eur0.format(best.s.price)} for Sulekha to Ingolstadt.</div>`;
   }
-  el.innerHTML = (errs.length ? `<p class="err" style="margin:0">Some days couldn’t be searched: ${esc(errs.join('; '))}</p>` : '') + cmp + secs.join('')
+  el.innerHTML = (errs.length ? `<p class="err" style="margin:0">Some days couldn’t be searched: ${esc(errs.join('; '))}</p>` : '') + planAiBox(P) + cmp + secs.join('')
     + `<p class="muted" style="margin:8px 0 0;font-size:12px">Prices are per person, one way each, from Google Flights${P.res.left != null ? ` · ${P.res.left} searches left this month` : ''}. They change; check before booking.</p>`;
 }
 async function planSearch(){
@@ -5647,7 +5694,7 @@ async function planSearch(){
   const legs = P.err ? [] : planLegs(P);
   if (!P.err && !legs.length) P.err = 'Pick at least one airport on each side.';
   if (P.err) return planRender();
-  P.busy = true; planRender();
+  P.busy = true; P.ai = null; planRender();
   try {
     const r = await api('/api/trip-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ legs: legs.map(({ from, to, date }) => ({ from, to, date })) }) });
     const j = await r.json();
@@ -5715,10 +5762,15 @@ document.addEventListener('click', e => {
   const w = t.closest('[data-planwho]'); if (w){ const P = state.plan, was = P.who; P.who = w.dataset.planwho; if ((was === 'meet') !== (P.who === 'meet')) P.res = null; planForm(); planRender(); return; }
   const pl = t.closest('[data-planplace]'); if (pl){ const P = state.plan; P.dest = planPlaces(P)[+pl.dataset.planplace]; P.res = null; planCost(); planSearch(); return; }
   if (t.closest('[data-planback]')){ const P = state.plan; P.dest = null; P.res = null; planCost(); planRender(); return; }
+  if (t.closest('[data-planai]')){ planAsk(); return; }
   const mu = t.closest('[data-planmeet]'); if (mu){ mu.disabled = true; planUseMeet(+mu.dataset.planmeet); return; }
   if (t.id === 'planGo'){ planSearch(); return; }
   if (t.closest('#planClose')){ $('#planDlg').close(); return; }
   const u = t.closest('[data-planuse]'); if (u){ u.disabled = true; planUse(+u.dataset.planuse); return; }
+});
+document.addEventListener('input', e => {
+  if (e.target.id !== 'planCond' || !state.plan) return;
+  state.plan.cond = e.target.value; try { localStorage.setItem('planCond', e.target.value); } catch {}
 });
 // Any "from / to" date pair: the second calendar starts from the first date.
 document.addEventListener('change', e => {
@@ -5735,7 +5787,7 @@ document.addEventListener('change', e => {
   }
   if (e.target.id === 'planEve'){ state.plan.eve = e.target.value === '1'; planCost(); }
   if (e.target.id === 'planInterest'){ state.plan.interest = e.target.value; state.plan.explore = null; state.plan.dest = null; state.plan.res = null; planCost(); planRender(); }
-  if (e.target.id === 'planNights' || e.target.id === 'planNonstop'){ state.plan.nights = Math.max(0, Math.round(+$('#planNights').value || 0)); state.plan.nonstop = $('#planNonstop').value === '1'; if (state.plan.res) planRender(); }
+  if (e.target.id === 'planNights' || e.target.id === 'planNonstop'){ state.plan.ai = null; state.plan.nights = Math.max(0, Math.round(+$('#planNights').value || 0)); state.plan.nonstop = $('#planNonstop').value === '1'; if (state.plan.res) planRender(); }
 });
 
 function bkPanel(t){
