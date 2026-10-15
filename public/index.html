@@ -1119,6 +1119,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <label class="f">Back by<input id="planEnd" type="date"></label>
       <label class="f">At least (nights)<input id="planNights" type="number" min="0" max="14" step="1" inputmode="numeric"></label>
       <label class="f">Stops<select id="planNonstop"><option value="">Any</option><option value="1">Nonstop only</option></select></label>
+      <label class="f full">The evening before<select id="planEve"><option value="1">Also look at flights the evening before (from 17:00)</option><option value="">No, leave on the first day</option></select></label>
     </div>
     <div id="planAirports" class="planap"></div>
     <label class="f" id="planMeet" hidden>What kind of place<select id="planInterest"><option value="">Popular</option><option value="beaches">Beaches</option><option value="history">History</option><option value="museums">Museums</option><option value="outdoors">Outdoors</option></select></label>
@@ -2665,7 +2666,7 @@ function openTripDlg(t, preset){
   state.editingTrip = t ? t.id : null;
   $('#tripDlgTitle').textContent = t ? 'Edit trip' : 'New trip';
   const src = t || preset || {};
-  T('name').value = src.name || ''; T('start').value = src.start || ''; T('end').value = src.end || '';
+  T('name').value = src.name || ''; T('start').value = src.start || ''; T('end').value = src.end || ''; T('end').min = src.start || '';
   T('traveller').value = src.traveller || (cap(usernameOf(state.user)) === 'Sulekha' ? 'Sulekha' : 'Anubhav');
   T('budget').value = src.budget || ''; T('notes').value = src.notes || '';
   T('currency').value = src.currency || 'EUR';
@@ -5445,6 +5446,7 @@ const PLAN_SIDES = {
 };
 const PLAN_DIRS = { a: { who: 'Anubhav', from: 'ing', to: 'rome' }, s: { who: 'Sulekha', from: 'rome', to: 'ing' } };
 const PLAN_HOUR = 5;   // € an extra hour together is worth, for "best value"
+const PLAN_EVE = '17:00';   // flights the evening before the first day count from this time
 state.plan = null;
 const planDays = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 864e5);
 const hhmm = iso => (iso || '').slice(11, 16);
@@ -5454,7 +5456,7 @@ function openPlan(tripId){
   const t = tripId ? state.tripMap[tripId] : null;
   const who = t ? (t.traveller === 'Anubhav' ? 'a' : t.traveller === 'Sulekha' ? 's' : 'both') : (usernameOf(state.user) === 'sulekha' ? 's' : 'both');
   const prev = state.plan && !tripId && !state.plan.tripId ? state.plan : null;
-  state.plan = prev || { tripId: t ? tripId : null, who, start: t?.start || '', end: t?.end || '', nights: 2, nonstop: false,
+  state.plan = prev || { tripId: t ? tripId : null, who, start: t?.start || '', end: t?.end || '', nights: 2, nonstop: false, eve: true,
     off: {}, res: null, busy: false, err: '' };
   if (!prev && t?.start && t?.end) state.plan.nights = Math.max(0, Math.min(3, planDays(t.start, t.end) - 1));
   $('#planTitle').textContent = t ? 'Flights for ' + t.name : 'Plan a trip';
@@ -5466,6 +5468,7 @@ function planForm(){
   $('#planWho').innerHTML = [['a', 'Anubhav → Rome'], ['s', 'Sulekha → Ingolstadt'], ['both', 'Compare both'], ['meet', 'Meet somewhere new']].map(([k, l]) => `<button type="button" role="radio" data-planwho="${k}" aria-checked="${P.who === k}">${l}</button>`).join('');
   $('#planStart').value = P.start; $('#planEnd').value = P.end; $('#planNights').value = P.nights; $('#planNonstop').value = P.nonstop ? '1' : '';
   $('#planMeet').hidden = P.who !== 'meet'; $('#planInterest').value = P.interest || '';
+  $('#planEve').value = P.eve ? '1' : ''; $('#planEnd').min = P.start || '';
   $('#planAirports').innerHTML = Object.values(PLAN_SIDES).map(sd => `<div class="row"><span>${sd.city}</span>${Object.entries(sd.ap).map(([c, [n, acc]]) =>
     `<label title="about ${durTxt(acc)} from ${sd.city}"><input type="checkbox" data-planap="${c}" ${P.off[c] ? '' : 'checked'}> ${c} <span class="muted">${n}</span></label>`).join('')}</div>`).join('');
   planCost();
@@ -5476,10 +5479,12 @@ function planLegs(P){
   if (!P.start || !P.end || P.end <= P.start) return [];
   if (P.who === 'meet' && !P.dest) return [];
   const outs = [P.start, addDays(P.start, 1)].filter(d => d < P.end), rets = [addDays(P.end, -1), P.end].filter(d => d > P.start);
+  const eve = P.eve && addDays(P.start, -1) >= today() ? addDays(P.start, -1) : null;
   const aps = side => planAps(P, side);
   const dirs = P.who === 'both' || P.who === 'meet' ? ['a', 's'] : [P.who], legs = [];
   for (const d of dirs){
     const D = PLAN_DIRS[d], f = aps(D.from), t = P.who === 'meet' ? P.dest.airport : aps(D.to); if (!f || !t) continue;
+    if (eve) legs.push({ dir: d, way: 'out', from: f, to: t, date: eve, eve: true });
     for (const date of [...new Set(outs)]) legs.push({ dir: d, way: 'out', from: f, to: t, date });
     for (const date of [...new Set(rets)]) legs.push({ dir: d, way: 'ret', from: t, to: f, date });
   }
@@ -5494,7 +5499,7 @@ function planCost(){
 // Every outbound × return pair that fits the nights, with price, hours together and travel time.
 function planCombos(P, d){
   const legs = (P.res?.legs || []).filter(l => l.dir === d);
-  const outs = legs.filter(l => l.way === 'out').flatMap(l => (l.options || []).map(o => ({ ...o, date: l.date })));
+  const outs = legs.filter(l => l.way === 'out').flatMap(l => (l.options || []).filter(o => !l.eve || hhmm(o.dep) >= PLAN_EVE).map(o => ({ ...o, date: l.date, eve: !!l.eve })));
   const rets = legs.filter(l => l.way === 'ret').flatMap(l => (l.options || []).map(o => ({ ...o, date: l.date })));
   const home = PLAN_SIDES[PLAN_DIRS[d].from].ap, ok = o => !P.nonstop || o.stops === 0, out = [];
   for (const o of outs) for (const r of rets){
@@ -5519,7 +5524,7 @@ function planPicks(list){
 const gfUrl = l => 'https://www.google.com/travel/flights?hl=en&curr=EUR&q=' + encodeURIComponent(`one way flights from ${l.from} to ${l.to} on ${l.date}`);
 function planLegHtml(k, x, d){
   const home = PLAN_SIDES[PLAN_DIRS[d].from], ap = k === 'Out' ? x.from : x.to, acc = home.ap[ap];
-  return `<div class="plleg"><span class="k">${k}</span><span><strong>${wday(x.dep)} ${shortDate(x.dep.slice(0, 10))} · ${hhmm(x.dep)} ${x.from} → ${hhmm(x.arr)} ${x.to}</strong>
+  return `<div class="plleg"><span class="k">${k}</span><span><strong>${wday(x.dep)} ${shortDate(x.dep.slice(0, 10))} · ${hhmm(x.dep)} ${x.from} → ${hhmm(x.arr)} ${x.to}</strong>${x.eve ? ' <span class="tag">evening before</span>' : ''}
     <small>${esc(x.airline || '')}${x.numbers.length ? ' ' + esc(x.numbers.join(', ')) : ''} · ${x.stops ? x.stops + ' stop' + (x.stops > 1 ? 's' : '') + (x.via.length ? ' via ' + esc(x.via.join(', ')) : '') : 'nonstop'}${x.minutes ? ' · ' + durTxt(x.minutes) : ''}${x.overnight ? ' · overnight' : ''} · ${eur0.format(x.price)}${acc ? ` · ${ap} is about ${durTxt(acc[1])} from ${home.city}` : ''}</small></span></div>`;
 }
 function planCard(label, c, d, note, top){
@@ -5621,7 +5626,7 @@ function planRender(){
 }
 async function planSearch(){
   const P = state.plan;
-  Object.assign(P, { start: $('#planStart').value, end: $('#planEnd').value, nights: Math.max(0, Math.round(+$('#planNights').value || 0)), nonstop: $('#planNonstop').value === '1' });
+  Object.assign(P, { start: $('#planStart').value, end: $('#planEnd').value, nights: Math.max(0, Math.round(+$('#planNights').value || 0)), nonstop: $('#planNonstop').value === '1', eve: $('#planEve').value === '1' });
   P.err = '';
   if (!P.start || !P.end) P.err = 'Pick when you can leave and when you need to be back.';
   else if (P.end <= P.start) P.err = '“Back by” has to be after “Leave from”.';
@@ -5715,10 +5720,20 @@ document.addEventListener('click', e => {
   if (t.closest('#planClose')){ $('#planDlg').close(); return; }
   const u = t.closest('[data-planuse]'); if (u){ u.disabled = true; planUse(+u.dataset.planuse); return; }
 });
+// Any "from / to" date pair: the second calendar starts from the first date.
+document.addEventListener('change', e => {
+  if (e.target.id === 't-start' && e.target.value){ const end = $('#t-end'); end.min = e.target.value; if (!end.value || end.value < e.target.value) end.value = e.target.value; }
+});
 document.addEventListener('change', e => {
   if (!state.plan) return;
   const a = e.target.closest && e.target.closest('[data-planap]'); if (a){ state.plan.off[a.dataset.planap] = !a.checked; if (state.plan.who === 'meet' && !state.plan.dest) state.plan.explore = null; planCost(); return; }
-  if (['planStart', 'planEnd'].includes(e.target.id)){ state.plan[e.target.id === 'planStart' ? 'start' : 'end'] = e.target.value; state.plan.explore = null; state.plan.dest = null; planCost(); }
+  if (['planStart', 'planEnd'].includes(e.target.id)){
+    const P = state.plan; P[e.target.id === 'planStart' ? 'start' : 'end'] = e.target.value; P.explore = null; P.dest = null;
+    // The "back by" calendar starts from the start date.
+    if (e.target.id === 'planStart' && P.start){ $('#planEnd').min = P.start; if (!P.end || P.end < P.start){ P.end = P.start; $('#planEnd').value = P.start; } }
+    planCost();
+  }
+  if (e.target.id === 'planEve'){ state.plan.eve = e.target.value === '1'; planCost(); }
   if (e.target.id === 'planInterest'){ state.plan.interest = e.target.value; state.plan.explore = null; state.plan.dest = null; state.plan.res = null; planCost(); planRender(); }
   if (e.target.id === 'planNights' || e.target.id === 'planNonstop'){ state.plan.nights = Math.max(0, Math.round(+$('#planNights').value || 0)); state.plan.nonstop = $('#planNonstop').value === '1'; if (state.plan.res) planRender(); }
 });
