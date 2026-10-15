@@ -97,3 +97,15 @@ Each trip has a "To book" list (`toBook` collection): what to book, the date it'
 overdue show on the Overview, the 21:00 reminder lists those due within 3 days, and saving a matching booking in the
 trip ticks the item off and links it. Typing it in plain words ("flights to Rome on 12 Nov and back on the 15th")
 and "Fill in" turns it into items via `/api/tobook` (Groq), shown for checking before they are added.
+
+## Trip planner (flight prices)
+
+Trips → **✈ Plan a trip** (or **✈ Find flights** on a visit) searches Google Flights for each day in the window:
+leaving on the first or second day, coming back on the last or the one before, for Anubhav → Rome, Sulekha →
+Ingolstadt, or both to compare. It ranks the pairs as best value (each hour together counts as €5), cheapest and
+most time together, and **Plan this trip** creates the trip (or uses the visit already on those dates) with both
+flights on its To book list.
+
+Setup: sign up at serpapi.com (free plan: 250 searches a month), copy **Your Private API Key** from the dashboard
+and add it in Netlify as `SERPAPI_KEY`, then redeploy. One planner run uses up to 8 searches; the same day and
+airports again within 6 hours come from the cache (`flightSearch` in Firestore, server only).

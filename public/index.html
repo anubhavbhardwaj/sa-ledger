@@ -203,6 +203,29 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .bk.co .ti{font-weight:500}
 .chip{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600;white-space:nowrap}
 .bkdlg{width:min(640px,calc(100vw - 20px))}
+.plandlg{width:min(760px,calc(100vw - 20px))}
+.planap{display:grid;gap:6px;font-size:13px}
+.planap .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.planap .row>span:first-child{color:var(--muted);min-width:92px}
+@media (max-width:560px){.planap .row>span:first-child{flex-basis:100%}}
+.planap label{display:inline-flex;gap:5px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer}
+.planap input{accent-color:var(--accent)}
+.plsec{display:grid;gap:10px;margin-top:6px}
+.plsec h4{margin:6px 0 0;font:700 15px/1.3 var(--f-display)}
+.plcmp{padding:10px 12px;border-radius:10px;background:var(--accent-soft);font-size:13.5px}
+.plcard{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+.plcard.top{border-color:var(--accent)}
+.plhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.plhead .tag2{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+.plhead .pr{font:700 20px/1 var(--f-display)}
+.plleg{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;font-size:13.5px}
+.plleg .k{color:var(--muted);font-size:12px;padding-top:1px}
+.plleg small{display:block;color:var(--muted);font-size:12.5px}
+.plmeta{font-size:12.5px;color:var(--muted)}
+.plact{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.plmore summary{cursor:pointer;color:var(--muted);font-size:13px;padding:4px 0}
+.plrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.plrow small{display:block;color:var(--muted)}
 .bkdlg form{max-height:calc(100dvh - 40px);overflow:auto}
 .bkdrop{border:2px dashed var(--line);border-radius:12px;padding:18px;display:grid;gap:10px;justify-items:center;text-align:center}
 .bkdrop.over{border-color:var(--accent);background:var(--accent-soft)}
@@ -776,7 +799,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <div><button class="btn ghost" type="button" data-back>← Back</button></div>
         <div class="pagehead">
           <div><h1>Trips</h1><p>Visits, holidays and office travel. Link any expense to a trip, whenever it was paid.</p></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="repeatVisit" type="button">Repeat last visit</button><button class="btn" type="button" data-addbk="">+ Booking</button><button class="btn primary" id="newTrip" type="button">+ New trip</button></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="repeatVisit" type="button">Repeat last visit</button><button class="btn" type="button" data-addbk="">+ Booking</button><button class="btn" type="button" data-plan="">✈ Plan a trip</button><button class="btn primary" id="newTrip" type="button">+ New trip</button></div>
         </div>
         <div class="banner" id="tripSetup" hidden></div>
         <div class="banner" data-bkinboxbar hidden></div>
@@ -1078,6 +1101,26 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <button class="btn danger" type="button" id="bkDismiss" hidden>Dismiss email</button>
       <div class="right"><button class="btn" type="button" id="bkCancel">Cancel</button><button class="btn" type="button" id="bkRead" hidden>Read text</button><button class="btn primary" type="submit" id="bkSave" hidden>Save</button></div>
     </div>
+  </form>
+</dialog>
+
+<dialog id="planDlg" class="bkdlg plandlg" aria-labelledby="planTitle">
+  <form id="planForm" novalidate>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 id="planTitle">Plan a trip</h3><button class="btn ghost small" type="button" id="planClose" aria-label="Close">✕</button></div>
+    <div class="seg" role="radiogroup" aria-label="Who travels" id="planWho"></div>
+    <div class="fields">
+      <label class="f">Leave from<input id="planStart" type="date"></label>
+      <label class="f">Back by<input id="planEnd" type="date"></label>
+      <label class="f">At least (nights)<input id="planNights" type="number" min="0" max="14" step="1" inputmode="numeric"></label>
+      <label class="f">Stops<select id="planNonstop"><option value="">Any</option><option value="1">Nonstop only</option></select></label>
+    </div>
+    <div id="planAirports" class="planap"></div>
+    <p class="err" id="planErr" hidden></p>
+    <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">
+      <span class="muted" style="font-size:12.5px" id="planCost"></span>
+      <button class="btn primary" type="button" id="planGo">Find flights</button>
+    </div>
+    <div id="planOut"></div>
   </form>
 </dialog>
 
@@ -2565,6 +2608,7 @@ function renderTripDetail(t){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" type="button" data-edittrip="${esc(t.id)}">Edit trip</button>
         ${t.closed || (t.start && t.start <= today()) ? `<button class="btn" type="button" data-tripclose="${esc(t.id)}">${t.closed ? 'Reopen' : 'Mark as finished'}</button>` : ''}
+        ${t.type === 'visit' && (!t.start || (t.end || t.start) >= today()) ? `<button class="btn" type="button" data-plan="${esc(t.id)}">✈ Find flights</button>` : ''}
         <button class="btn" type="button" data-attach>${state.attachOpen ? 'Close attach' : 'Attach transactions'}</button>
         <button class="btn primary" type="button" data-addtotrip="${esc(t.id)}">+ Add expense</button>
       </div>
@@ -5179,6 +5223,7 @@ const HEALTH = [
   { id: 'capture', name: 'Payment notifications captured', onDemand: true },
   { id: 'extract', name: 'Reading bookings (AI)', onDemand: true },
   { id: 'ask', name: 'Ask AI', onDemand: true },
+  { id: 'plan', name: 'Flight prices (trip planner)', onDemand: true },
 ];
 function healthRows(){
   const now = Date.now();
@@ -5383,6 +5428,184 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', e => {
   if (e.target.id === 'tbFor' || e.target.id === 'tbType'){ const by = $('#tbBy'); if (by && (!by.value || by.dataset.auto !== '0')) by.value = tbBy($('#tbType').value, $('#tbFor').value); }
   if (e.target.id === 'tbBy') e.target.dataset.auto = '0';
+});
+
+// --- trip planner: real Google Flights prices (netlify/functions/trip-plan.mjs) for both directions, ranked ---
+// Home is Ingolstadt (airports within reach), the other city Rome. "access" is the rough time from home to the airport.
+const PLAN_SIDES = {
+  ing: { city: 'Ingolstadt', ap: { MUC: ['Munich', 75], NUE: ['Nuremberg', 70], FMM: ['Memmingen', 110] } },
+  rome: { city: 'Rome', ap: { FCO: ['Fiumicino', 45], CIA: ['Ciampino', 45] } },
+};
+const PLAN_DIRS = { a: { who: 'Anubhav', from: 'ing', to: 'rome' }, s: { who: 'Sulekha', from: 'rome', to: 'ing' } };
+const PLAN_HOUR = 5;   // € an extra hour together is worth, for "best value"
+state.plan = null;
+const planDays = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 864e5);
+const hhmm = iso => (iso || '').slice(11, 16);
+const durTxt = m => m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) : '') : m + ' min';
+const togetherTxt = h => { const d = Math.floor(h / 24), r = Math.round(h - d * 24); return (d ? d + ' day' + (d === 1 ? '' : 's') + ' ' : '') + r + ' h'; };
+function openPlan(tripId){
+  const t = tripId ? state.tripMap[tripId] : null;
+  const who = t ? (t.traveller === 'Anubhav' ? 'a' : t.traveller === 'Sulekha' ? 's' : 'both') : (usernameOf(state.user) === 'sulekha' ? 's' : 'both');
+  const prev = state.plan && !tripId && !state.plan.tripId ? state.plan : null;
+  state.plan = prev || { tripId: t ? tripId : null, who, start: t?.start || '', end: t?.end || '', nights: 2, nonstop: false,
+    off: {}, res: null, busy: false, err: '' };
+  if (!prev && t?.start && t?.end) state.plan.nights = Math.max(0, Math.min(3, planDays(t.start, t.end) - 1));
+  $('#planTitle').textContent = t ? 'Flights for ' + t.name : 'Plan a trip';
+  planForm(); planRender();
+  $('#planDlg').showModal();
+}
+function planForm(){
+  const P = state.plan;
+  $('#planWho').innerHTML = [['a', 'Anubhav → Rome'], ['s', 'Sulekha → Ingolstadt'], ['both', 'Compare both']].map(([k, l]) => `<button type="button" role="radio" data-planwho="${k}" aria-checked="${P.who === k}">${l}</button>`).join('');
+  $('#planStart').value = P.start; $('#planEnd').value = P.end; $('#planNights').value = P.nights; $('#planNonstop').value = P.nonstop ? '1' : '';
+  $('#planAirports').innerHTML = Object.values(PLAN_SIDES).map(sd => `<div class="row"><span>${sd.city}</span>${Object.entries(sd.ap).map(([c, [n, acc]]) =>
+    `<label title="about ${durTxt(acc)} from ${sd.city}"><input type="checkbox" data-planap="${c}" ${P.off[c] ? '' : 'checked'}> ${c} <span class="muted">${n}</span></label>`).join('')}</div>`).join('');
+  planCost();
+}
+// Which day searches a run needs: leave on the first or second day, come back on the last or the one before.
+function planLegs(P){
+  if (!P.start || !P.end || P.end <= P.start) return [];
+  const outs = [P.start, addDays(P.start, 1)].filter(d => d < P.end), rets = [addDays(P.end, -1), P.end].filter(d => d > P.start);
+  const aps = side => Object.keys(PLAN_SIDES[side].ap).filter(c => !P.off[c]).join(',');
+  const dirs = P.who === 'both' ? ['a', 's'] : [P.who], legs = [];
+  for (const d of dirs){
+    const D = PLAN_DIRS[d], f = aps(D.from), t = aps(D.to); if (!f || !t) continue;
+    for (const date of [...new Set(outs)]) legs.push({ dir: d, way: 'out', from: f, to: t, date });
+    for (const date of [...new Set(rets)]) legs.push({ dir: d, way: 'ret', from: t, to: f, date });
+  }
+  return legs;
+}
+function planCost(){
+  const n = planLegs(state.plan).length;
+  $('#planCost').textContent = n ? `${n} price search${n === 1 ? '' : 'es'} (free plan: 250 a month; the same days again within 6 hours are free)` : 'Pick the dates first.';
+}
+// Every outbound × return pair that fits the nights, with price, hours together and travel time.
+function planCombos(P, d){
+  const legs = (P.res?.legs || []).filter(l => l.dir === d);
+  const outs = legs.filter(l => l.way === 'out').flatMap(l => (l.options || []).map(o => ({ ...o, date: l.date })));
+  const rets = legs.filter(l => l.way === 'ret').flatMap(l => (l.options || []).map(o => ({ ...o, date: l.date })));
+  const home = PLAN_SIDES[PLAN_DIRS[d].from].ap, ok = o => !P.nonstop || o.stops === 0, out = [];
+  for (const o of outs) for (const r of rets){
+    if (!ok(o) || !ok(r) || planDays(o.date, r.date) < P.nights || r.dep <= o.arr) continue;
+    const together = (Date.parse(r.dep + ':00Z') - Date.parse(o.arr + ':00Z')) / 3.6e6;
+    const travel = (o.minutes || 0) + (r.minutes || 0) + (home[o.from]?.[1] || 60) + (home[r.to]?.[1] || 60);
+    out.push({ o, r, price: o.price + r.price, together, travel, value: o.price + r.price - PLAN_HOUR * together });
+  }
+  return out;
+}
+function planPicks(list){
+  if (!list.length) return [];
+  const by = (f, g) => [...list].sort((x, y) => f(x, y) || g(x, y))[0];
+  const picks = [
+    ['Best value', by((x, y) => x.value - y.value, (x, y) => x.price - y.price), `cheapest once each hour together counts as €${PLAN_HOUR}`],
+    ['Cheapest', by((x, y) => x.price - y.price, (x, y) => y.together - x.together), ''],
+    ['Most time together', by((x, y) => y.together - x.together, (x, y) => x.price - y.price), ''],
+  ];
+  const seen = new Set();
+  return picks.filter(([, c]) => { const k = c.o.numbers.join() + c.o.dep + c.r.numbers.join() + c.r.dep; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+const gfUrl = l => 'https://www.google.com/travel/flights?hl=en&curr=EUR&q=' + encodeURIComponent(`one way flights from ${l.from} to ${l.to} on ${l.date}`);
+function planLegHtml(k, x, d){
+  const home = PLAN_SIDES[PLAN_DIRS[d].from], ap = k === 'Out' ? x.from : x.to, acc = home.ap[ap];
+  return `<div class="plleg"><span class="k">${k}</span><span><strong>${wday(x.dep)} ${shortDate(x.dep.slice(0, 10))} · ${hhmm(x.dep)} ${x.from} → ${hhmm(x.arr)} ${x.to}</strong>
+    <small>${esc(x.airline || '')}${x.numbers.length ? ' ' + esc(x.numbers.join(', ')) : ''} · ${x.stops ? x.stops + ' stop' + (x.stops > 1 ? 's' : '') + (x.via.length ? ' via ' + esc(x.via.join(', ')) : '') : 'nonstop'}${x.minutes ? ' · ' + durTxt(x.minutes) : ''}${x.overnight ? ' · overnight' : ''} · ${eur0.format(x.price)}${acc ? ` · ${ap} is about ${durTxt(acc[1])} from ${home.city}` : ''}</small></span></div>`;
+}
+function planCard(label, c, d, note, top){
+  const i = state.plan._cards.push({ c, d }) - 1;
+  return `<div class="plcard ${top ? 'top' : ''}"><div class="plhead"><span><span class="tag2">${label}</span>${note ? ` <span class="plmeta">${note}</span>` : ''}</span><span class="pr">${eur0.format(c.price)}</span></div>
+    ${planLegHtml('Out', c.o, d)}${planLegHtml('Back', c.r, d)}
+    <div class="plhead"><span class="plmeta">${togetherTxt(c.together)} together in ${PLAN_SIDES[PLAN_DIRS[d].to].city} · ${planDays(c.o.date, c.r.date)} nights · door to door about ${durTxt(c.travel)} of travel</span>
+      <span class="plact"><a class="btn small" href="${gfUrl({ from: c.o.from, to: c.o.to, date: c.o.date })}" target="_blank" rel="noopener">Out on Google</a><a class="btn small" href="${gfUrl({ from: c.r.from, to: c.r.to, date: c.r.date })}" target="_blank" rel="noopener">Back on Google</a>
+      <button class="btn primary small" type="button" data-planuse="${i}">${state.plan.tripId ? 'Add to the trip' : 'Plan this trip'}</button></span></div></div>`;
+}
+function planRender(){
+  const P = state.plan, el = $('#planOut');
+  $('#planErr').hidden = !P.err; $('#planErr').textContent = P.err || '';
+  $('#planGo').disabled = P.busy; $('#planGo').textContent = P.busy ? 'Searching…' : P.res ? 'Search again' : 'Find flights';
+  if (!P.res){ el.innerHTML = P.busy ? '<p class="muted">Asking Google Flights for each day…</p>' : ''; return; }
+  P._cards = [];
+  const dirs = P.who === 'both' ? ['a', 's'] : [P.who];
+  const errs = [...new Set(P.res.legs.filter(l => l.error).map(l => l.error))];
+  const best = {}, secs = dirs.map(d => {
+    const D = PLAN_DIRS[d], list = planCombos(P, d), picks = planPicks(list); best[d] = picks[0]?.[1];
+    const ins = P.res.legs.find(l => l.dir === d && l.insight?.level)?.insight;
+    const rest = [...list].sort((x, y) => x.value - y.value).filter(c => !picks.some(([, p]) => p === c)).slice(0, 8);
+    return `<div class="plsec"><h4>${D.who} → ${PLAN_SIDES[D.to].city}</h4>
+      ${ins ? `<span class="plmeta">Google rates prices for these days as <strong>${esc(ins.level)}</strong>${Array.isArray(ins.typical) ? ` (usually ${eur0.format(ins.typical[0])} to ${eur0.format(ins.typical[1])} one way)` : ''}.</span>` : ''}
+      ${picks.length ? picks.map(([l, c, n], j) => planCard(l, c, d, n, j === 0)).join('')
+        : `<p class="muted" style="margin:0">No flights fit${P.nonstop ? ' nonstop' : ''} with at least ${P.nights} night${P.nights === 1 ? '' : 's'}. Try fewer nights${P.nonstop ? ', allow stops' : ''} or more airports.</p>`}
+      ${rest.length ? `<details class="plmore"><summary>${rest.length} more combinations</summary>${rest.map(c => { const i = P._cards.push({ c, d }) - 1;
+        return `<div class="plrow"><span>${wday(c.o.dep)} ${hhmm(c.o.dep)} ${c.o.from} → ${c.o.to} · back ${wday(c.r.dep)} ${hhmm(c.r.dep)} ${c.r.from} → ${c.r.to}<small>${esc([...new Set([c.o.airline, c.r.airline])].join(' / '))} · ${togetherTxt(c.together)} together</small></span>
+          <span style="display:flex;gap:8px;align-items:center"><strong>${eur0.format(c.price)}</strong><button class="btn small" type="button" data-planuse="${i}">Use</button></span></div>`; }).join('')}</details>` : ''}</div>`;
+  });
+  let cmp = '';
+  if (dirs.length === 2 && best.a && best.s){
+    const [c, e] = best.a.price <= best.s.price ? ['a', 's'] : ['s', 'a'], diff = best[e].price - best[c].price;
+    cmp = `<div class="plcmp">${diff < 5 ? 'About the same either way' : `<strong>${PLAN_DIRS[c].who} travelling is ${eur0.format(diff)} cheaper</strong>`}: best value ${eur0.format(best.a.price)} for Anubhav to Rome, ${eur0.format(best.s.price)} for Sulekha to Ingolstadt.</div>`;
+  }
+  el.innerHTML = (errs.length ? `<p class="err" style="margin:0">Some days couldn’t be searched: ${esc(errs.join('; '))}</p>` : '') + cmp + secs.join('')
+    + `<p class="muted" style="margin:8px 0 0;font-size:12px">Prices are per person, one way each, from Google Flights${P.res.left != null ? ` · ${P.res.left} searches left this month` : ''}. They change; check before booking.</p>`;
+}
+async function planSearch(){
+  const P = state.plan;
+  Object.assign(P, { start: $('#planStart').value, end: $('#planEnd').value, nights: Math.max(0, Math.round(+$('#planNights').value || 0)), nonstop: $('#planNonstop').value === '1' });
+  P.err = '';
+  if (!P.start || !P.end) P.err = 'Pick when you can leave and when you need to be back.';
+  else if (P.end <= P.start) P.err = '“Back by” has to be after “Leave from”.';
+  else if (P.start < today()) P.err = 'That date has passed.';
+  else if (planDays(P.start, P.end) > 21) P.err = 'Keep it to three weeks at most.';
+  const legs = P.err ? [] : planLegs(P);
+  if (!P.err && !legs.length) P.err = 'Pick at least one airport on each side.';
+  if (P.err) return planRender();
+  P.busy = true; planRender();
+  try {
+    const r = await api('/api/trip-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ legs: legs.map(({ from, to, date }) => ({ from, to, date })) }) });
+    const j = await r.json();
+    P.res = { left: j.left, legs: legs.map((l, i) => ({ ...l, ...j.legs[i], dir: l.dir, way: l.way })) };
+  } catch (x){ P.err = x.message; }
+  P.busy = false; if (state.plan === P) planRender();
+}
+// Turn a pick into a trip (or add it to the trip the planner was opened from) with the two flights on its To book list.
+async function planUse(i){
+  const P = state.plan, x = P._cards?.[i]; if (!x) return;
+  const { c, d } = x, D = PLAN_DIRS[d], me = usernameOf(state.user), now = new Date().toISOString();
+  try {
+    // An existing visit by the same person over those dates gets the flights instead of a second trip.
+    let tripId = P.tripId || state.trips.find(t => t.type === 'visit' && t.traveller === D.who && t.start && t.start <= c.r.date && (t.end || t.start) >= c.o.date)?.id;
+    const created = !tripId;
+    if (!tripId){
+      const name = `${PLAN_SIDES[D.to].city} visit, ${MON[+c.o.date.slice(5, 7) - 1]} ${c.o.date.slice(0, 4)}`;
+      tripId = (await addDoc(tripsCol, { name, type: 'visit', traveller: D.who, start: c.o.date, end: c.r.date, createdAt: now, createdBy: me })).id;
+    }
+    const item = (leg, what) => pickDoc(TB_KEYS, { tripId, what, type: 'flight', forDate: leg.date, byDate: tbBy('flight', leg.date), price: leg.price,
+      note: `${leg.airline || ''} ${leg.numbers.join(', ')} · ${hhmm(leg.dep)}–${hhmm(leg.arr)}${leg.stops ? ' · ' + leg.stops + ' stop' + (leg.stops > 1 ? 's' : '') : ' · nonstop'} · seen at ${eur0.format(leg.price)} on ${shortDate(today())}`.trim().slice(0, 300),
+      done: false, createdAt: now, createdBy: me });
+    const b = writeBatch(fs);
+    b.set(doc(toBookCol), item(c.o, `Flight ${c.o.from} → ${c.o.to}`));
+    b.set(doc(toBookCol), item(c.r, `Flight ${c.r.from} → ${c.r.to}`));
+    await b.commit();
+    $('#planDlg').close();
+    state.openTrip = tripId; state.attachOpen = false;
+    if (state.page !== 'trips') location.hash = 'trips'; else render();
+    window.scrollTo(0, 0);
+    toast(created ? 'Trip created with both flights to book' : 'Both flights added to the trip’s To book list');
+    state.plan = null;
+  } catch (e){ P.err = e?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules, then try again.' : writeError(e); planRender(); }
+}
+document.addEventListener('click', e => {
+  const t = e.target;
+  const op = t.closest('[data-plan]'); if (op){ openPlan(op.dataset.plan || null); return; }
+  if (!state.plan) return;
+  const w = t.closest('[data-planwho]'); if (w){ state.plan.who = w.dataset.planwho; planForm(); if (state.plan.res) planRender(); return; }
+  if (t.id === 'planGo'){ planSearch(); return; }
+  if (t.closest('#planClose')){ $('#planDlg').close(); return; }
+  const u = t.closest('[data-planuse]'); if (u){ u.disabled = true; planUse(+u.dataset.planuse); return; }
+});
+document.addEventListener('change', e => {
+  if (!state.plan) return;
+  const a = e.target.closest && e.target.closest('[data-planap]'); if (a){ state.plan.off[a.dataset.planap] = !a.checked; planCost(); return; }
+  if (['planStart', 'planEnd'].includes(e.target.id)){ state.plan[e.target.id === 'planStart' ? 'start' : 'end'] = e.target.value; planCost(); }
+  if (e.target.id === 'planNights' || e.target.id === 'planNonstop'){ state.plan.nights = Math.max(0, Math.round(+$('#planNights').value || 0)); state.plan.nonstop = $('#planNonstop').value === '1'; if (state.plan.res) planRender(); }
 });
 
 function bkPanel(t){
