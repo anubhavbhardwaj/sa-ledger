@@ -112,10 +112,12 @@ export async function handle(req, { env = process.env, verify = verifyToken, fet
   const adults = Math.min(4, Math.max(1, Math.round(+body.adults || 1)));
   const left = async () => { try { const a = await (await f('https://serpapi.com/account.json?api_key=' + encodeURIComponent(env.SERPAPI_KEY))).json(); return a.total_searches_left ?? a.plan_searches_left ?? null; } catch { return null; } };
   const cached = async (id, run) => {
+    // An empty answer is never reused: Google sometimes returns nothing and asking again (or airport by airport) finds flights.
+    const empty = d => !(d?.options?.length || d?.places?.length);
     const hit = cache && await cache.get(id).catch(() => null);
-    if (hit && now - hit.at < TTL) return { ...hit.data, cachedAt: new Date(hit.at).toISOString() };
+    if (hit && now - hit.at < TTL && !empty(hit.data)) return { ...hit.data, cachedAt: new Date(hit.at).toISOString() };
     const r = await run();
-    if (!r.error && cache) await cache.set(id, { at: now, data: r }).catch(() => {});
+    if (!r.error && !empty(r) && cache) await cache.set(id, { at: now, data: r }).catch(() => {});
     return r;
   };
   if (Array.isArray(body.explore)){
