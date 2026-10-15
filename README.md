@@ -106,6 +106,13 @@ Ingolstadt, or both to compare. It ranks the pairs as best value (each hour toge
 most time together, and **Plan this trip** creates the trip (or uses the visit already on those dates) with both
 flights on its To book list.
 
+**Meet somewhere new** looks for a third place instead: two Google Travel Explore searches (from Ingolstadt's and
+Rome's airports, optionally by kind of place: beaches, history, museums, outdoors) give the places across Europe
+both of you can fly to on those dates, cheapest together first, with Google's hotel price. **Check flights** on one
+runs the day searches for both of you (8) and pairs your flights so you overlap the longest for the least money,
+counting the hotel for the nights you're both there. **Plan this trip** makes a holiday for both with four flights
+and the hotel on its To book list.
+
 Setup: sign up at serpapi.com (free plan: 250 searches a month), copy **Your Private API Key** from the dashboard
 and add it in Netlify as `SERPAPI_KEY`, then redeploy. One planner run uses up to 8 searches; the same day and
 airports again within 6 hours come from the cache (`flightSearch` in Firestore, server only).

@@ -3,6 +3,9 @@
 //
 // POST /api/trip-plan { legs: [{ from: 'MUC,NUE,FMM', to: 'FCO,CIA', date: 'YYYY-MM-DD' }, ...], adults }
 //   → { legs: [{ from, to, date, options: [...], insight, error? }], left }
+// POST /api/trip-plan { explore: [{ from: 'MUC,NUE,FMM', start, end, interest }] }  (somewhere new to meet)
+//   → { explore: [{ from, places: [{ id, name, country, airport, price, hotel, minutes, stops, airline }], error? }], left }
+//   Google Travel Explore: return-trip prices from those airports to places across Europe for those dates.
 // Each search costs one SerpApi search (free plan: 250 a month). Results are kept in Firestore for 6 hours, so
 // opening the planner again for the same days costs nothing.
 //
@@ -55,25 +58,57 @@ export async function search(leg, { key, adults, fetch: f }){
   return { options: normalize(j), insight: pi ? { level: pi.price_level || null, low: pi.lowest_price || null, typical: pi.typical_price_range || null } : null };
 }
 
+// Google Travel Explore interests (SerpApi values); '' = popular.
+export const INTERESTS = { '': null, outdoors: '/g/11bc58l13w', beaches: '/m/0b3yr', museums: '/m/09cmq', history: '/m/03g3w' };
+const EUROPE = '/m/02j9z';
+export function normalizePlaces(j){
+  return (j.destinations || []).map(d => ({
+    id: d.destination_id || (d.name + '|' + d.country), name: d.name || null, country: d.country || null,
+    airport: d.destination_airport?.code || null, price: +d.flight_price > 0 ? Math.round(+d.flight_price) : null,
+    hotel: +d.hotel_price > 0 ? Math.round(+d.hotel_price) : null, minutes: +d.flight_duration || null,
+    stops: Number.isFinite(+d.number_of_stops) ? +d.number_of_stops : null, airline: d.airline || null,
+    start: d.start_date || null, end: d.end_date || null,
+  })).filter(d => d.name && d.airport && d.price);
+}
+export async function explore(x, { key, adults, fetch: f }){
+  const q = new URLSearchParams({ engine: 'google_travel_explore', departure_id: x.from, arrival_area_id: EUROPE, type: '1',
+    outbound_date: x.start, return_date: x.end, travel_mode: '1', currency: 'EUR', hl: 'en', gl: 'de', adults: String(adults), api_key: key });
+  if (INTERESTS[x.interest]){ q.delete('travel_mode'); q.set('interest', INTERESTS[x.interest]); }
+  const r = await f('https://serpapi.com/search.json?' + q);
+  let j = {}; try { j = await r.json(); } catch {}
+  if (!r.ok || j.error){
+    const e = String(j.error || 'SerpApi ' + r.status);
+    if (/hasn't returned any results|no results/i.test(e)) return { places: [] };
+    return { error: r.status === 401 || /invalid api key/i.test(e) ? 'SERPAPI_KEY is not valid' : r.status === 429 || /run out of searches/i.test(e) ? 'Monthly SerpApi searches used up' : e.slice(0, 160) };
+  }
+  return { places: normalizePlaces(j) };
+}
+
 export async function handle(req, { env = process.env, verify = verifyToken, fetch: f = fetch, cache, now = Date.now() } = {}){
   if (req.method !== 'POST') return json(405, { error: 'Use POST' });
   if (!env.SERPAPI_KEY) return json(503, { error: 'Flight prices need SERPAPI_KEY in Netlify (free key from serpapi.com).' });
   const m = await member(req, verify); if (m.res) return m.res;
   let body; try { body = await req.json(); } catch { return json(400, { error: 'Bad request' }); }
   const adults = Math.min(4, Math.max(1, Math.round(+body.adults || 1)));
+  const left = async () => { try { const a = await (await f('https://serpapi.com/account.json?api_key=' + encodeURIComponent(env.SERPAPI_KEY))).json(); return a.total_searches_left ?? a.plan_searches_left ?? null; } catch { return null; } };
+  const cached = async (id, run) => {
+    const hit = cache && await cache.get(id).catch(() => null);
+    if (hit && now - hit.at < TTL) return { ...hit.data, cachedAt: new Date(hit.at).toISOString() };
+    const r = await run();
+    if (!r.error && cache) await cache.set(id, { at: now, data: r }).catch(() => {});
+    return r;
+  };
+  if (Array.isArray(body.explore)){
+    const xs = body.explore.filter(x => x && isAirports(x.from) && isDate(x.start) && isDate(x.end) && x.end > x.start && (!x.interest || x.interest in INTERESTS)).slice(0, 2);
+    if (!xs.length) return json(400, { error: 'Nothing to search.' });
+    const res = await Promise.all(xs.map(async x => ({ ...x, ...await cached(['x', x.from, x.start, x.end, x.interest || 'any', adults].join('_').replace(/,/g, '-'),
+      () => explore(x, { key: env.SERPAPI_KEY, adults, fetch: f })) })));
+    return json(200, { explore: res, left: await left() });
+  }
   const legs = (Array.isArray(body.legs) ? body.legs : []).filter(l => l && isAirports(l.from) && isAirports(l.to) && isDate(l.date)).slice(0, MAX_LEGS);
   if (!legs.length) return json(400, { error: 'Nothing to search.' });
-  const res = await Promise.all(legs.map(async l => {
-    const id = [l.from, l.to, l.date, adults].join('_').replace(/,/g, '-');
-    const hit = cache && await cache.get(id).catch(() => null);
-    if (hit && now - hit.at < TTL) return { ...l, ...hit.data, cachedAt: new Date(hit.at).toISOString() };
-    const r = await search(l, { key: env.SERPAPI_KEY, adults, fetch: f });
-    if (!r.error && cache) await cache.set(id, { at: now, data: r }).catch(() => {});
-    return { ...l, ...r };
-  }));
-  let left = null;
-  try { const a = await (await f('https://serpapi.com/account.json?api_key=' + encodeURIComponent(env.SERPAPI_KEY))).json(); left = a.total_searches_left ?? a.plan_searches_left ?? null; } catch {}
-  return json(200, { legs: res, left });
+  const res = await Promise.all(legs.map(async l => ({ ...l, ...await cached([l.from, l.to, l.date, adults].join('_').replace(/,/g, '-'), () => search(l, { key: env.SERPAPI_KEY, adults, fetch: f })) })));
+  return json(200, { legs: res, left: await left() });
 }
 
 export default async (req) => {
@@ -83,8 +118,8 @@ export default async (req) => {
     const res = await handle(req, { cache });
     const body = await res.clone().json().catch(() => ({}));
     if (res.status === 200){
-      const errs = body.legs.filter(l => l.error).map(l => l.error);
-      await beat(db, 'plan', errs.length ? { ok: false, error: errs[0] } : { info: `${body.legs.length} searches${body.left != null ? ', ' + body.left + ' left this month' : ''}` });
+      const list = body.legs || body.explore || [], errs = list.filter(l => l.error).map(l => l.error);
+      await beat(db, 'plan', errs.length ? { ok: false, error: errs[0] } : { info: `${list.length} ${body.explore ? 'place' : 'flight'} searches${body.left != null ? ', ' + body.left + ' left this month' : ''}` });
     } else if (res.status === 503) await beat(db, 'plan', { ok: false, error: body.error });
     return res;
   } catch (e) { console.error('trip-plan failed', e); return json(500, { error: 'Something went wrong searching flights. Try again.' }); }

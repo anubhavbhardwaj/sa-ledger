@@ -204,6 +204,8 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .chip{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600;white-space:nowrap}
 .bkdlg{width:min(640px,calc(100vw - 20px))}
 .plandlg{width:min(760px,calc(100vw - 20px))}
+#planWho{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:560px){#planWho{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .planap{display:grid;gap:6px;font-size:13px}
 .planap .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .planap .row>span:first-child{color:var(--muted);min-width:92px}
@@ -226,6 +228,10 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .plmore summary{cursor:pointer;color:var(--muted);font-size:13px;padding:4px 0}
 .plrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
 .plrow small{display:block;color:var(--muted)}
+.plplace{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.plplace strong{font-size:14.5px}.plplace small{display:block;color:var(--muted);font-size:12.5px}
+.plplace .pr{font:700 17px/1 var(--f-display);text-align:right}
+.plplace .pr small{font:400 12px var(--f-body);color:var(--muted)}
 .bkdlg form{max-height:calc(100dvh - 40px);overflow:auto}
 .bkdrop{border:2px dashed var(--line);border-radius:12px;padding:18px;display:grid;gap:10px;justify-items:center;text-align:center}
 .bkdrop.over{border-color:var(--accent);background:var(--accent-soft)}
@@ -1115,6 +1121,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <label class="f">Stops<select id="planNonstop"><option value="">Any</option><option value="1">Nonstop only</option></select></label>
     </div>
     <div id="planAirports" class="planap"></div>
+    <label class="f" id="planMeet" hidden>What kind of place<select id="planInterest"><option value="">Popular</option><option value="beaches">Beaches</option><option value="history">History</option><option value="museums">Museums</option><option value="outdoors">Outdoors</option></select></label>
     <p class="err" id="planErr" hidden></p>
     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">
       <span class="muted" style="font-size:12.5px" id="planCost"></span>
@@ -5456,27 +5463,32 @@ function openPlan(tripId){
 }
 function planForm(){
   const P = state.plan;
-  $('#planWho').innerHTML = [['a', 'Anubhav → Rome'], ['s', 'Sulekha → Ingolstadt'], ['both', 'Compare both']].map(([k, l]) => `<button type="button" role="radio" data-planwho="${k}" aria-checked="${P.who === k}">${l}</button>`).join('');
+  $('#planWho').innerHTML = [['a', 'Anubhav → Rome'], ['s', 'Sulekha → Ingolstadt'], ['both', 'Compare both'], ['meet', 'Meet somewhere new']].map(([k, l]) => `<button type="button" role="radio" data-planwho="${k}" aria-checked="${P.who === k}">${l}</button>`).join('');
   $('#planStart').value = P.start; $('#planEnd').value = P.end; $('#planNights').value = P.nights; $('#planNonstop').value = P.nonstop ? '1' : '';
+  $('#planMeet').hidden = P.who !== 'meet'; $('#planInterest').value = P.interest || '';
   $('#planAirports').innerHTML = Object.values(PLAN_SIDES).map(sd => `<div class="row"><span>${sd.city}</span>${Object.entries(sd.ap).map(([c, [n, acc]]) =>
     `<label title="about ${durTxt(acc)} from ${sd.city}"><input type="checkbox" data-planap="${c}" ${P.off[c] ? '' : 'checked'}> ${c} <span class="muted">${n}</span></label>`).join('')}</div>`).join('');
   planCost();
 }
 // Which day searches a run needs: leave on the first or second day, come back on the last or the one before.
+const planAps = (P, side) => Object.keys(PLAN_SIDES[side].ap).filter(c => !P.off[c]).join(',');
 function planLegs(P){
   if (!P.start || !P.end || P.end <= P.start) return [];
+  if (P.who === 'meet' && !P.dest) return [];
   const outs = [P.start, addDays(P.start, 1)].filter(d => d < P.end), rets = [addDays(P.end, -1), P.end].filter(d => d > P.start);
-  const aps = side => Object.keys(PLAN_SIDES[side].ap).filter(c => !P.off[c]).join(',');
-  const dirs = P.who === 'both' ? ['a', 's'] : [P.who], legs = [];
+  const aps = side => planAps(P, side);
+  const dirs = P.who === 'both' || P.who === 'meet' ? ['a', 's'] : [P.who], legs = [];
   for (const d of dirs){
-    const D = PLAN_DIRS[d], f = aps(D.from), t = aps(D.to); if (!f || !t) continue;
+    const D = PLAN_DIRS[d], f = aps(D.from), t = P.who === 'meet' ? P.dest.airport : aps(D.to); if (!f || !t) continue;
     for (const date of [...new Set(outs)]) legs.push({ dir: d, way: 'out', from: f, to: t, date });
     for (const date of [...new Set(rets)]) legs.push({ dir: d, way: 'ret', from: t, to: f, date });
   }
   return legs;
 }
 function planCost(){
-  const n = planLegs(state.plan).length;
+  const P = state.plan;
+  if (P.who === 'meet' && !P.dest){ $('#planCost').textContent = P.start && P.end ? '2 searches to find places both of you can fly to (free plan: 250 a month)' : 'Pick the dates first.'; return; }
+  const n = planLegs(P).length;
   $('#planCost').textContent = n ? `${n} price search${n === 1 ? '' : 'es'} (free plan: 250 a month; the same days again within 6 hours are free)` : 'Pick the dates first.';
 }
 // Every outbound × return pair that fits the nights, with price, hours together and travel time.
@@ -5518,10 +5530,71 @@ function planCard(label, c, d, note, top){
       <span class="plact"><a class="btn small" href="${gfUrl({ from: c.o.from, to: c.o.to, date: c.o.date })}" target="_blank" rel="noopener">Out on Google</a><a class="btn small" href="${gfUrl({ from: c.r.from, to: c.r.to, date: c.r.date })}" target="_blank" rel="noopener">Back on Google</a>
       <button class="btn primary small" type="button" data-planuse="${i}">${state.plan.tripId ? 'Add to the trip' : 'Plan this trip'}</button></span></div></div>`;
 }
+// --- meeting somewhere new: places both can reach, then the exact flights there for both ---
+const PLAN_HOME_NAMES = /^(rome|munich|nuremberg|memmingen|ingolstadt)$/i;
+function planPlaces(P){
+  const [a, s] = P.explore || [];
+  if (!a || !s) return [];
+  const home = new Set(Object.values(PLAN_SIDES).flatMap(sd => Object.keys(sd.ap)));
+  const bs = new Map((s.places || []).map(p => [p.id, p]));
+  return (a.places || []).filter(p => bs.has(p.id) && !home.has(p.airport) && !PLAN_HOME_NAMES.test(p.name))
+    .map(p => { const q = bs.get(p.id); return { ...p, a: p, s: q, total: p.price + q.price, hotel: p.hotel || q.hotel }; })
+    .sort((x, y) => x.total - y.total).slice(0, 20);
+}
+function planMeetCombos(P){
+  const A = [...planCombos(P, 'a')].sort((x, y) => x.value - y.value).slice(0, 25), S = [...planCombos(P, 's')].sort((x, y) => x.value - y.value).slice(0, 25), out = [];
+  for (const a of A) for (const b of S){
+    const t0 = Math.max(Date.parse(a.o.arr + ':00Z'), Date.parse(b.o.arr + ':00Z')), t1 = Math.min(Date.parse(a.r.dep + ':00Z'), Date.parse(b.r.dep + ':00Z'));
+    const together = (t1 - t0) / 3.6e6; if (together <= 0) continue;
+    const gap = Math.abs(Date.parse(a.o.arr + ':00Z') - Date.parse(b.o.arr + ':00Z')) / 6e4;
+    const nights = planDays(a.o.date < b.o.date ? b.o.date : a.o.date, a.r.date < b.r.date ? a.r.date : b.r.date);
+    const price = a.price + b.price, hotel = (P.dest.hotel || 0) * Math.max(1, nights);
+    out.push({ a, b, together, gap, nights, price, hotel, value: price + hotel - PLAN_HOUR * 2 * together });
+  }
+  return out;
+}
+function planMeetCard(label, m, note, top){
+  const i = state.plan._meet.push(m) - 1, P = state.plan, first = Date.parse(m.a.o.arr + ':00Z') <= Date.parse(m.b.o.arr + ':00Z') ? 'Anubhav' : 'Sulekha';
+  return `<div class="plcard ${top ? 'top' : ''}"><div class="plhead"><span><span class="tag2">${label}</span>${note ? ` <span class="plmeta">${note}</span>` : ''}</span><span class="pr">${eur0.format(m.price)}<span class="plmeta" style="font-weight:400"> flights</span></span></div>
+    <div class="plmeta" style="font-weight:600;color:var(--ink-2)">Anubhav · ${eur0.format(m.a.price)}</div>${planLegHtml('Out', m.a.o, 'a')}${planLegHtml('Back', m.a.r, 'a')}
+    <div class="plmeta" style="font-weight:600;color:var(--ink-2)">Sulekha · ${eur0.format(m.b.price)}</div>${planLegHtml('Out', m.b.o, 's')}${planLegHtml('Back', m.b.r, 's')}
+    <div class="plhead"><span class="plmeta">${togetherTxt(m.together)} together in ${esc(P.dest.name)} · ${m.nights} night${m.nights === 1 ? '' : 's'}${m.gap >= 30 ? ` · ${first} lands ${durTxt(Math.round(m.gap))} earlier` : ' · you land within half an hour of each other'}${m.hotel ? ` · hotel about ${eur0.format(m.hotel)} more` : ''}</span>
+      <span class="plact"><button class="btn primary small" type="button" data-planmeet="${i}">${P.tripId ? 'Add to the trip' : 'Plan this trip'}</button></span></div></div>`;
+}
+function planRenderMeet(P, el){
+  if (!P.dest){
+    if (!P.explore){ el.innerHTML = P.busy ? '<p class="muted">Looking for places you can both fly to…</p>' : '<p class="muted" style="margin:0">Finds places across Europe with flights from both Ingolstadt’s and Rome’s airports on these dates, cheapest together first. Then check the exact flights for one.</p>'; return; }
+    const list = planPlaces(P), errs = [...new Set(P.explore.filter(x => x.error).map(x => x.error))];
+    el.innerHTML = (errs.length ? `<p class="err" style="margin:0">${esc(errs.join('; '))}</p>` : '') + (list.length
+      ? `<div class="plsec"><h4>Places you can both reach</h4><span class="plmeta">Return flights per person on ${shortDate(P.start)} to ${shortDate(P.end)}, the cheapest Google found for each place. Check one for the exact flights.</span>
+        ${list.map((p, i) => `<div class="plplace"><span><strong>${esc(p.name)}</strong> <span class="muted">${esc(p.country || '')} · ${esc(p.airport)}</span>
+          <small>Anubhav ${eur0.format(p.a.price)}${p.a.stops ? ' (' + p.a.stops + ' stop)' : ''} · Sulekha ${eur0.format(p.s.price)}${p.s.stops ? ' (' + p.s.stops + ' stop)' : ''}${p.hotel ? ' · hotels from ' + eur0.format(p.hotel) + ' a night' : ''}</small></span>
+          <span style="display:flex;gap:10px;align-items:center"><span class="pr">${eur0.format(p.total)}<small><br>both, return</small></span><button class="btn small" type="button" data-planplace="${i}">Check flights</button></span></div>`).join('')}</div>`
+      : '<p class="muted" style="margin:0">No place came up with flights from both sides on these dates. Try other days or “Popular”.</p>')
+      + (P.exploreLeft != null ? `<p class="muted" style="margin:8px 0 0;font-size:12px">${P.exploreLeft} searches left this month.</p>` : '');
+    return;
+  }
+  const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h4 style="margin:0;font:700 16px/1.3 var(--f-display)">${esc(P.dest.name)}, ${esc(P.dest.country || '')}</h4><button class="btn small" type="button" data-planback>← Other places</button></div>`;
+  if (!P.res){ el.innerHTML = head + (P.busy ? '<p class="muted">Checking each day for both of you…</p>' : ''); return; }
+  P._cards = []; P._meet = [];
+  const list = planMeetCombos(P), errs = [...new Set(P.res.legs.filter(l => l.error).map(l => l.error))];
+  const by = (f, g) => [...list].sort((x, y) => f(x, y) || g(x, y))[0];
+  const picks = list.length ? [
+    ['Best value', by((x, y) => x.value - y.value, (x, y) => x.price - y.price), `flights and hotel, each hour together counts as €${PLAN_HOUR} each`],
+    ['Cheapest', by((x, y) => (x.price + x.hotel) - (y.price + y.hotel), (x, y) => y.together - x.together), ''],
+    ['Most time together', by((x, y) => y.together - x.together, (x, y) => x.price - y.price), ''],
+  ].filter(([, m], j, arr) => arr.findIndex(([, n]) => n === m) === j) : [];
+  el.innerHTML = head + (errs.length ? `<p class="err" style="margin:0">Some days couldn’t be searched: ${esc(errs.join('; '))}</p>` : '')
+    + (picks.length ? `<div class="plsec">${picks.map(([l, m, n], j) => planMeetCard(l, m, n, j === 0)).join('')}</div>`
+      : `<p class="muted" style="margin:0">No flights line up for both of you${P.nonstop ? ' nonstop' : ''} with at least ${P.nights} night${P.nights === 1 ? '' : 's'}. Try fewer nights or another place.</p>`)
+    + `<p class="muted" style="margin:8px 0 0;font-size:12px">Flight prices per person, one way each, from Google Flights${P.res.left != null ? ` · ${P.res.left} searches left this month` : ''}. Hotel is Google’s “from” price a night, for the nights you overlap.</p>`;
+}
 function planRender(){
   const P = state.plan, el = $('#planOut');
   $('#planErr').hidden = !P.err; $('#planErr').textContent = P.err || '';
-  $('#planGo').disabled = P.busy; $('#planGo').textContent = P.busy ? 'Searching…' : P.res ? 'Search again' : 'Find flights';
+  const meetList = P.who === 'meet' && !P.dest;
+  $('#planGo').disabled = P.busy; $('#planGo').textContent = P.busy ? 'Searching…' : meetList ? (P.explore ? 'Search places again' : 'Find places') : P.res ? 'Search again' : 'Find flights';
+  if (P.who === 'meet') return planRenderMeet(P, el);
   if (!P.res){ el.innerHTML = P.busy ? '<p class="muted">Asking Google Flights for each day…</p>' : ''; return; }
   P._cards = [];
   const dirs = P.who === 'both' ? ['a', 's'] : [P.who];
@@ -5554,6 +5627,18 @@ async function planSearch(){
   else if (P.end <= P.start) P.err = '“Back by” has to be after “Leave from”.';
   else if (P.start < today()) P.err = 'That date has passed.';
   else if (planDays(P.start, P.end) > 21) P.err = 'Keep it to three weeks at most.';
+  if (!P.err && P.who === 'meet' && !P.dest){
+    const a = planAps(P, 'ing'), b = planAps(P, 'rome');
+    if (!a || !b) P.err = 'Pick at least one airport on each side.';
+    if (P.err) return planRender();
+    P.busy = true; planRender();
+    try {
+      const r = await api('/api/trip-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ explore: [a, b].map(from => ({ from, start: P.start, end: P.end, interest: P.interest || '' })) }) });
+      const j = await r.json(); P.explore = j.explore; P.exploreLeft = j.left;
+    } catch (x){ P.err = x.message; }
+    P.busy = false; if (state.plan === P) planRender();
+    return;
+  }
   const legs = P.err ? [] : planLegs(P);
   if (!P.err && !legs.length) P.err = 'Pick at least one airport on each side.';
   if (P.err) return planRender();
@@ -5592,19 +5677,49 @@ async function planUse(i){
     state.plan = null;
   } catch (e){ P.err = e?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules, then try again.' : writeError(e); planRender(); }
 }
+// A meeting pick becomes a holiday for both (or goes onto the trip it was opened from): four flights and the hotel to book.
+async function planUseMeet(i){
+  const P = state.plan, m = P._meet?.[i]; if (!m) return;
+  const me = usernameOf(state.user), now = new Date().toISOString();
+  const start = [m.a.o.date, m.b.o.date].sort()[0], end = [m.a.r.date, m.b.r.date].sort().pop();
+  try {
+    let tripId = P.tripId || state.trips.find(t => t.type !== 'visit' && t.type !== 'office' && t.traveller === 'Both' && t.start && t.start <= end && (t.end || t.start) >= start)?.id;
+    const created = !tripId;
+    if (!tripId) tripId = (await addDoc(tripsCol, { name: `${P.dest.name}, ${MON[+start.slice(5, 7) - 1]} ${start.slice(0, 4)}`.slice(0, 80), type: 'holiday', traveller: 'Both', start, end, createdAt: now, createdBy: me })).id;
+    const fl = (leg, who) => pickDoc(TB_KEYS, { tripId, what: `Flight ${leg.from} → ${leg.to} (${who})`, type: 'flight', forDate: leg.date, byDate: tbBy('flight', leg.date), price: leg.price,
+      note: `${leg.airline || ''} ${leg.numbers.join(', ')} · ${hhmm(leg.dep)}–${hhmm(leg.arr)}${leg.stops ? ' · ' + leg.stops + ' stop' + (leg.stops > 1 ? 's' : '') : ' · nonstop'} · seen at ${eur0.format(leg.price)} on ${shortDate(today())}`.trim().slice(0, 300),
+      done: false, createdAt: now, createdBy: me });
+    const b = writeBatch(fs);
+    [[m.a.o, 'Anubhav'], [m.a.r, 'Anubhav'], [m.b.o, 'Sulekha'], [m.b.r, 'Sulekha']].forEach(([leg, who]) => b.set(doc(toBookCol), fl(leg, who)));
+    const hIn = [m.a.o.date, m.b.o.date].sort().pop();
+    b.set(doc(toBookCol), pickDoc(TB_KEYS, { tripId, what: `Hotel in ${P.dest.name} (${m.nights} night${m.nights === 1 ? '' : 's'})`.slice(0, 120), type: 'hotel', forDate: hIn, byDate: tbBy('hotel', hIn),
+      price: m.hotel || null, priceEst: m.hotel ? true : null, note: m.hotel ? `Google: hotels from ${eur0.format(P.dest.hotel)} a night` : null, done: false, createdAt: now, createdBy: me }));
+    await b.commit();
+    $('#planDlg').close();
+    state.openTrip = tripId; state.attachOpen = false;
+    if (state.page !== 'trips') location.hash = 'trips'; else render();
+    window.scrollTo(0, 0);
+    toast(created ? `${P.dest.name} trip created with flights and hotel to book` : 'Flights and hotel added to the trip’s To book list');
+    state.plan = null;
+  } catch (e){ P.err = e?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules, then try again.' : writeError(e); planRender(); }
+}
 document.addEventListener('click', e => {
   const t = e.target;
   const op = t.closest('[data-plan]'); if (op){ openPlan(op.dataset.plan || null); return; }
   if (!state.plan) return;
-  const w = t.closest('[data-planwho]'); if (w){ state.plan.who = w.dataset.planwho; planForm(); if (state.plan.res) planRender(); return; }
+  const w = t.closest('[data-planwho]'); if (w){ const P = state.plan, was = P.who; P.who = w.dataset.planwho; if ((was === 'meet') !== (P.who === 'meet')) P.res = null; planForm(); planRender(); return; }
+  const pl = t.closest('[data-planplace]'); if (pl){ const P = state.plan; P.dest = planPlaces(P)[+pl.dataset.planplace]; P.res = null; planCost(); planSearch(); return; }
+  if (t.closest('[data-planback]')){ const P = state.plan; P.dest = null; P.res = null; planCost(); planRender(); return; }
+  const mu = t.closest('[data-planmeet]'); if (mu){ mu.disabled = true; planUseMeet(+mu.dataset.planmeet); return; }
   if (t.id === 'planGo'){ planSearch(); return; }
   if (t.closest('#planClose')){ $('#planDlg').close(); return; }
   const u = t.closest('[data-planuse]'); if (u){ u.disabled = true; planUse(+u.dataset.planuse); return; }
 });
 document.addEventListener('change', e => {
   if (!state.plan) return;
-  const a = e.target.closest && e.target.closest('[data-planap]'); if (a){ state.plan.off[a.dataset.planap] = !a.checked; planCost(); return; }
-  if (['planStart', 'planEnd'].includes(e.target.id)){ state.plan[e.target.id === 'planStart' ? 'start' : 'end'] = e.target.value; planCost(); }
+  const a = e.target.closest && e.target.closest('[data-planap]'); if (a){ state.plan.off[a.dataset.planap] = !a.checked; if (state.plan.who === 'meet' && !state.plan.dest) state.plan.explore = null; planCost(); return; }
+  if (['planStart', 'planEnd'].includes(e.target.id)){ state.plan[e.target.id === 'planStart' ? 'start' : 'end'] = e.target.value; state.plan.explore = null; state.plan.dest = null; planCost(); }
+  if (e.target.id === 'planInterest'){ state.plan.interest = e.target.value; state.plan.explore = null; state.plan.dest = null; state.plan.res = null; planCost(); planRender(); }
   if (e.target.id === 'planNights' || e.target.id === 'planNonstop'){ state.plan.nights = Math.max(0, Math.round(+$('#planNights').value || 0)); state.plan.nonstop = $('#planNonstop').value === '1'; if (state.plan.res) planRender(); }
 });
 
