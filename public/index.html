@@ -1481,8 +1481,9 @@ function renderOverview(ms){
   const net = incTotal - total;
   const earners = group(inc, 'earner');
   const tr = state.transfers.filter(inPeriod).map(t => ({ ...t, ttype: transferType(t) }));
-  const snapInv = investedIn(state.period);
-  const invested = snapInv !== null ? snapInv : sum(tr.filter(t => t.ttype === 'Investment')) - sum(tr.filter(t => t.ttype === 'Withdrawal'));
+  const invBy = investedBy(state.period);
+  const invested = invBy ? invBy.total : 0;
+  const invWho = invBy ? Object.entries(invBy.by).filter(([, v]) => Math.abs(v) >= 1) : [];
   const bud = state.period !== 'all' && (state.budgets.items || []).some(b => b.a > 0) ? budgetStatus(state.period) : null;
   const left = bud ? bud.total.budget - bud.total.spent : null;
   const issues = bud ? ['over','risk'].map(k => bud.rows.filter(r => r.status === k).length) : [0,0];
@@ -1493,7 +1494,7 @@ function renderOverview(ms){
       const tip = `So far ${eur0.format(f.soFar)} + bills and repeats still due ${eur0.format(f.recLeft)}${f.upcoming.length ? ' (' + f.upcoming.map(r => r.name).join(', ') + ')' : ''} + usual spending ${f.rate === null ? '' : eur0.format(f.rate) + '/day × ' + f.left + ' days = ' + eur0.format(f.varLeft)}${f.tripLeft ? ' + trip budgets ' + eur0.format(f.tripLeft) : ''}. Pace from ${f.basis}.`;
       return `<button type="button" class="sub fc linkish" data-fcopen title="${esc(tip)}">Heading for <strong>~${eur0.format(f.total)}</strong> by ${f.D} ${MON[+f.month.slice(5,7)-1]}${f.left > 0 && f.varLeft > 0 ? ` (${eur0.format(f.low)} to ${eur0.format(f.high)})` : ''} <span class="more">· how?</span></button>`; })()}</div>
     <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
-    <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' : ''}</span></div>
+    <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' + (invWho.length > 1 ? ' (' + invWho.map(([k, v]) => esc(k) + ' ' + eur0.format(v)).join(' · ') + ')' : invWho.length === 1 ? ' by ' + esc(invWho[0][0]) : '') : ''}</span></div>
     <div class="kpi"><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
     + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${hm0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : `<span class="${nw.delta >= 0 ? 'pos' : 'neg'}">${signed(nw.delta)}</span> since end of ${MON[+nw.prevM.slice(5,7)-1]}`} · Wealth →</span></a>` : ''; })();
   renderBudgets();
@@ -3313,14 +3314,34 @@ function portfolio(){
   res.last = last;
   return pfCache = res;
 }
-// Euros put into investments in a month (or all time), from the monthly values. null when none recorded.
-function investedIn(period){
-  if (!state.snaps.length) return null;
-  const pf = portfolio(); if (!pf.withData.length) return null;
-  if (period === 'all') return pf.tl.reduce((s,t) => s + t.fresh, 0);
-  const t = pf.tl.find(t => t.m === period);
-  return t ? t.fresh : null;
+// Euros put into investments in a month (or all time), across every investment account of both of you.
+// Per account and month: the amount on that month's value entry (Wealth → Investments) when there is one,
+// otherwise the transfers into it that month (so an account without monthly values, or not updated yet,
+// still counts). Opening balances are not new money. null when nothing at all was recorded.
+function investedBy(period){
+  const accs = state.accounts.filter(a => a.type === 'investment');
+  const inP = m => period === 'all' || m === period;
+  const by = {}; let any = false;
+  for (const a of accs){
+    const n = a.name.toLowerCase(), cur = a.currency || 'EUR', own = a.owner || 'Shared';
+    const snaps = Object.fromEntries(snapsOf(a).filter(x => inP(x.month)).map(x => [x.month, x]));
+    const months = new Set(Object.keys(snaps));
+    const tr = {};
+    for (const t of state.transfers){
+      const m = t.date.slice(0, 7); if (!inP(m)) continue;
+      const v = String(t.to).toLowerCase() === n ? +t.amount || 0 : String(t.from).toLowerCase() === n ? -(+t.amount || 0) : 0;
+      if (v){ tr[m] = (tr[m] || 0) + v; months.add(m); }
+    }
+    for (const m of months){
+      const x = snaps[m];
+      const v = x ? (x.opening ? 0 : (+x.investment || 0) * monthRate(cur, m)) : tr[m] || 0;
+      any = true; by[own] = (by[own] || 0) + v;
+    }
+  }
+  if (!any) return null;
+  return { total: Object.values(by).reduce((s, v) => s + v, 0), by };
 }
+const investedIn = period => investedBy(period)?.total ?? null;
 function pendingByMonth(a, afterMonth){
   const n = a.name.toLowerCase(), td = today(), out = {};
   for (const t of state.transfers){
