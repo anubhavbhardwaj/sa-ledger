@@ -51,11 +51,12 @@ export async function search(leg, { key, adults, fetch: f }){
   if (!r.ok || j.error){
     const e = String(j.error || 'SerpApi ' + r.status);
     // "no results" is an answer, not a failure
-    if (/hasn't returned any results|no results/i.test(e)) return { options: [], insight: null };
+    if (/hasn't returned any results|no results/i.test(e)) return { options: [], insight: null, found: 0, note: 'Google Flights returned no flights' };
     return { error: r.status === 401 || /invalid api key/i.test(e) ? 'SERPAPI_KEY is not valid' : r.status === 429 || /run out of searches/i.test(e) ? 'Monthly SerpApi searches used up' : e.slice(0, 160) };
   }
   const pi = j.price_insights || null;
-  return { options: normalize(j), insight: pi ? { level: pi.price_level || null, low: pi.lowest_price || null, typical: pi.typical_price_range || null } : null };
+  const found = (j.best_flights || []).length + (j.other_flights || []).length;
+  return { options: normalize(j), found, insight: pi ? { level: pi.price_level || null, low: pi.lowest_price || null, typical: pi.typical_price_range || null } : null };
 }
 
 // Google Travel Explore interests (SerpApi values); '' = popular.
@@ -105,9 +106,10 @@ export async function handle(req, { env = process.env, verify = verifyToken, fet
       () => explore(x, { key: env.SERPAPI_KEY, adults, fetch: f })) })));
     return json(200, { explore: res, left: await left() });
   }
-  const legs = (Array.isArray(body.legs) ? body.legs : []).filter(l => l && isAirports(l.from) && isAirports(l.to) && isDate(l.date)).slice(0, MAX_LEGS);
-  if (!legs.length) return json(400, { error: 'Nothing to search.' });
-  const res = await Promise.all(legs.map(async l => ({ ...l, ...await cached([l.from, l.to, l.date, adults].join('_').replace(/,/g, '-'), () => search(l, { key: env.SERPAPI_KEY, adults, fetch: f })) })));
+  // Answers stay in the order asked (the app matches them by position), so a bad leg gets an error, not dropped.
+  const legs = (Array.isArray(body.legs) ? body.legs : []).slice(0, MAX_LEGS);
+  if (!legs.some(l => l && isAirports(l.from) && isAirports(l.to) && isDate(l.date))) return json(400, { error: 'Nothing to search.' });
+  const res = await Promise.all(legs.map(async l => !(l && isAirports(l.from) && isAirports(l.to) && isDate(l.date)) ? { ...l, error: 'Not a valid airport or date: ' + JSON.stringify(l).slice(0, 80) } : ({ ...l, ...await cached([l.from, l.to, l.date, adults].join('_').replace(/,/g, '-'), () => search(l, { key: env.SERPAPI_KEY, adults, fetch: f })) })));
   return json(200, { legs: res, left: await left() });
 }
 
