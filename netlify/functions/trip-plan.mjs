@@ -43,7 +43,7 @@ export function normalize(j){
   return out.sort((x, y) => x.price - y.price).filter(o => { const k = o.numbers.join('|') + o.dep; if (seen.has(k)) return false; seen.add(k); return o.dep && o.arr; }).slice(0, MAX_OPTIONS);
 }
 
-export async function search(leg, { key, adults, fetch: f }){
+async function searchOnce(leg, { key, adults, fetch: f }){
   const q = new URLSearchParams({ engine: 'google_flights', type: '2', departure_id: leg.from, arrival_id: leg.to, outbound_date: leg.date,
     currency: 'EUR', hl: 'en', gl: 'de', adults: String(adults), api_key: key });
   const r = await f('https://serpapi.com/search.json?' + q);
@@ -51,12 +51,31 @@ export async function search(leg, { key, adults, fetch: f }){
   if (!r.ok || j.error){
     const e = String(j.error || 'SerpApi ' + r.status);
     // "no results" is an answer, not a failure
-    if (/hasn't returned any results|no results/i.test(e)) return { options: [], insight: null, found: 0, note: 'Google Flights returned no flights' };
+    if (/hasn't returned any results|no results/i.test(e)) return { json: {}, found: 0 };
     return { error: r.status === 401 || /invalid api key/i.test(e) ? 'SERPAPI_KEY is not valid' : r.status === 429 || /run out of searches/i.test(e) ? 'Monthly SerpApi searches used up' : e.slice(0, 160) };
   }
-  const pi = j.price_insights || null;
-  const found = (j.best_flights || []).length + (j.other_flights || []).length;
-  return { options: normalize(j), found, insight: pi ? { level: pi.price_level || null, low: pi.lowest_price || null, typical: pi.typical_price_range || null } : null };
+  return { json: j, found: (j.best_flights || []).length + (j.other_flights || []).length };
+}
+// One day, one direction. Google sometimes returns nothing for a group of airports (seen for ATH → FCO,CIA) while
+// each airport on its own has flights, so an empty answer for a group is asked again airport by airport.
+export async function search(leg, ctx){
+  const first = await searchOnce(leg, ctx);
+  if (first.error) return { error: first.error };
+  let parts = [first.json], found = first.found, split = 0;
+  if (!found){
+    const each = (k) => leg[k].split(',').slice(0, 3).map(c => ({ ...leg, [k]: c }));
+    const alts = leg.to.includes(',') ? each('to') : leg.from.includes(',') ? each('from') : [];
+    if (alts.length){
+      const rs = await Promise.all(alts.map(l => searchOnce(l, ctx)));
+      const ok = rs.filter(x => !x.error);
+      if (!ok.length && rs.length) return { error: rs[0].error };
+      parts = ok.map(x => x.json); found = ok.reduce((n, x) => n + x.found, 0); split = alts.length;
+    }
+  }
+  const pi = parts.find(j => j.price_insights)?.price_insights || null;
+  const merged = { best_flights: parts.flatMap(j => j.best_flights || []), other_flights: parts.flatMap(j => j.other_flights || []) };
+  return { options: normalize(merged), found, split, note: found ? null : 'Google Flights returned no flights' + (split ? ` (also asked each airport: ${split} more searches)` : ''),
+    insight: pi ? { level: pi.price_level || null, low: pi.lowest_price || null, typical: pi.typical_price_range || null } : null };
 }
 
 // Google Travel Explore interests (SerpApi values); '' = popular.

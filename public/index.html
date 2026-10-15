@@ -5595,8 +5595,14 @@ function planRenderMeet(P, el){
   ].filter(([, m], j, arr) => arr.findIndex(([, n]) => n === m) === j) : [];
   el.innerHTML = head + (errs.length ? `<p class="err" style="margin:0">Some days couldn’t be searched: ${esc(errs.join('; '))}</p>` : '') + (list.length ? planAiBox(P) : '')
     + (picks.length ? `<div class="plsec">${picks.map(([l, m, n], j) => planMeetCard(l, m, n, j === 0)).join('')}</div>`
-      : `<p class="muted" style="margin:0">No flights line up for both of you${P.nonstop ? ' nonstop' : ''} with at least ${P.nights} night${P.nights === 1 ? '' : 's'}. See below what each day’s search found.</p>`) + planSearchLog(P)
+      : `<p class="muted" style="margin:0">${planGaps(P) || `No flights line up for both of you${P.nonstop ? ' nonstop' : ''} with at least ${P.nights} night${P.nights === 1 ? '' : 's'}.`} See below what each day’s search found.</p>`) + planSearchLog(P)
     + `<p class="muted" style="margin:8px 0 0;font-size:12px">Flight prices per person, one way each, from Google Flights${P.res.left != null ? ` · ${P.res.left} searches left this month` : ''}. Hotel is Google’s “from” price a night, for the nights you overlap.</p>`;
+}
+// "No return flights found for Sulekha (29 Mar, 30 Mar)": which side came back empty, when nothing pairs up.
+function planGaps(P){
+  const by = {};
+  for (const l of P.res?.legs || []){ const k = l.dir + l.way; (by[k] ||= { l, any: false, days: [] }); if ((l.options || []).some(o => !l.eve || hhmm(o.dep) >= PLAN_EVE)) by[k].any = true; else by[k].days.push(shortDate(l.date)); }
+  return Object.values(by).filter(x => !x.any).map(x => `No ${x.l.way === 'out' ? 'outbound' : 'return'} flights found for ${PLAN_DIRS[x.l.dir].who} (${x.days.join(', ')}).`).join(' ');
 }
 // What each day search came back with, so an empty result can be traced (no flights, all before 17:00, too few nights...).
 function planSearchLog(P){
@@ -5604,7 +5610,7 @@ function planSearchLog(P){
   const who = d => PLAN_DIRS[d].who;
   return `<details class="plmore"><summary>What the searches found</summary>${legs.map(l => {
     const n = (l.options || []).length, eveN = l.eve ? (l.options || []).filter(o => hhmm(o.dep) >= PLAN_EVE).length : null;
-    return `<div class="plrow"><span>${who(l.dir)} ${l.way === 'out' ? 'out' : 'back'} · ${wday(l.date)} ${shortDate(l.date)} · ${esc(l.from.replace(/,/g, '/'))} → ${esc(l.to.replace(/,/g, '/'))}${l.eve ? ' (from 17:00)' : ''}${l.cachedAt ? ' · saved result' : ''}
+    return `<div class="plrow"><span>${who(l.dir)} ${l.way === 'out' ? 'out' : 'back'} · ${wday(l.date)} ${shortDate(l.date)} · ${esc(l.from.replace(/,/g, '/'))} → ${esc(l.to.replace(/,/g, '/'))}${l.eve ? ' (from 17:00)' : ''}${l.cachedAt ? ' · saved result' : ''}${l.split ? ' · asked each airport separately' : ''}
       <small>${l.error ? 'Error: ' + esc(l.error) : l.note ? esc(l.note) : `${n} kept of ${l.found ?? n} found${l.eve ? `, ${eveN} after 17:00` : ''}${n ? ` · ${hhmm(l.options.reduce((a, o) => o.dep < a.dep ? o : a).dep)} to ${hhmm(l.options.reduce((a, o) => o.dep > a.dep ? o : a).dep)} · from ${eur0.format(Math.min(...l.options.map(o => o.price)))}` : ''}`}</small></span><span></span></div>`; }).join('')}</details>`;
 }
 // --- "Ask AI to choose": the combinations found plus the conditions typed in plain words go to the model ---
