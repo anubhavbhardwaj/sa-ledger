@@ -1,0 +1,23 @@
+# Runs on every push: the server tests (also run by Netlify before each deploy) and the browser tests.
+name: Tests
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Server and rules tests
+        run: npm test
+      - name: Install the test browser
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: Browser tests
+        run: npm run test:e2e

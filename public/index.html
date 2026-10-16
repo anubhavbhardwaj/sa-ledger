@@ -5608,7 +5608,7 @@ function planGaps(P){
 function planSearchLog(P){
   const legs = P.res?.legs || []; if (!legs.length) return '';
   const who = d => PLAN_DIRS[d].who;
-  return `<details class="plmore"><summary>What the searches found <span class="muted" style="font-size:11px">(server ${esc(P.res.v || 'old')})</span></summary>${legs.map(l => {
+  return `<details class="plmore pllog"><summary>What the searches found <span class="muted" style="font-size:11px">(server ${esc(P.res.v || 'old')})</span></summary>${legs.map(l => {
     const n = (l.options || []).length, eveN = l.eve ? (l.options || []).filter(o => hhmm(o.dep) >= PLAN_EVE).length : null;
     return `<div class="plrow"><span>${who(l.dir)} ${l.way === 'out' ? 'out' : 'back'} · ${wday(l.date)} ${shortDate(l.date)} · ${esc(l.from.replace(/,/g, '/'))} → ${esc(l.to.replace(/,/g, '/'))}${l.eve ? ' (from 17:00)' : ''}${l.cachedAt ? ' · saved result' : ''}${l.split ? ' · asked each airport separately' : ''}
       <small>${l.error ? 'Error: ' + esc(l.error) : l.note ? esc(l.note) : `${n} kept of ${l.found ?? n} found${l.eve ? `, ${eveN} after 17:00` : ''}${n ? ` · ${hhmm(l.options.reduce((a, o) => o.dep < a.dep ? o : a).dep)} to ${hhmm(l.options.reduce((a, o) => o.dep > a.dep ? o : a).dep)} · from ${eur0.format(Math.min(...l.options.map(o => o.price)))}` : ''}`}</small></span><span></span></div>`; }).join('')}</details>`;

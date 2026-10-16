@@ -116,3 +116,14 @@ and the hotel on its To book list.
 Setup: sign up at serpapi.com (free plan: 250 searches a month), copy **Your Private API Key** from the dashboard
 and add it in Netlify as `SERPAPI_KEY`, then redeploy. One planner run uses up to 8 searches; the same day and
 airports again within 6 hours come from the cache (`flightSearch` in Firestore, server only).
+
+## Tests
+
+- `npm test`: server functions and the Firestore rules (node's built-in test runner, no extra packages). Netlify
+  runs this before every deploy, so a failing test stops the deploy and the live site stays as it was.
+- `npm run test:e2e`: the app in a real browser (Chromium via Playwright), desktop and phone size, with a fake
+  Firebase (`tests/e2e/mock`) and the real `/api` handlers talking to fake SerpApi and Groq. Needs
+  `npm install --no-save playwright@1.56.0 && npx playwright install chromium` once.
+- GitHub Actions runs both on every push (`.github/workflows/test.yml`).
+- The fake Firestore refuses any field `firestore.rules` doesn't allow, read from the rules file itself, and
+  `tests/unit/rules.test.mjs` checks every field list the app saves with against the rules.

@@ -2,7 +2,12 @@
   "name": "sa-ledger",
   "private": true,
   "type": "module",
-  "description": "S&A Ledger: static app in public/, capture function in netlify/functions/",
+  "description": "S&A Ledger: static app in public/, serverless functions in netlify/functions/",
+  "scripts": {
+    "test": "node --test \"tests/unit/*.test.mjs\"",
+    "test:e2e": "node --test --test-concurrency=1 \"tests/e2e/*.test.mjs\"",
+    "test:all": "npm test && npm run test:e2e"
+  },
   "dependencies": {
     "firebase-admin": "^13.0.0"
   }

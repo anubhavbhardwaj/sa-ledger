@@ -1,7 +1,11 @@
-# Netlify serves the app straight from /public. No build step.
+# Netlify serves the app straight from /public. The only build step runs the server and rules tests, so a deploy
+# with a failing test stops here and the live site stays as it was. (Browser tests run in GitHub Actions.)
 [build]
   publish = "public"
-  command = ""
+  command = "npm test"
+
+[build.environment]
+  NODE_VERSION = "22"
 
 [functions]
   directory = "netlify/functions"
