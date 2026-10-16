@@ -113,3 +113,28 @@ test('what if: lower a category for the month and the invested amount goes up', 
   assert.match(await app.text('.wisum'), /€900 more invested that month/);
   await clean(app);
 });
+
+test('trips: finished trips fold away; leave days and the travel budget add up per year', async () => {
+  const app = await openApp(), { page } = app, now = new Date();
+  const y = now.getUTCMonth() >= 9 ? now.getUTCFullYear() + 1 : now.getUTCFullYear();   // the panel opens on next year from October
+  await app.seed({ trips: {
+    old: { name: 'Old visit', type: 'visit', traveller: 'Anubhav', start: d(-40), end: d(-35) },
+    a: { name: 'Easter visit', type: 'visit', traveller: 'Anubhav', start: `${y}-04-01`, end: `${y}-04-06`, vacDays: 3, wfaDays: 1 },
+    b: { name: 'Summer', type: 'holiday', traveller: 'Both', start: `${y}-08-03`, end: `${y}-08-14`, budget: 2000 },
+  }, toBook: { t1: { tripId: 'b', what: 'Flights', type: 'flight', price: 400, done: false } } });
+  await app.go('trips'); await page.waitForSelector('.lvgrid');
+  assert.equal(await page.$eval('#tripPast', el => el.open), false, 'past trips start folded');
+  assert.match(await app.text('#tripPast summary'), /Past and finished \(1\)/);
+  const panel = await app.text('.lvgrid');
+  assert.match(panel, /Vacation days3 of 30/); assert.match(panel, /Work from abroad1 of 15/); assert.match(panel, /€2,000 planned/);
+  assert.match(await app.text('.lvlist'), /Summer.*days not set/);
+  // Set a travel budget for that year
+  await page.click(`[data-leaveedit="${y}"] >> nth=0`); await page.fill('#lv-budget', '5000'); await page.click('#leaveForm [type=submit]'); await page.waitForTimeout(200);
+  assert.match(await app.text('.lvgrid'), /€2,000 of €5,000/);
+  // The trip dialog counts workdays without Bavarian holidays: Easter week 2027, Thu 25 to Tue 30 March = Thu 25 and Tue 30
+  await page.click('#newTrip'); await page.fill('#t-start', '2027-03-25'); await page.dispatchEvent('#t-start', 'change');
+  await page.fill('#t-end', '2027-03-30'); await page.dispatchEvent('#t-end', 'change');
+  assert.match(await app.text('#tripWorkdays'), /^2 workdays in these dates \(not counting Good Friday, Easter Monday\)/);
+  await page.click('#tripUseDays'); await page.fill('#t-name', 'Easter 2027'); await page.click('#tripSave'); await page.waitForTimeout(200);
+  await clean(app);
+});

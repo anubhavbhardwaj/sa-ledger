@@ -105,6 +105,20 @@ a{color:var(--accent)}
 .mwrap{overflow-x:auto}
 /* trips */
 .tgroup{display:grid;gap:10px}
+details.tgroup > summary{font:700 13px/1.2 var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:6px 0 0;cursor:pointer;list-style:none}
+details.tgroup > summary::-webkit-details-marker{display:none}
+details.tgroup > summary::before{content:'▸ ';}
+details.tgroup[open] > summary::before{content:'▾ ';}
+.lvgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.lvbox{display:grid;gap:6px}
+.lvbox .lbl{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.lvbox .val{font:700 22px/1.1 var(--f-display)}
+.lvbox .val small{font:400 13px var(--f-body);color:var(--muted)}
+.lvbar{height:8px;border-radius:99px;background:var(--sunk);overflow:hidden;display:flex}
+.lvbar i{display:block;height:100%}
+.lvlist{display:grid;margin-top:6px}
+.lvrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.lvrow small{display:block;color:var(--muted);font-size:12px}
 .tgroup > h2{font:700 13px/1.2 var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:6px 0 0}
 .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
 .tcard{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:6px;cursor:pointer;color:var(--ink);align-content:start}
@@ -928,12 +942,31 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <label class="f">Local currency<select id="t-currency"></select></label>
       <label class="f full">Notes<input id="t-notes" autocomplete="off"></label>
     </div>
+    <div class="fields" id="tripLeave">
+      <label class="f">Anubhav’s vacation days<input id="t-vac" type="number" step="0.5" min="0" max="60" inputmode="decimal" placeholder="0"></label>
+      <label class="f">Work from abroad days<input id="t-wfa" type="number" step="0.5" min="0" max="60" inputmode="decimal" placeholder="0"></label>
+      <p class="f full muted" id="tripWorkdays" style="margin:0;font-size:12.5px"></p>
+    </div>
     <p class="hint muted" id="tripHint" style="margin:0;font-size:12.5px"></p>
     <p class="err" id="tripErr" hidden></p>
     <div class="dlg-actions">
       <button class="btn danger" id="tripDel" type="button" hidden>Delete trip</button>
       <div class="right"><button class="btn" id="tripCancel" type="button">Cancel</button><button class="btn primary" id="tripSave" type="submit">Save trip</button></div>
     </div>
+  </form>
+</dialog>
+
+<dialog id="leaveDlg">
+  <form id="leaveForm" novalidate>
+    <h3 id="leaveTitle">Leave and travel budget</h3>
+    <div class="fields">
+      <label class="f">Vacation days<input id="lv-vac" type="number" step="0.5" min="0" max="100" inputmode="decimal"></label>
+      <label class="f">Work from abroad days<input id="lv-wfa" type="number" step="0.5" min="0" max="100" inputmode="decimal"></label>
+      <label class="f full">Travel budget for the year (€, optional)<input id="lv-budget" type="number" step="50" min="0" inputmode="decimal" placeholder="e.g. 8000"></label>
+    </div>
+    <p class="muted" style="margin:0;font-size:12.5px">Anubhav’s allowance. Trips count toward the year they start in.</p>
+    <p class="err" id="leaveErr" hidden></p>
+    <div class="dlg-actions"><span></span><div class="right"><button class="btn" id="leaveCancel" type="button">Cancel</button><button class="btn primary" type="submit">Save</button></div></div>
   </form>
 </dialog>
 
@@ -1345,6 +1378,7 @@ onAuthStateChanged(auth, user => {
     state.fire = fire ? fire.data() : {};
     const fi = snap.docs.find(x => x.id === 'fireInr'); state.fireInr = fi ? fi.data() : {};
     const bs = snap.docs.find(x => x.id === 'bookings'); state.bkSettings = bs ? bs.data() : {};
+    const lv = snap.docs.find(x => x.id === 'leave'); state.leave = lv ? lv.data() : {};
     pfCache = null; render();
   }, onErr('budgets')));
   unsubs.push(onSnapshot(collection(fs, 'health'), snap => {
@@ -2576,8 +2610,10 @@ function renderTrips(){
     <div class="kpi"><span class="lbl">${g.ongoing[0] ? 'On a trip now' : 'Next trip'}</span><span class="val" style="font-size:18px">${next ? esc(next.name) : '—'}</span><span class="sub">${next ? (g.ongoing[0] ? 'until ' + shortDate(next.end || next.start) : 'in ' + days + ' day' + (days===1?'':'s') + ' · ' + fmtRange(next.start, next.end)) : 'Nothing planned'}</span></div>` : '';
   $('#tripKpis').hidden = !state.trips.length;
   const sec = (title, arr) => arr.length ? `<section class="tgroup"><h2>${title}</h2><div class="tgrid">${arr.map(tripCard).join('')}</div></section>` : '';
+  // Finished trips fold away; opening the section is remembered on this phone.
+  const past = g.past.length ? `<details class="tgroup" id="tripPast" ${state.pastOpen ? 'open' : ''}><summary>Past and finished (${g.past.length})</summary><div class="tgrid">${g.past.map(tripCard).join('')}</div></details>` : '';
   $('#tripList').innerHTML = state.trips.length
-    ? sec('Ongoing', g.ongoing) + sec('Upcoming', g.upcoming) + sec('Dates not set', g.nodate) + sec('Past', g.past)
+    ? leavePanel() + sec('Ongoing', g.ongoing) + sec('Upcoming', g.upcoming) + sec('Dates not set', g.nodate) + past
     : `<div class="panel"><p class="empty" style="margin:0">${state.tripsReady ? 'No trips yet. Create one with “New trip”, then link its flights, hotels and other costs.' : 'Loading…'}</p></div>`;
 }
 
@@ -2657,11 +2693,106 @@ function renderTripDetail(t){
     </div>`;
 }
 
+
+// ---------- leave: vacation and work-from-abroad days, and a yearly travel budget ----------
+// Public holidays in Bavaria (Ingolstadt), so the workday count for a trip leaves them out.
+function easter(y){ const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3),
+  h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451),
+  mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1; return `${y}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`; }
+const holCache = {};
+function holidaysBY(y){
+  if (holCache[y]) return holCache[y];
+  const e = easter(y), add = k => addDays(e, k);
+  return holCache[y] = new Map([[`${y}-01-01`, 'New Year'], [`${y}-01-06`, 'Epiphany'], [add(-2), 'Good Friday'], [add(1), 'Easter Monday'], [`${y}-05-01`, 'Labour Day'],
+    [add(39), 'Ascension'], [add(50), 'Whit Monday'], [add(60), 'Corpus Christi'], [`${y}-08-15`, 'Assumption'], [`${y}-10-03`, 'Unity Day'], [`${y}-11-01`, 'All Saints'],
+    [`${y}-12-25`, 'Christmas'], [`${y}-12-26`, 'St Stephen']]);
+}
+// Workdays (Mon to Fri, not a Bavarian holiday) from start to end, both included, and the holidays skipped.
+function workdays(start, end){
+  let n = 0; const skipped = [];
+  if (!start) return { n, skipped };
+  for (let x = start; x <= (end || start); x = addDays(x, 1)){
+    const wd = new Date(x + 'T12:00:00Z').getUTCDay(), hol = holidaysBY(+x.slice(0, 4)).get(x);
+    if (wd === 0 || wd === 6) continue;
+    if (hol){ skipped.push(hol); continue; }
+    n++;
+  }
+  return { n, skipped };
+}
+function tripWorkdaysHint(){
+  const el = $('#tripWorkdays'); if (!el) return;
+  const s = T('start').value, e = T('end').value;
+  if (!s){ el.textContent = ''; return; }
+  const w = workdays(s, e);
+  el.innerHTML = `${w.n} workday${w.n === 1 ? '' : 's'} in these dates${w.skipped.length ? ' (not counting ' + esc([...new Set(w.skipped)].join(', ')) + ')' : ''}. <button class="linkbtn" type="button" id="tripUseDays">Use ${w.n} as vacation</button>`;
+}
+document.addEventListener('change', e => { if (e.target.id === 't-start' || e.target.id === 't-end') tripWorkdaysHint(); });
+document.addEventListener('click', e => { if (e.target.id === 'tripUseDays'){ const s = T('start').value, n = workdays(s, T('end').value).n; T('vac').value = n; } });
+
+const LEAVE_DEFAULT = { vacation: 30, wfa: 15 };
+const leaveYear = y => ({ ...LEAVE_DEFAULT, ...(state.leave?.years?.[y] || {}) });
+// What a trip costs as far as known: spent, booked but not yet an expense, and the estimates still to book.
+function tripMoney(t){
+  const spent = sum(tripExpenses(t.id));
+  const bkEur = b => { const c = (b.currency || 'EUR').toUpperCase(); return c === 'EUR' ? +b.price : state.fxLatest[c] ? +b.price * state.fxLatest[c] : 0; };
+  const unpaid = state.bookings.filter(b => b.tripId === t.id && +b.price > 0 && (!b.expenseId || !state.items.some(i => i.id === b.expenseId))).reduce((a, b) => a + bkEur(b), 0);
+  const tb = tbEstimate(t.id).sum;
+  const expected = spent + unpaid + tb;
+  // For the year's plan a trip counts with its budget when that's higher than what's known so far.
+  return { spent, expected, planned: Math.max(expected, +t.budget || 0) };
+}
+function leavePanel(){
+  const thisY = +today().slice(0, 4);
+  const y = state.leaveY || (today().slice(5, 7) >= '10' ? thisY + 1 : thisY);
+  const L = leaveYear(y), trips = state.trips.filter(t => (t.start || '').startsWith(String(y))).sort((a, b) => a.start.localeCompare(b.start));
+  const vac = trips.reduce((a, t) => a + (+t.vacDays || 0), 0), wfa = trips.reduce((a, t) => a + (+t.wfaDays || 0), 0);
+  const money = trips.map(t => ({ t, ...tripMoney(t) })), spent = money.reduce((a, x) => a + x.spent, 0), expected = money.reduce((a, x) => a + x.planned, 0);
+  const missing = trips.filter(t => t.type !== 'office' && !t.vacDays && !t.wfaDays && workdays(t.start, t.end).n > 0);
+  const bar = (used, total, col) => `<span class="lvbar"><i style="width:${Math.min(100, total ? used / total * 100 : 0)}%;background:${used > total ? 'var(--danger)' : col}"></i></span>`;
+  const left = (used, total) => used > total ? `<span class="neg">${fmtDays(used - total)} over</span>` : `${fmtDays(total - used)} left to plan`;
+  const B = +L.budget || 0;
+  return `<section class="panel"><header><h2>Leave and travel budget</h2><span class="right" style="display:flex;gap:8px;align-items:center">
+      <span class="seg" role="radiogroup" aria-label="Year">${[thisY, thisY + 1].map(v => `<button type="button" role="radio" data-leavey="${v}" aria-checked="${v === y}">${v}</button>`).join('')}</span>
+      <button class="btn small" type="button" data-leaveedit="${y}">Edit</button></span></header>
+    <div class="lvgrid">
+      <div class="lvbox"><span class="lbl">Vacation days</span><span class="val">${fmtDays(vac)} <small>of ${fmtDays(L.vacation)}</small></span>${bar(vac, L.vacation, 'var(--accent)')}<span class="muted" style="font-size:12.5px">${left(vac, L.vacation)}</span></div>
+      <div class="lvbox"><span class="lbl">Work from abroad</span><span class="val">${fmtDays(wfa)} <small>of ${fmtDays(L.wfa)}</small></span>${bar(wfa, L.wfa, 'var(--s1)')}<span class="muted" style="font-size:12.5px">${left(wfa, L.wfa)}</span></div>
+      <div class="lvbox"><span class="lbl">Travel budget</span>${B ? `<span class="val">${eur0.format(expected)} <small>of ${eur0.format(B)}</small></span>${bar(expected, B, 'var(--s3)')}<span class="muted" style="font-size:12.5px">planned: ${eur0.format(spent)} spent, ${eur0.format(expected - spent)} still to come · ${expected > B ? `<span class="neg">${eur0.format(expected - B)} over</span>` : eur0.format(B - expected) + ' left'}</span>`
+        : `<span class="val">${eur0.format(expected)} <small>planned</small></span><span class="muted" style="font-size:12.5px">${eur0.format(spent)} spent so far. <button class="linkbtn" type="button" data-leaveedit="${y}">Set a budget</button></span>`}</div>
+    </div>
+    ${trips.length ? `<div class="lvlist">${trips.map(t => { const w = workdays(t.start, t.end).n, m = money.find(x => x.t === t);
+      return `<div class="lvrow"><span><strong>${esc(t.name)}</strong> <span class="muted">${fmtRange(t.start, t.end)}</span><small>${t.type === 'office' ? 'office trip' : t.vacDays || t.wfaDays ? [t.vacDays ? fmtDays(t.vacDays) + ' vacation' : '', t.wfaDays ? fmtDays(t.wfaDays) + ' from abroad' : ''].filter(Boolean).join(' · ') : w ? `<span class="tbl warn">days not set</span> · ${w} workday${w === 1 ? '' : 's'} in these dates` : 'no workdays'}${m.planned ? ' · ' + eur0.format(m.planned) + (m.planned > m.expected ? ' budget' : m.expected > m.spent ? ' expected' : ' spent') : ''}</small></span>
+        <button class="btn small" type="button" data-edittrip="${esc(t.id)}">${missing.includes(t) ? 'Set days' : 'Edit'}</button></div>`; }).join('')}</div>`
+      : `<p class="muted" style="margin:6px 0 0;font-size:13px">No trips in ${y} yet.</p>`}
+  </section>`;
+}
+const fmtDays = n => (Math.round(n * 2) / 2).toString().replace('.5', '½').replace(/^0½/, '½');
+document.addEventListener('click', e => {
+  const yb = e.target.closest('[data-leavey]'); if (yb){ state.leaveY = +yb.dataset.leavey; render(); return; }
+  const ed = e.target.closest('[data-leaveedit]'); if (ed){
+    const y = ed.dataset.leaveedit, L = leaveYear(y); state.leaveEditY = y;
+    $('#leaveTitle').textContent = `Leave and travel budget ${y}`; $('#lv-vac').value = L.vacation; $('#lv-wfa').value = L.wfa; $('#lv-budget').value = L.budget || '';
+    $('#leaveErr').hidden = true; $('#leaveDlg').showModal(); return;
+  }
+});
+document.addEventListener('toggle', e => { if (e.target.id === 'tripPast') state.pastOpen = e.target.open; }, true);
+$('#leaveCancel').addEventListener('click', () => $('#leaveDlg').close());
+$('#leaveForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const y = state.leaveEditY, num = id => { const v = parseFloat($(id).value); return v >= 0 ? Math.round(v * 2) / 2 : null; };
+  const rec = { vacation: num('#lv-vac') ?? LEAVE_DEFAULT.vacation, wfa: num('#lv-wfa') ?? LEAVE_DEFAULT.wfa };
+  const b = parseFloat($('#lv-budget').value); if (b > 0) rec.budget = Math.round(b);
+  const years = { ...(state.leave?.years || {}), [y]: rec };
+  try { await setDoc(doc(fs, 'settings', 'leave'), { years, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) }); $('#leaveDlg').close(); toast(`Saved for ${y}`); }
+  catch (x){ const er = $('#leaveErr'); er.textContent = x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x); er.hidden = false; }
+});
+
 // trip dialog
 const tdlg = $('#tripDlg');
 const T = k => $('#t-' + k);
 function setTripType(k){
   state.tripType = k;
+  if ($('#tripLeave')) $('#tripLeave').hidden = k === 'office';
   $$('#tripTypeSeg [data-ttype]').forEach(b => b.setAttribute('aria-checked', b.dataset.ttype === k));
   $('#tripHint').textContent = k === 'office' ? 'Tip: when your employer reimburses you, log the refund as Income (category Refund) so your net saved stays right.' : '';
 }
@@ -2673,7 +2804,8 @@ function openTripDlg(t, preset){
   T('traveller').value = src.traveller || (cap(usernameOf(state.user)) === 'Sulekha' ? 'Sulekha' : 'Anubhav');
   T('budget').value = src.budget || ''; T('notes').value = src.notes || '';
   T('currency').value = src.currency || 'EUR';
-  setTripType(src.type || 'visit');
+  T('vac').value = t?.vacDays ?? ''; T('wfa').value = t?.wfaDays ?? '';
+  setTripType(src.type || 'visit'); tripWorkdaysHint();
   $('#tripDel').hidden = !t; $('#tripDel').classList.remove('armed'); $('#tripDel').textContent = 'Delete trip';
   $('#tripErr').hidden = true;
   tdlg.showModal(); (preset ? T('start') : T('name')).focus();
@@ -2698,6 +2830,8 @@ $('#tripForm').addEventListener('submit', async e => {
   const budget = parseFloat(T('budget').value); if (budget > 0) rec.budget = Math.round(budget * 100) / 100;
   const notes = T('notes').value.trim(); if (notes) rec.notes = notes;
   if (T('currency').value !== 'EUR') rec.currency = T('currency').value;
+  const vac = parseFloat(T('vac').value), wfa = parseFloat(T('wfa').value);
+  if (type !== 'office'){ if (vac > 0) rec.vacDays = Math.round(Math.min(60, vac) * 2) / 2; if (wfa > 0) rec.wfaDays = Math.round(Math.min(60, wfa) * 2) / 2; }
   $('#tripSave').disabled = true;
   try {
     if (state.editingTrip){
@@ -4564,7 +4698,7 @@ document.addEventListener('click', e => {
 
 
 // Mark a trip finished (or reopen it): its leftover budget stops (or starts) counting in the forecast.
-const TRIP_KEYS = ['name','type','traveller','start','end','budget','notes','currency','createdAt','createdBy'];
+const TRIP_KEYS = ['name','type','traveller','start','end','budget','notes','currency','vacDays','wfaDays','createdAt','createdBy'];
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-tripclose]'); if (!b) return;
   const t = state.tripMap[b.dataset.tripclose]; if (!t) return;
