@@ -5675,14 +5675,21 @@ function planCard(label, c, d, note, top){
 }
 // --- meeting somewhere new: places both can reach, then the exact flights there for both ---
 const PLAN_HOME_NAMES = /^(rome|munich|nuremberg|memmingen|ingolstadt)$/i;
+// Places from both searches, matched by city (Google's ids and airports can differ between the two searches for
+// the same city, e.g. Paris CDG from one side and ORY from the other). Places only one search listed are kept too:
+// Google lists only some places per search, and the exact day searches often find flights for the other person.
 function planPlaces(P){
   const [a, s] = P.explore || [];
-  if (!a || !s) return [];
+  if (!a || !s) return { both: [], one: [], na: 0, ns: 0 };
   const home = new Set(Object.values(PLAN_SIDES).flatMap(sd => Object.keys(sd.ap)));
-  const bs = new Map((s.places || []).map(p => [p.id, p]));
-  return (a.places || []).filter(p => bs.has(p.id) && !home.has(p.airport) && !PLAN_HOME_NAMES.test(p.name))
-    .map(p => { const q = bs.get(p.id); return { ...p, a: p, s: q, total: p.price + q.price, hotel: p.hotel || q.hotel }; })
+  const key = p => (p.name + '|' + (p.country || '')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const side = list => { const m = new Map(); for (const p of list || []){ if (home.has(p.airport) || PLAN_HOME_NAMES.test(p.name)) continue; const k = key(p); if (!m.has(k) || m.get(k).price > p.price) m.set(k, p); } return m; };
+  const A = side(a.places), S = side(s.places);
+  const both = [...A].filter(([k]) => S.has(k)).map(([k, p]) => { const q = S.get(k); return { ...p, a: p, s: q, total: p.price + q.price, hotel: p.hotel || q.hotel }; })
     .sort((x, y) => x.total - y.total).slice(0, 20);
+  const one = [...[...A].filter(([k]) => !S.has(k)).map(([, p]) => ({ ...p, a: p })), ...[...S].filter(([k]) => !A.has(k)).map(([, p]) => ({ ...p, s: p }))]
+    .sort((x, y) => x.price - y.price).slice(0, 12);
+  return { both, one, na: A.size, ns: S.size };
 }
 function planMeetCombos(P){
   const A = [...planCombos(P, 'a')].sort((x, y) => x.value - y.value).slice(0, 25), S = [...planCombos(P, 's')].sort((x, y) => x.value - y.value).slice(0, 25), out = [];
@@ -5707,13 +5714,17 @@ function planMeetCard(label, m, note, top){
 function planRenderMeet(P, el){
   if (!P.dest){
     if (!P.explore){ el.innerHTML = P.busy ? '<p class="muted">Looking for places you can both fly to…</p>' : '<p class="muted" style="margin:0">Finds places across Europe with flights from both Ingolstadt’s and Rome’s airports on these dates, cheapest together first. Then check the exact flights for one.</p>'; return; }
-    const list = planPlaces(P), errs = [...new Set(P.explore.filter(x => x.error).map(x => x.error))];
-    el.innerHTML = (errs.length ? `<p class="err" style="margin:0">${esc(errs.join('; '))}</p>` : '') + (list.length
-      ? `<div class="plsec"><h4>Places you can both reach</h4><span class="plmeta">Return flights per person on ${shortDate(P.start)} to ${shortDate(P.end)}, the cheapest Google found for each place. Check one for the exact flights.</span>
-        ${list.map((p, i) => `<div class="plplace"><span><strong>${esc(p.name)}</strong> <span class="muted">${esc(p.country || '')} · ${esc(p.airport)}</span>
-          <small>Anubhav ${eur0.format(p.a.price)}${p.a.stops ? ' (' + p.a.stops + ' stop)' : ''} · Sulekha ${eur0.format(p.s.price)}${p.s.stops ? ' (' + p.s.stops + ' stop)' : ''}${p.hotel ? ' · hotels from ' + eur0.format(p.hotel) + ' a night' : ''}</small></span>
-          <span style="display:flex;gap:10px;align-items:center"><span class="pr">${eur0.format(p.total)}<small><br>both, return</small></span><button class="btn small" type="button" data-planplace="${i}">Check flights</button></span></div>`).join('')}</div>`
-      : '<p class="muted" style="margin:0">No place came up with flights from both sides on these dates. Try other days or “Popular”.</p>')
+    const { both, one, na, ns } = planPlaces(P), errs = [...new Set(P.explore.filter(x => x.error).map(x => x.error))];
+    P._places = [...both, ...one];
+    const stops = x => x.stops ? ' (' + x.stops + ' stop' + (x.stops > 1 ? 's' : '') + ')' : '';
+    const row = (p, i) => `<div class="plplace"><span><strong>${esc(p.name)}</strong> <span class="muted">${esc(p.country || '')} · ${esc(p.airport)}</span>
+          <small>${p.a ? 'Anubhav ' + eur0.format(p.a.price) + stops(p.a) : 'Anubhav: not listed'} · ${p.s ? 'Sulekha ' + eur0.format(p.s.price) + stops(p.s) : 'Sulekha: not listed'}${p.hotel ? ' · hotels from ' + eur0.format(p.hotel) + ' a night' : ''}</small></span>
+          <span style="display:flex;gap:10px;align-items:center"><span class="pr">${eur0.format(p.total || p.price)}<small><br>${p.total ? 'both, return' : 'one of you'}</small></span><button class="btn small" type="button" data-planplace="${i}">Check flights</button></span></div>`;
+    el.innerHTML = (errs.length ? `<p class="err" style="margin:0">${esc(errs.join('; '))}</p>` : '')
+      + `<span class="plmeta">Google listed ${na} place${na === 1 ? '' : 's'} from your airports and ${ns} from Sulekha’s for ${shortDate(P.start)} to ${shortDate(P.end)}; ${both.length} in both.</span>`
+      + (both.length ? `<div class="plsec"><h4>Places you can both reach</h4><span class="plmeta">Return flights per person, the cheapest Google found for each place. Check one for the exact flights.</span>${both.map(row).join('')}</div>` : '')
+      + (one.length ? `<div class="plsec"><h4>${both.length ? 'More places to check' : 'Places to check'}</h4><span class="plmeta">Google listed these for only one of you. Its list is short, so the other person often has flights too: Check flights searches both of you.</span>${one.map((p, i) => row(p, both.length + i)).join('')}</div>` : '')
+      + (!both.length && !one.length ? '<p class="muted" style="margin:0">No places came up for these dates. Try other days or “Popular”.</p>' : '')
       + (P.exploreLeft != null ? `<p class="muted" style="margin:8px 0 0;font-size:12px">${P.exploreLeft} searches left this month.</p>` : '');
     return;
   }
@@ -5910,7 +5921,7 @@ document.addEventListener('click', e => {
   const op = t.closest('[data-plan]'); if (op){ openPlan(op.dataset.plan || null); return; }
   if (!state.plan) return;
   const w = t.closest('[data-planwho]'); if (w){ const P = state.plan, was = P.who; P.who = w.dataset.planwho; if ((was === 'meet') !== (P.who === 'meet')) P.res = null; planForm(); planRender(); return; }
-  const pl = t.closest('[data-planplace]'); if (pl){ const P = state.plan; P.dest = planPlaces(P)[+pl.dataset.planplace]; P.res = null; planCost(); planSearch(); return; }
+  const pl = t.closest('[data-planplace]'); if (pl){ const P = state.plan; P.dest = P._places?.[+pl.dataset.planplace]; if (!P.dest) return; P.res = null; planCost(); planSearch(); return; }
   if (t.closest('[data-planback]')){ const P = state.plan; P.dest = null; P.res = null; planCost(); planRender(); return; }
   if (t.closest('[data-planai]')){ planAsk(); return; }
   const mu = t.closest('[data-planmeet]'); if (mu){ mu.disabled = true; planUseMeet(+mu.dataset.planmeet); return; }

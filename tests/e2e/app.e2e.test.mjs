@@ -50,7 +50,9 @@ test('planner, meet somewhere new: places for both, a Rome group with no answer 
   await page.click('#planGo'); await page.waitForSelector('.plplace');
   const places = await app.text('#planOut');
   assert.match(places, /Athens/); assert.match(places, /Vienna/);
-  assert.doesNotMatch(places, /Rome|Porto|Lisbon/, 'home and one-sided places are left out');
+  assert.doesNotMatch(places, /Rome/, 'home cities are left out');
+  assert.match(await app.text('.plsec >> nth=0'), /Places you can both reach(?=.*Athens)(?=.*Vienna)/, 'matched by city even when Google ids differ');
+  assert.match(await app.text('.plsec >> nth=1'), /More places to check.*(Porto|Lisbon)/, 'one-sided places stay checkable');
   await page.click('[data-planplace="0"]'); await page.waitForSelector('.plcard');
   assert.match(await app.text('.pllog'), /asked each airport separately/);
   assert.doesNotMatch(await app.text('#planOut'), /No return flights/);

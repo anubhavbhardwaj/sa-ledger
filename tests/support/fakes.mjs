@@ -10,7 +10,8 @@ export const seg = (from, to, date, h, m, mins, airline = 'Lufthansa', number = 
   return { departure_airport: { id: from, time: at(date, h, m) }, arrival_airport: { id: to, time: `${t.toISOString().slice(0, 10)} ${t.getUTCHours()}:${pad(t.getUTCMinutes())}` }, airline, flight_number: number };
 };
 
-// SerpApi stand-in. Flights exist for every route, departing 07:10, 13:00 and 21:30, except that a group of airports
+// SerpApi stand-in. Explore lists Athens under a different id per side (as Google does), Lisbon and Porto on one side only.
+// Flights exist for every route, departing 07:10, 13:00 and 21:30, except that a group of airports
 // ending in Rome ("…,CIA") returns nothing, the way Google did for ATH → FCO,CIA (each airport alone works).
 export function fakeSerpApi({ calls = [], emptyGroups = /,CIA$/ } = {}){
   return async url => {
@@ -20,7 +21,7 @@ export function fakeSerpApi({ calls = [], emptyGroups = /,CIA$/ } = {}){
     if (p.engine === 'google_travel_explore'){
       const rome = p.departure_id.includes('FCO');
       const d = (id, name, country, code, price, hotel) => ({ destination_id: id, name, country, destination_airport: { code }, flight_price: price, hotel_price: hotel, flight_duration: 140, number_of_stops: 0, airline: 'Aegean' });
-      return res(200, { destinations: [d('/m/ath', 'Athens', 'Greece', 'ATH', rome ? 160 : 200, 70), d('/m/vie', 'Vienna', 'Austria', 'VIE', rome ? 150 : 90, 95), d('/m/rom', 'Rome', 'Italy', 'FCO', 120, 90),
+      return res(200, { destinations: [d(rome ? '/g/athens-city' : '/m/ath', 'Athens', 'Greece', 'ATH', rome ? 160 : 200, 70), d('/m/vie', 'Vienna', 'Austria', 'VIE', rome ? 150 : 90, 95), d('/m/rom', 'Rome', 'Italy', 'FCO', 120, 90),
         rome ? d('/m/lis', 'Lisbon', 'Portugal', 'LIS', 170, 80) : d('/m/opo', 'Porto', 'Portugal', 'OPO', 130, 60)] });
     }
     if (emptyGroups && emptyGroups.test(p.arrival_id)) return res(400, { error: "Google Flights hasn't returned any results for this query." });
