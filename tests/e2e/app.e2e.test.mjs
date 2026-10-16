@@ -140,3 +140,19 @@ test('trips: finished trips fold away; leave days and the travel budget add up p
   await page.click('#tripUseDays'); await page.fill('#t-name', 'Easter 2027'); await page.click('#tripSave'); await page.waitForTimeout(200);
   await clean(app);
 });
+
+test('leave planner: two 3-week India trips around holidays and the shutdown, fewest vacation days', async () => {
+  const app = await openApp(), { page } = app;
+  // Fixed calendar (2027) on purpose: the holidays and the shutdown are what's being tested.
+  await app.seed({ trips: { e: { name: 'Easter visit', type: 'visit', traveller: 'Anubhav', start: '2027-03-25', end: '2027-03-30', vacDays: 2 } } });
+  await app.go('trips'); await page.waitForSelector('.lvgrid');
+  await page.evaluate(() => { const b = document.createElement('button'); b.dataset.lvplan = '2027'; document.body.append(b); b.click(); b.remove(); });
+  await page.fill('#lvp-sfrom', '2027-12-24'); await page.fill('#lvp-sto', '2028-01-02'); await page.fill('#lvp-wfa', '15');
+  await page.click('#lvpGo'); await page.waitForSelector('.lvpsum');
+  const out = await app.text('#lvpOut');
+  assert.match(out, /Vacation days in 2027 ?10 of 30/, '2 Easter + 6 shutdown + 2: ' + out.slice(0, 300));
+  assert.match(out, /India, year end.*Sat 18 Dec 2027 → Sat 8 Jan 2028/);
+  assert.match(out, /India, mid-year.*13 workdays to cover/);
+  await page.click('#lvpCreate'); await page.waitForTimeout(200);
+  await clean(app);
+});

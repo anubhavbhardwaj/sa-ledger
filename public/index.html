@@ -109,6 +109,12 @@ details.tgroup > summary{font:700 13px/1.2 var(--f-body);text-transform:uppercas
 details.tgroup > summary::-webkit-details-marker{display:none}
 details.tgroup > summary::before{content:'▸ ';}
 details.tgroup[open] > summary::before{content:'▾ ';}
+.lvprow{display:grid;grid-template-columns:minmax(0,2fr) 90px minmax(0,1.2fr) minmax(0,1.2fr) 34px;gap:8px;align-items:end}
+.lvprow label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.lvprow input{font:inherit;border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--ground);color:var(--ink);min-width:0;box-sizing:border-box;width:100%}
+@media (max-width:560px){.lvprow{grid-template-columns:1fr 1fr}.lvprow label:first-child{grid-column:1 / -1}}
+.lvpsum{display:grid;gap:4px;padding:12px 14px;border-radius:12px;background:var(--good-soft);margin:6px 0}
+.lvpsum .big{font:700 22px/1.2 var(--f-display);color:var(--good)}
 .lvgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
 .lvbox{display:grid;gap:6px}
 .lvbox .lbl{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
@@ -953,6 +959,23 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <button class="btn danger" id="tripDel" type="button" hidden>Delete trip</button>
       <div class="right"><button class="btn" id="tripCancel" type="button">Cancel</button><button class="btn primary" id="tripSave" type="submit">Save trip</button></div>
     </div>
+  </form>
+</dialog>
+
+<dialog id="lvPlanDlg" class="bkdlg plandlg" aria-labelledby="lvPlanTitle">
+  <form id="lvPlanForm" novalidate>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 id="lvPlanTitle">Plan leave</h3><button class="btn ghost small" type="button" id="lvPlanClose" aria-label="Close">✕</button></div>
+    <p class="muted" style="margin:0;font-size:13px">Finds dates for the trips you want so they need the fewest vacation days: weekends, Bavarian holidays and the company shutdown are free, and your work-from-abroad days cover workdays first.</p>
+    <div class="fields">
+      <label class="f">Company shutdown from<input id="lvp-sfrom" type="date"></label>
+      <label class="f">to<input id="lvp-sto" type="date"></label>
+      <label class="f full">Work from abroad days to use on these trips<input id="lvp-wfa" type="number" min="0" max="60" step="0.5" inputmode="decimal"></label>
+    </div>
+    <div class="wilbl">Trips to fit in</div>
+    <div id="lvpTrips" style="display:grid;gap:8px"></div>
+    <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><button class="btn small" type="button" id="lvpAdd">+ Another trip</button><button class="btn primary" type="button" id="lvpGo">Find the best dates</button></div>
+    <p class="err" id="lvpErr" hidden></p>
+    <div id="lvpOut"></div>
   </form>
 </dialog>
 
@@ -2745,7 +2768,8 @@ function leavePanel(){
   const thisY = +today().slice(0, 4);
   const y = state.leaveY || (today().slice(5, 7) >= '10' ? thisY + 1 : thisY);
   const L = leaveYear(y), trips = state.trips.filter(t => (t.start || '').startsWith(String(y))).sort((a, b) => a.start.localeCompare(b.start));
-  const vac = trips.reduce((a, t) => a + (+t.vacDays || 0), 0), wfa = trips.reduce((a, t) => a + (+t.wfaDays || 0), 0);
+  const shut = L.shutdown ? shutdownDays(L.shutdown, y) : 0;
+  const vac = trips.reduce((a, t) => a + (+t.vacDays || 0), 0) + shut, wfa = trips.reduce((a, t) => a + (+t.wfaDays || 0), 0);
   const money = trips.map(t => ({ t, ...tripMoney(t) })), spent = money.reduce((a, x) => a + x.spent, 0), expected = money.reduce((a, x) => a + x.planned, 0);
   const missing = trips.filter(t => t.type !== 'office' && !t.vacDays && !t.wfaDays && workdays(t.start, t.end).n > 0);
   const bar = (used, total, col) => `<span class="lvbar"><i style="width:${Math.min(100, total ? used / total * 100 : 0)}%;background:${used > total ? 'var(--danger)' : col}"></i></span>`;
@@ -2753,9 +2777,9 @@ function leavePanel(){
   const B = +L.budget || 0;
   return `<section class="panel"><header><h2>Leave and travel budget</h2><span class="right" style="display:flex;gap:8px;align-items:center">
       <span class="seg" role="radiogroup" aria-label="Year">${[thisY, thisY + 1].map(v => `<button type="button" role="radio" data-leavey="${v}" aria-checked="${v === y}">${v}</button>`).join('')}</span>
-      <button class="btn small" type="button" data-leaveedit="${y}">Edit</button></span></header>
+      <button class="btn small" type="button" data-leaveedit="${y}">Edit</button><button class="btn primary small" type="button" data-lvplan="${y}">Plan leave</button></span></header>
     <div class="lvgrid">
-      <div class="lvbox"><span class="lbl">Vacation days</span><span class="val">${fmtDays(vac)} <small>of ${fmtDays(L.vacation)}</small></span>${bar(vac, L.vacation, 'var(--accent)')}<span class="muted" style="font-size:12.5px">${left(vac, L.vacation)}</span></div>
+      <div class="lvbox"><span class="lbl">Vacation days</span><span class="val">${fmtDays(vac)} <small>of ${fmtDays(L.vacation)}</small></span>${bar(vac, L.vacation, 'var(--accent)')}<span class="muted" style="font-size:12.5px">${left(vac, L.vacation)}${shut ? ` · incl. ${fmtDays(shut)} for the company shutdown (${shortDate(L.shutdown.start)} to ${shortDate(L.shutdown.end)})` : ''}</span></div>
       <div class="lvbox"><span class="lbl">Work from abroad</span><span class="val">${fmtDays(wfa)} <small>of ${fmtDays(L.wfa)}</small></span>${bar(wfa, L.wfa, 'var(--s1)')}<span class="muted" style="font-size:12.5px">${left(wfa, L.wfa)}</span></div>
       <div class="lvbox"><span class="lbl">Travel budget</span>${B ? `<span class="val">${eur0.format(expected)} <small>of ${eur0.format(B)}</small></span>${bar(expected, B, 'var(--s3)')}<span class="muted" style="font-size:12.5px">planned: ${eur0.format(spent)} spent, ${eur0.format(expected - spent)} still to come · ${expected > B ? `<span class="neg">${eur0.format(expected - B)} over</span>` : eur0.format(B - expected) + ' left'}</span>`
         : `<span class="val">${eur0.format(expected)} <small>planned</small></span><span class="muted" style="font-size:12.5px">${eur0.format(spent)} spent so far. <button class="linkbtn" type="button" data-leaveedit="${y}">Set a budget</button></span>`}</div>
@@ -2785,6 +2809,155 @@ $('#leaveForm').addEventListener('submit', async e => {
   const years = { ...(state.leave?.years || {}), [y]: rec };
   try { await setDoc(doc(fs, 'settings', 'leave'), { years, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) }); $('#leaveDlg').close(); toast(`Saved for ${y}`); }
   catch (x){ const er = $('#leaveErr'); er.textContent = x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x); er.hidden = false; }
+});
+
+// ---------- leave planner: dates for the trips you want that cost the fewest vacation days ----------
+// Shutdown workdays in a year (company closed: they're vacation days whatever you plan).
+function shutdownDays(sd, y){ let n = 0; for (const d of dayList(sd.start, sd.end)) if (d.startsWith(String(y)) && isWorkday(d)) n++; return n; }
+function dayList(a, b){ const out = []; if (!a || !b) return out; for (let x = a; x <= b; x = addDays(x, 1)) out.push(x); return out; }
+const isWorkday = d => { const wd = new Date(d + 'T12:00:00Z').getUTCDay(); return wd !== 0 && wd !== 6 && !holidaysBY(+d.slice(0, 4)).has(d); };
+// Workdays a trip needs covered, per year, leaving out weekends, holidays and shutdown days.
+function leaveCost(start, end, sd){
+  const by = {}, hol = new Set(); let shut = 0;
+  for (const d of dayList(start, end)){
+    const wd = new Date(d + 'T12:00:00Z').getUTCDay(); if (wd === 0 || wd === 6) continue;
+    const h = holidaysBY(+d.slice(0, 4)).get(d); if (h){ hol.add(h); continue; }
+    if (sd?.start && d >= sd.start && d <= sd.end){ shut++; continue; }
+    const y = d.slice(0, 4); by[y] = (by[y] || 0) + 1;
+  }
+  return { by, total: Object.values(by).reduce((a, b) => a + b, 0), hol: [...hol], shut };
+}
+const lastDay = m => addDays(addMonth(m, 1) + '-01', -1);
+function lvCandidates(T, sd, busy){
+  const out = [], first = T.from + '-01', last = lastDay(T.to);
+  for (let s = first; s <= last; s = addDays(s, 1)){
+    const e = addDays(s, T.nights);
+    if (busy.some(b => b.start <= e && b.end >= s)) continue;
+    const c = leaveCost(s, e, sd), wd = new Date(s + 'T12:00:00Z').getUTCDay();
+    out.push({ start: s, end: e, ...c, nice: wd === 5 || wd === 6 ? 0 : 1 });
+  }
+  return out.sort((a, b) => a.total - b.total || a.nice - b.nice || a.start.localeCompare(b.start));
+}
+// Best combination: one window per trip, no overlaps, fewest days off: this year's vacation once its WFA pool is
+// used, plus every workday that falls into next year (those spend next year's leave, whichever kind).
+function lvBest(trips, pools, Y){
+  const lists = trips.map(t => t.cands.slice(0, trips.length > 3 ? 12 : 40)), res = [];
+  const cost = pick => {
+    const W = {}; pick.forEach(c => Object.entries(c.by).forEach(([y, n]) => { W[y] = (W[y] || 0) + n; }));
+    const vac = {}; let tot = 0; for (const [y, n] of Object.entries(W)){ vac[y] = Math.max(0, n - (pools[y] || 0)); tot += y === Y ? vac[y] : n; }
+    return { vac, W, tot, w: Object.values(W).reduce((a, b) => a + b, 0), here: vac[Y] || 0, nice: pick.reduce((a, c) => a + c.nice, 0) };
+  };
+  const walk = (i, pick) => {
+    if (i === lists.length){ res.push({ pick: [...pick], ...cost(pick) }); return; }
+    for (const c of lists[i]) if (!pick.some(p => p.start <= c.end && p.end >= c.start)){ pick.push(c); walk(i + 1, pick); pick.pop(); }
+  };
+  walk(0, []);
+  return res.sort((a, b) => a.tot - b.tot || a.here - b.here || a.w - b.w || a.nice - b.nice).slice(0, 1)[0] || null;
+}
+// Share each year's WFA pool across the trips in proportion to their workdays that year.
+function lvSplit(best, pools){
+  const per = best.pick.map(() => ({ wfa: {}, vac: {} }));
+  for (const y of Object.keys(best.W)){
+    let pool = Math.min(pools[y] || 0, best.W[y]);
+    const idx = best.pick.map((c, i) => [i, c.by[y] || 0]).filter(x => x[1] > 0);
+    idx.forEach(([i, n], k) => { const share = k === idx.length - 1 ? pool : Math.min(n, Math.round(pool * n / best.W[y]) || 0);
+      per[i].wfa[y] = share; per[i].vac[y] = n - share; pool -= share; });
+  }
+  return per;
+}
+function lvDefaults(y){
+  return [{ name: 'India, mid-year', nights: 21, from: `${y}-05`, to: `${y}-09` }, { name: 'India, year end', nights: 21, from: `${y}-11`, to: `${y + 1}-01` }];
+}
+function lvRows(){
+  const P = state.lvPlan;
+  $('#lvpTrips').innerHTML = P.trips.map((t, i) => `<div class="lvprow" data-lvi="${i}">
+    <label>Trip<input data-lvk="name" value="${esc(t.name)}" maxlength="60"></label>
+    <label>Nights<input data-lvk="nights" type="number" min="1" max="60" value="${t.nights}"></label>
+    <label>Between<input data-lvk="from" type="month" value="${t.from}"></label>
+    <label>and<input data-lvk="to" type="month" value="${t.to}"></label>
+    <button class="btn ghost small" type="button" data-lvdel="${i}" aria-label="Remove">✕</button></div>`).join('');
+}
+function openLvPlan(y){
+  y = +y;
+  const L = leaveYear(y), saved = (() => { try { return JSON.parse(localStorage.getItem('lvPlan') || 'null'); } catch { return null; } })();
+  const used = state.trips.filter(t => (t.start || '').startsWith(String(y))).reduce((a, t) => a + (+t.wfaDays || 0), 0);
+  state.lvPlan = { y, trips: saved?.y === y ? saved.trips : lvDefaults(y), res: null };
+  $('#lvPlanTitle').textContent = `Plan leave ${y}`;
+  $('#lvp-sfrom').value = L.shutdown?.start || `${y}-12-24`; $('#lvp-sto').value = L.shutdown?.end || `${y + 1}-01-02`;
+  $('#lvp-wfa').value = Math.max(0, L.wfa - used);
+  $('#lvpErr').hidden = true; $('#lvpOut').innerHTML = '';
+  lvRows(); $('#lvPlanDlg').showModal();
+}
+async function lvRun(){
+  const P = state.lvPlan, y = P.y, err = $('#lvpErr'); err.hidden = true;
+  const sd = { start: $('#lvp-sfrom').value, end: $('#lvp-sto').value };
+  const fail = m => { err.textContent = m; err.hidden = false; };
+  if ((sd.start && !sd.end) || (sd.end && sd.start > sd.end)) return fail('Check the shutdown dates.');
+  if (!P.trips.length) return fail('Add a trip to plan.');
+  for (const t of P.trips) if (!t.from || !t.to || t.to < t.from || !(t.nights > 0)) return fail(`Check the months and nights for “${t.name}”.`);
+  try { localStorage.setItem('lvPlan', JSON.stringify({ y, trips: P.trips })); } catch {}
+  // Keep the shutdown with the year's leave settings, so the panel counts it too.
+  const L = leaveYear(y);
+  if (sd.start && (L.shutdown?.start !== sd.start || L.shutdown?.end !== sd.end)){
+    const years = { ...(state.leave?.years || {}), [y]: { ...(state.leave?.years?.[y] || {}), vacation: L.vacation, wfa: L.wfa, shutdown: sd } };
+    try { await setDoc(doc(fs, 'settings', 'leave'), { years, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) }); }
+    catch (x){ return fail(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); }
+  }
+  const busy = state.trips.filter(t => t.start && t.traveller !== 'Sulekha').map(t => ({ start: t.start, end: t.end || t.start }));
+  const trips = P.trips.map(t => ({ ...t, cands: lvCandidates(t, sd.start ? sd : null, busy) }));
+  if (trips.some(t => !t.cands.length)) return fail(`No free dates for “${trips.find(t => !t.cands.length).name}” in those months.`);
+  const wfaHere = Math.max(0, +$('#lvp-wfa').value || 0), next = leaveYear(y + 1);
+  const pools = { [y]: wfaHere, [y + 1]: Math.max(0, next.wfa - state.trips.filter(t => (t.start || '').startsWith(String(y + 1))).reduce((a, t) => a + (+t.wfaDays || 0), 0)) };
+  const best = lvBest(trips, pools, String(y));
+  if (!best) return fail('These trips can’t all fit without overlapping. Widen the months.');
+  P.res = { best, trips, split: lvSplit(best, pools), pools, sd };
+  lvRender();
+}
+function lvRender(){
+  const P = state.lvPlan, { best, trips, split, sd } = P.res, y = String(P.y), ny = String(P.y + 1), L = leaveYear(P.y);
+  const already = state.trips.filter(t => (t.start || '').startsWith(y)).reduce((a, t) => a + (+t.vacDays || 0), 0);
+  const shut = sd.start ? shutdownDays(sd, P.y) : 0, plannedHere = best.vac[y] || 0, total = already + shut + plannedHere;
+  const wfaUsed = Object.fromEntries(Object.keys(best.W).map(k => [k, Math.min(P.res.pools[k] || 0, best.W[k])]));
+  const yr = (o, k) => o[k] ? fmtDays(o[k]) : '0';
+  const card = (t, c, sp, i) => `<div class="plcard ${i === 0 ? '' : ''}"><div class="plhead"><span><span class="tag2">${esc(t.name)}</span></span><span class="pr">${fmtDays(Object.values(sp.vac).reduce((a, b) => a + b, 0))} <span class="plmeta" style="font-weight:400">vacation days</span></span></div>
+      <div><strong>${wday(c.start)} ${shortDate(c.start, true)} → ${wday(c.end)} ${shortDate(c.end, true)}</strong> <span class="muted">· ${t.nights} nights</span></div>
+      <div class="plmeta">${c.total} workday${c.total === 1 ? '' : 's'} to cover${Object.keys(c.by).length > 1 ? ' (' + Object.entries(c.by).map(([k, n]) => `${n} in ${k}`).join(', ') + ')' : ''}: ${Object.keys(sp.wfa).filter(k => sp.wfa[k]).map(k => `${fmtDays(sp.wfa[k])} from abroad${Object.keys(c.by).length > 1 ? ' (' + k + ')' : ''}`).join(', ') || 'no work from abroad'}, ${Object.keys(sp.vac).filter(k => sp.vac[k]).map(k => `${fmtDays(sp.vac[k])} vacation${Object.keys(c.by).length > 1 ? ' (' + k + ')' : ''}`).join(', ') || 'no vacation'}.${c.hol.length ? ' Free: ' + esc(c.hol.join(', ')) + '.' : ''}${c.shut ? ` ${c.shut} shutdown day${c.shut === 1 ? '' : 's'} inside (already counted).` : ''}</div>
+      <details class="plmore"><summary>Other dates for this trip</summary>${t.cands.filter(x => x.start !== c.start).slice(0, 5).map(x => `<div class="plrow"><span>${wday(x.start)} ${shortDate(x.start, true)} → ${wday(x.end)} ${shortDate(x.end, true)}<small>${x.total} workdays to cover${x.hol.length ? ' · free: ' + esc(x.hol.join(', ')) : ''}${x.shut ? ' · ' + x.shut + ' shutdown days' : ''}</small></span><span></span></div>`).join('')}</details></div>`;
+  $('#lvpOut').innerHTML = `<div class="lvpsum"><span class="wilbl" style="color:var(--good)">Vacation days in ${y}</span><span class="big">${fmtDays(total)} of ${fmtDays(L.vacation)}</span>
+      <span style="font-size:13px">${fmtDays(already)} on trips already planned · ${fmtDays(shut)} for the shutdown · ${fmtDays(plannedHere)} for these trips · <strong>${fmtDays(L.vacation - total)} left</strong>. Work from abroad: ${fmtDays(wfaUsed[y] || 0)} of the ${fmtDays(P.res.pools[y] || 0)} you set aside.${best.W[ny] ? ` In ${ny}: ${best.W[ny]} workday${best.W[ny] === 1 ? '' : 's'} (${fmtDays(wfaUsed[ny] || 0)} from abroad, ${fmtDays(best.vac[ny] || 0)} vacation from ${ny}’s allowance).` : ''}</span></div>
+    ${best.pick.map((c, i) => card(trips[i], c, split[i], i)).join('')}
+    <div style="display:flex;justify-content:flex-end"><button class="btn primary" type="button" id="lvpCreate">Add these trips</button></div>`;
+}
+async function lvCreate(){
+  const P = state.lvPlan, { best, trips, split } = P.res, y = String(P.y), me = usernameOf(state.user), now = new Date().toISOString();
+  try {
+    const b = writeBatch(fs);
+    best.pick.forEach((c, i) => {
+      const sp = split[i], other = Object.keys(c.by).filter(k => k !== c.start.slice(0, 4));
+      const rec = { name: trips[i].name.slice(0, 80), type: 'holiday', traveller: 'Anubhav', start: c.start, end: c.end, createdAt: now, createdBy: me };
+      const ys = c.start.slice(0, 4);
+      if (sp.vac[ys]) rec.vacDays = sp.vac[ys]; if (sp.wfa[ys]) rec.wfaDays = sp.wfa[ys];
+      if (other.length) rec.notes = other.map(k => `${k}: ${fmtDays(sp.wfa[k] || 0)} from abroad, ${fmtDays(sp.vac[k] || 0)} vacation`).join('; ');
+      b.set(doc(tripsCol), rec);
+    });
+    await b.commit();
+    $('#lvPlanDlg').close(); toast(`Added ${best.pick.length} trip${best.pick.length === 1 ? '' : 's'} with their leave days`);
+  } catch (x){ const er = $('#lvpErr'); er.textContent = x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x); er.hidden = false; }
+}
+document.addEventListener('click', e => {
+  const t = e.target;
+  const op = t.closest('[data-lvplan]'); if (op){ openLvPlan(op.dataset.lvplan); return; }
+  if (!state.lvPlan) return;
+  if (t.closest('#lvPlanClose')){ $('#lvPlanDlg').close(); return; }
+  if (t.id === 'lvpAdd'){ const y = state.lvPlan.y; state.lvPlan.trips.push({ name: 'Trip', nights: 7, from: `${y}-01`, to: `${y}-12` }); lvRows(); return; }
+  const del = t.closest('[data-lvdel]'); if (del){ state.lvPlan.trips.splice(+del.dataset.lvdel, 1); lvRows(); return; }
+  if (t.id === 'lvpGo'){ lvRun(); return; }
+  if (t.id === 'lvpCreate'){ t.disabled = true; lvCreate(); return; }
+});
+document.addEventListener('input', e => {
+  const r = e.target.closest && e.target.closest('[data-lvi]'); if (!r || !state.lvPlan) return;
+  const T = state.lvPlan.trips[+r.dataset.lvi], k = e.target.dataset.lvk; if (!T || !k) return;
+  T[k] = k === 'nights' ? Math.max(0, Math.round(+e.target.value || 0)) : e.target.value;
 });
 
 // trip dialog
