@@ -13,7 +13,7 @@
 import { member, json, verifyToken, firestore } from '../lib/members.mjs';
 import { beat } from '../lib/health.mjs';
 
-export const VERSION = 'p5';   // shown in the app's search details, to tell which server version answered
+export const VERSION = 'p6';   // shown in the app's search details, to tell which server version answered
 const TTL = 6 * 3600e3, MAX_LEGS = 12, MAX_OPTIONS = 12;   // 12: both of you, 3 days out and 2 back
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isAirports = v => typeof v === 'string' && /^[A-Z]{3}(,[A-Z]{3}){0,5}$/.test(v);
@@ -92,7 +92,7 @@ export function normalizePlaces(j){
     start: d.start_date || null, end: d.end_date || null,
   })).filter(d => d.name && d.airport && d.price);
 }
-export async function explore(x, { key, adults, fetch: f }){
+async function exploreOnce(x, { key, adults, fetch: f }){
   const q = new URLSearchParams({ engine: 'google_travel_explore', departure_id: x.from, arrival_area_id: EUROPE, type: '1',
     outbound_date: x.start, return_date: x.end, travel_mode: '1', currency: 'EUR', hl: 'en', gl: 'de', adults: String(adults), api_key: key });
   if (INTERESTS[x.interest]){ q.delete('travel_mode'); q.set('interest', INTERESTS[x.interest]); }
@@ -104,6 +104,21 @@ export async function explore(x, { key, adults, fetch: f }){
     return { error: r.status === 401 || /invalid api key/i.test(e) ? 'SERPAPI_KEY is not valid' : r.status === 429 || /run out of searches/i.test(e) ? 'Monthly SerpApi searches used up' : e.slice(0, 160) };
   }
   return { places: normalizePlaces(j) };
+}
+// Places from a group of airports. Google sometimes answers a group with almost nothing (seen for MUC,NUE,FMM: one
+// place, while Rome's two airports gave dozens), so a thin answer is asked again airport by airport and merged,
+// keeping the cheapest price per place.
+const THIN = 5;
+export async function explore(x, ctx){
+  const first = await exploreOnce(x, ctx);
+  if (first.error || first.places.length >= THIN || !x.from.includes(',')) return first;
+  const rs = await Promise.all(x.from.split(',').slice(0, 3).map(c => exploreOnce({ ...x, from: c }, ctx)));
+  const best = new Map();
+  for (const p of [first, ...rs].flatMap(r => r.places || [])){
+    const k = (p.name + '|' + (p.country || '')).toLowerCase();
+    if (!best.has(k) || best.get(k).price > p.price) best.set(k, p);
+  }
+  return { places: [...best.values()].sort((a, b) => a.price - b.price), split: rs.length };
 }
 
 export async function handle(req, { env = process.env, verify = verifyToken, fetch: f = fetch, cache, now = Date.now() } = {}){
@@ -125,7 +140,7 @@ export async function handle(req, { env = process.env, verify = verifyToken, fet
   if (Array.isArray(body.explore)){
     const xs = body.explore.filter(x => x && isAirports(x.from) && isDate(x.start) && isDate(x.end) && x.end > x.start && (!x.interest || x.interest in INTERESTS)).slice(0, 2);
     if (!xs.length) return json(400, { error: 'Nothing to search.' });
-    const res = await Promise.all(xs.map(async x => ({ ...x, ...await cached(['x', x.from, x.start, x.end, x.interest || 'any', adults].join('_').replace(/,/g, '-'),
+    const res = await Promise.all(xs.map(async x => ({ ...x, ...await cached(['x2', x.from, x.start, x.end, x.interest || 'any', adults].join('_').replace(/,/g, '-'),
       () => explore(x, { key: env.SERPAPI_KEY, adults, fetch: f })) })));
     return json(200, { explore: res, left: await left() });
   }

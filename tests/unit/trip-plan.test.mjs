@@ -93,3 +93,13 @@ test('setup errors: no key, wrong method, not signed in', async () => {
   const r = await handle(new Request('http://t', { method: 'POST', body: '{}' }), { env, verify: async () => { throw new Error('no'); } });
   assert.ok(r.status === 401 || r.status === 403);
 });
+
+test('explore: a thin answer for a group of airports is asked again airport by airport and merged', async () => {
+  const calls = [], base = fakeSerpApi({ calls });
+  const f = async url => { const u = new URL(url); if (u.searchParams.get('departure_id') === 'MUC,NUE,FMM'){ calls.push(Object.fromEntries(u.searchParams)); return { ok: true, status: 200, json: async () => ({ destinations: [{ destination_id: '/m/lis', name: 'Lisbon', country: 'Portugal', destination_airport: { code: 'LIS' }, flight_price: 288 }] }) }; } return base(url); };
+  const j = await (await handle(req({ explore: [{ from: 'MUC,NUE,FMM', start: '2027-05-06', end: '2027-05-09' }] }), { env, verify, fetch: f })).json();
+  assert.deepEqual(calls.map(c => c.departure_id), ['MUC,NUE,FMM', 'MUC', 'NUE', 'FMM']);
+  assert.equal(j.explore[0].split, 3);
+  assert.ok(j.explore[0].places.length >= 4);
+  assert.ok(j.explore[0].places.some(p => p.name === 'Lisbon'));
+});
