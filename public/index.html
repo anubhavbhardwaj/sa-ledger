@@ -5713,7 +5713,8 @@ async function planSearch(){
   try {
     const r = await api('/api/trip-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ legs: legs.map(({ from, to, date }) => ({ from, to, date })) }) });
     const j = await r.json();
-    P.res = { left: j.left, v: j.v || 'old', legs: legs.map((l, i) => ({ ...l, ...j.legs[i], dir: l.dir, way: l.way })) };
+    // A day the server didn't answer shows as an error instead of looking like "no flights".
+    P.res = { left: j.left, v: j.v || 'old', legs: legs.map((l, i) => ({ ...l, ...(j.legs?.[i] || { error: 'Not searched (the server skipped this day)' }), dir: l.dir, way: l.way })) };
   } catch (x){ P.err = x.message; }
   P.busy = false; if (state.plan === P) planRender();
 }

@@ -13,8 +13,8 @@
 import { member, json, verifyToken, firestore } from '../lib/members.mjs';
 import { beat } from '../lib/health.mjs';
 
-export const VERSION = 'p4';   // shown in the app's search details, to tell which server version answered
-const TTL = 6 * 3600e3, MAX_LEGS = 8, MAX_OPTIONS = 12;
+export const VERSION = 'p5';   // shown in the app's search details, to tell which server version answered
+const TTL = 6 * 3600e3, MAX_LEGS = 12, MAX_OPTIONS = 12;   // 12: both of you, 3 days out and 2 back
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isAirports = v => typeof v === 'string' && /^[A-Z]{3}(,[A-Z]{3}){0,5}$/.test(v);
 
@@ -130,7 +130,8 @@ export async function handle(req, { env = process.env, verify = verifyToken, fet
     return json(200, { explore: res, left: await left() });
   }
   // Answers stay in the order asked (the app matches them by position), so a bad leg gets an error, not dropped.
-  const legs = (Array.isArray(body.legs) ? body.legs : []).slice(0, MAX_LEGS);
+  if (Array.isArray(body.legs) && body.legs.length > MAX_LEGS) return json(400, { error: `Too many days to search at once (${body.legs.length}, at most ${MAX_LEGS}).` });
+  const legs = Array.isArray(body.legs) ? body.legs : [];
   if (!legs.some(l => l && isAirports(l.from) && isAirports(l.to) && isDate(l.date))) return json(400, { error: 'Nothing to search.' });
   const res = await Promise.all(legs.map(async l => !(l && isAirports(l.from) && isAirports(l.to) && isDate(l.date)) ? { ...l, error: 'Not a valid airport or date: ' + JSON.stringify(l).slice(0, 80) } : ({ ...l, ...await cached([l.from, l.to, l.date, adults].join('_').replace(/,/g, '-'), () => search(l, { key: env.SERPAPI_KEY, adults, fetch: f })) })));
   return json(200, { legs: res, left: await left(), v: VERSION });
