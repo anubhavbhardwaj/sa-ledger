@@ -156,3 +156,14 @@ test('leave planner: two 3-week India trips around holidays and the shutdown, fe
   await page.click('#lvpCreate'); await page.waitForTimeout(200);
   await clean(app);
 });
+
+test('visualizations: spend by store, and tapping a store filters everything to it', async () => {
+  const app = await openApp(), { page } = app, m = month(0);
+  const e = (id, store, amount, category) => [id, { amount, date: m + '-0' + (1 + (id.charCodeAt(1) % 8)), store, category, account: 'DKB', spender: 'Anubhav', createdAt: 'x' }];
+  await app.seed({ expenses: Object.fromEntries([e('e1', 'Rewe', 40, 'Groceries'), e('e2', 'Rewe', 35, 'Groceries'), e('e3', 'Lidl', 20, 'Groceries'), e('e4', 'Amazon', 90, 'Shopping')]) });
+  await app.go('visualizations'); await page.click(`.chip[data-p="${m}"]`); await page.waitForSelector('#byStore .hbar');
+  assert.deepEqual(await page.$$eval('#byStore .hbar .name', x => x.map(n => n.textContent)), ['Amazon', 'Rewe', 'Lidl']);
+  await page.click('#byStore .hbar[data-v="Rewe"]'); await page.waitForTimeout(150);
+  assert.match(await app.text('#vzBanner'), /2 transactions · €75\.00.*Store: Rewe/);
+  await clean(app);
+});

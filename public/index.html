@@ -913,6 +913,10 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
           <header><h2>By country</h2><span class="right" data-vzslot="country"></span></header>
           <div class="hbars" id="byCountry"></div>
         </section>
+        <section class="panel span-12">
+          <header><h2>By store</h2><span class="right" data-vzslot="store"></span></header>
+          <div class="hbars" id="byStore"></div>
+        </section>
         <section class="panel span-12" id="wiPanel">
           <header><h2 id="wiTitle">What if</h2></header>
           <p class="muted" style="margin:0 0 10px;font-size:13px">What you spent per category in the month picked at the top. Type a lower amount where you could have spent less, and see how much more you could have invested that month.</p>
@@ -1326,8 +1330,8 @@ const eur = new Intl.NumberFormat('en-IE', {style:'currency', currency:'EUR'});
 const eur0 = new Intl.NumberFormat('en-IE', {style:'currency', currency:'EUR', maximumFractionDigits:0});
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CC = {Germany:'DE', Italy:'IT', India:'IN', France:'FR', Spain:'ES', Switzerland:'CH', Austria:'AT'};
-const DIMS = ['category','spender','account','country','tripKind','tripName'];
-const LABEL = {category:'Category', spender:'Spender', account:'Account', country:'Country', tripKind:'Trip type', tripName:'Trip'};
+const DIMS = ['category','spender','account','country','tripKind','tripName','store'];
+const LABEL = {category:'Category', spender:'Spender', account:'Account', country:'Country', tripKind:'Trip type', tripName:'Trip', store:'Store'};
 const PAGES = ['overview','transactions','trips','wealth','visualizations'];
 const FIELDS = ['amount','date','store','category','subcategory','account','spender','country','comment'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1335,7 +1339,7 @@ const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' +
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], toBook:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], toBook:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null, store:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -1689,6 +1693,7 @@ function renderTransactions(){
     const g = group(pool, k);
     const cur = state.filters[k];
     if (cur !== null && !g.some(x => x.key === cur)) g.push({key:cur, total:0});
+    if (!$('#fl-'+k)) continue;   // store has no dropdown; it's filtered from the chart
     $('#fl-'+k).innerHTML = `<option value="">All</option>` + g.map(x => `<option value="${esc(x.key)}" ${x.key===cur?'selected':''}>${esc(x.key)} (${eur0.format(x.total)})</option>`).join('');
   }
   if (document.activeElement !== $('#search')) $('#search').value = state.q;
@@ -1756,9 +1761,9 @@ function renderChips(el, withLink){
 }
 
 // ---------- chart type choices (remembered per device) ----------
-const VZ_TYPES = { tripKind:['bar','pie','table'], trend:['bar','line','table'], cum:['line','bar','table'], category:['bar','pie','table'], spender:['bar','pie','table'], account:['bar','pie','table'], country:['bar','pie','table'] };
+const VZ_TYPES = { tripKind:['bar','pie','table'], trend:['bar','line','table'], cum:['line','bar','table'], category:['bar','pie','table'], spender:['bar','pie','table'], account:['bar','pie','table'], country:['bar','pie','table'], store:['bar','pie','table'] };
 const VZ_LABEL = { bar:'Bar', line:'Line', pie:'Pie', table:'Table' };
-state.vz = { tripKind:'pie', trend:'bar', cum:'line', category:'bar', spender:'bar', account:'bar', country:'bar' };
+state.vz = { tripKind:'pie', trend:'bar', cum:'line', category:'bar', spender:'bar', account:'bar', country:'bar', store:'bar' };
 try { Object.assign(state.vz, JSON.parse(localStorage.getItem('vzTypes') || '{}')); } catch {}
 for (const k in state.vz) if (!VZ_TYPES[k]?.includes(state.vz[k])) state.vz[k] = VZ_TYPES[k][0];
 function vzSwitch(id){
@@ -1792,6 +1797,7 @@ function renderVisualizations(){
   renderBreakdown('spender', $('#bySpender'));
   renderBreakdown('account', $('#byAccount'));
   renderBreakdown('country', $('#byCountry'));
+  renderBreakdown('store', $('#byStore'), 15);
   renderWhatIf();
 }
 
@@ -1925,12 +1931,12 @@ function renderBars(key, el, opts={}){
   if (!g.length){ el.innerHTML = `<div class="empty">${state.ready ? 'Nothing in this period.' : 'Loading…'}</div>`; return; }
   if (opts.max && g.length > opts.max){
     const rest = g.slice(opts.max-1);
-    g = g.slice(0, opts.max-1).concat([{key:'Other', total:rest.reduce((s,x)=>s+x.total,0), other:true}]);
+    g = g.slice(0, opts.max-1).concat([{key:`Other (${rest.length})`, total:rest.reduce((s,x)=>s+x.total,0), other:true}]);
   }
   const max = Math.max(...g.map(x => x.total));
   const sel = useF ? state.filters[key] : null;
   el.innerHTML = g.map(x => `
-    <button type="button" class="hbar ${sel && sel!==x.key?'dim':''} ${sel===x.key?'sel':''}" ${x.other?'disabled':''} data-k="${key}" data-v="${esc(x.key)}" ${opts.goto?`data-goto="${opts.goto}"`:''} aria-pressed="${sel===x.key}" title="${x.other?'Smaller categories combined':opts.goto?'Show these transactions':'Filter by '+esc(x.key)}">
+    <button type="button" class="hbar ${sel && sel!==x.key?'dim':''} ${sel===x.key?'sel':''}" ${x.other?'disabled':''} data-k="${key}" data-v="${esc(x.key)}" ${opts.goto?`data-goto="${opts.goto}"`:''} aria-pressed="${sel===x.key}" title="${x.other?'The smaller ones combined':opts.goto?'Show these transactions':'Filter by '+esc(x.key)}">
       <span class="name">${esc(x.key)}</span>
       <span class="track"><span class="fill" style="width:${(x.total/max*100).toFixed(2)}%"></span></span>
       <span class="amt">${eur.format(x.total)}<span class="pct">${total?(x.total/total*100).toFixed(0):0}%</span></span>
@@ -2104,7 +2110,7 @@ document.addEventListener('click', e => {
   if (ed) openEdit(ed.dataset.edit, ed.dataset.kind || 'expense');
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('tr.mrow')){ e.target.click(); return; } if (e.key === 'Enter'){ const ed = e.target.closest && e.target.closest('[data-edit]'); if (ed) openEdit(ed.dataset.edit, ed.dataset.kind || 'expense'); } });
-DIMS.forEach(k => $('#fl-'+k).addEventListener('change', e => { state.filters[k] = e.target.value || null; render(); }));
+DIMS.forEach(k => $('#fl-'+k)?.addEventListener('change', e => { state.filters[k] = e.target.value || null; render(); }));
 $('#filterBtn').addEventListener('click', () => { state.showFilters = !state.showFilters; render(); });
 let qTimer; $('#search').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.q = e.target.value.trim(); render(); }, 150); });
 
