@@ -187,3 +187,23 @@ test('goals: monthly investing and an emergency fund, set up from the Overview',
   assert.match(g, /Emergency fund.*€9,000 of €12,000/); assert.match(g, /1 of the last 1 months/); assert.match(g, /€3,000 to go · 6 months × €2,000/);
   await clean(app);
 });
+
+test('FIRE: the German state pension from the payslip lowers the FIRE number', async () => {
+  const app = await openApp(), { page } = app, y = new Date().getFullYear();
+  await app.seed({
+    accounts: { tr: { name: 'Trade Republic', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
+    invSnapshots: { ['tr_' + month(0)]: { accountId: 'tr', month: month(0), investment: 1000, value: 50000 } },
+    settings: { fire: { expenses: 36000, fireYear: y + 15, withdrawal: 4, inflation: 3, returnPct: 7 } },
+  });
+  await app.go('wealth'); await page.click('[data-wv="fire"]'); await page.waitForSelector('[data-pen="penGross"]');
+  const before = await app.text('#wv-fire');
+  assert.match(before, /Fill these in/);
+  const fill = async (k, v) => { await page.fill(`[data-pen="${k}"]`, v); await page.dispatchEvent(`[data-pen="${k}"]`, 'change'); await page.waitForTimeout(120); };
+  await fill('penStart', '2024-09'); await fill('penGross', '7668.75'); await fill('birthYear', '1994'); await fill('penUntil', String(y + 15));
+  const t = await app.text('#wv-fire');
+  // 7,668.75 × 12 / 51,944 = 1.77 points a year → €75.33 a month of pension per year paid in
+  assert.match(t, /\+€75 a month of pension/); assert.match(t, /1\.77 points a year/);
+  assert.match(t, /Pension from 2061/); assert.match(t, /less thanks to the pension from 2061/);
+  assert.match(t, /Minimum 5 years\s*Met/);
+  await clean(app);
+});

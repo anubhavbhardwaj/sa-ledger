@@ -4108,17 +4108,27 @@ function ledgerAnnualSpend(){
   if (ms.length < 3) return null;
   return { v: ms.reduce((s,m) => s + by[m], 0) / ms.length * 12, n: ms.length };
 }
+// The portfolio needed at the start of year y0+k. With a state pension from pen.year, the years before it are
+// bridged in full and afterwards the portfolio covers only spending minus the pension (both grown with inflation).
+function fireNum(p, k){
+  if (!(p.wr > 0)) return 0;
+  const y = new Date().getFullYear() + k, spend = p.exp * Math.pow(1 + p.inf / 100, k);
+  const P = p.pen && p.pen.today > 0 ? p.pen.today * Math.pow(1 + (p.pen.inf ?? p.inf) / 100, k) : 0;
+  if (!P) return spend / (p.wr / 100);
+  const bridge = Math.max(0, p.pen.year - y);
+  return Math.max(0, spend - P) / (p.wr / 100) + Math.min(P, spend) * bridge;
+}
 function fireCalc(p){
   const r = p.ret / 100, yrs = Math.max(0, p.year - new Date().getFullYear());
-  const fae = p.exp * Math.pow(1 + p.inf / 100, yrs), num = p.wr > 0 ? fae / (p.wr / 100) : 0;
+  const fae = p.exp * Math.pow(1 + p.inf / 100, yrs), num = fireNum(p, yrs), numNoPen = p.wr > 0 ? fae / (p.wr / 100) : 0;
   const grow = Math.pow(1 + r, yrs), pmt = p.save * 12;
   const fvC = r > 0 ? pmt * (grow - 1) / r : pmt * yrs;
   const proj = p.cur * grow + fvC;
   const need = yrs > 0 ? Math.max(0, (num - p.cur * grow) * (r > 0 ? r / (grow - 1) : 1 / yrs) / 12) : null;
   // First year the projected portfolio covers that year's FIRE number.
   let reach = null;
-  for (let k = 0; k <= 60; k++){ const g = Math.pow(1 + r, k), v = p.cur * g + (r > 0 ? pmt * (g - 1) / r : pmt * k), t = p.exp * Math.pow(1 + p.inf / 100, k) / (p.wr / 100); if (v >= t){ reach = new Date().getFullYear() + k; break; } }
-  return { yrs, fae, num, proj, need, reach, on: proj >= num };
+  for (let k = 0; k <= 60; k++){ const g = Math.pow(1 + r, k), v = p.cur * g + (r > 0 ? pmt * (g - 1) / r : pmt * k), t = fireNum(p, k); if (v >= t){ reach = new Date().getFullYear() + k; break; } }
+  return { yrs, fae, num, numNoPen, proj, need, reach, on: proj >= num };
 }
 function renderFire(pf){
   // Two separate plans: a euro one for life in Germany (spending from the ledger) and a rupee one for life in India.
@@ -4128,6 +4138,8 @@ function renderFire(pf){
   const p = { exp: f.expenses ?? (led ? Math.round(led.v) : 0), inf: f.inflation ?? (inr ? 6 : 3), year: f.fireYear ?? (inr ? (state.fire?.fireYear ?? y0 + 20) : y0 + 20), wr: f.withdrawal ?? (inr ? 3.5 : 4),
     save: f.savings ?? (ledSave !== null ? Math.round(ledSave) : 0), ret: f.returnPct ?? (inr ? 10 : 7),
     cur: pf.withData.filter(x => x.a.inFire !== false).reduce((s,x) => s + x.valueEur, 0) };
+  const pen = germanPension(state.fire || {}, state.fire?.fireYear ?? y0 + 20);
+  if (pen) p.pen = { today: inr ? eurToHome(pen.monthly) * 12 : pen.monthly * 12, year: pen.year, inf: inr ? p.inf : (state.fire?.inflation ?? 3) };
   const left = pf.withData.filter(x => x.a.inFire === false);
   const c = fireCalc(p), prog = c.num > 0 ? p.cur / c.num : 0, noExp = !(p.exp > 0);
   const src = (key, val, label) => val === null ? '' : f[key] !== undefined && f[key] !== null
@@ -4135,7 +4147,7 @@ function renderFire(pf){
   $('#wv-fire').innerHTML = `${inr ? `<div class="banner"><span class="left"><span><strong>Plan for life in India</strong> · in rupees, with its own spending, inflation and return. Your euro plan stays as it is; switch back with €.</span></span></div>` : ''}
     ${noExp ? `<div class="panel"><p class="empty" style="margin:0">Enter your expected yearly spending${inr ? ' in India (in rupees, at today’s prices)' : ''} under Assumptions to see your FIRE number.</p></div>` : ''}
     <section class="kpis w" ${noExp ? 'hidden' : ''}>
-      <div class="kpi"><span class="lbl">FIRE number</span><span class="val">${hm0.format(c.num)}</span><span class="sub">${hm0.format(c.fae)} a year in ${p.year}, at ${p.wr}% withdrawal</span></div>
+      <div class="kpi"><span class="lbl">FIRE number</span><span class="val">${hm0.format(c.num)}</span><span class="sub">${hm0.format(c.fae)} a year in ${p.year}, at ${p.wr}% withdrawal${p.pen && c.numNoPen > c.num ? ` · ${hm0.format(c.numNoPen - c.num)} less thanks to the pension from ${p.pen.year}` : ''}</span></div>
       <div class="kpi"><span class="lbl">Invested today</span><span class="val">${hm0.format(p.cur)}</span><span class="sub">${(prog * 100).toFixed(0)}% of the way${left.length ? ` · leaves out ${left.map(x => esc(x.a.name)).join(', ')} (${hm0.format(left.reduce((s,x) => s + x.valueEur, 0))})` : ''}</span><div class="progress" aria-hidden="true"><i style="width:${Math.min(100, prog * 100).toFixed(1)}%"></i></div></div>
       <div class="kpi"><span class="lbl">Projected in ${p.year}</span><span class="val">${hm0.format(c.proj)}</span><span class="sub"><span class="pill ${c.on ? 'ontrack' : 'over'}">${c.on ? 'On track' : 'Behind'}</span> ${c.num > 0 ? (c.proj / c.num * 100).toFixed(0) + '% of target' : ''}</span></div>
       <div class="kpi"><span class="lbl">Needed a month</span><span class="val">${c.need === null ? '—' : hm0.format(c.need)}</span><span class="sub">${c.reach ? 'At your pace: FIRE around ' + c.reach : 'Not reached within 60 years at this pace'}</span></div>
@@ -4151,9 +4163,10 @@ function renderFire(pf){
         <label>Withdrawal rate (%)<input type="number" step="0.1" min="0.1" inputmode="decimal" data-fire="withdrawal" value="${p.wr}"></label>
       </div>
       <p class="hint">Invested today is the live value of your investment accounts that count towards FIRE (set per account with Edit).${inr ? ' Monthly investing follows the last 12 months, in rupees, unless you type a figure.' : ' Leave spending or monthly investing empty to follow your ledger.'}</p>
-    </section>`;
+    </section>
+    ${pensionPanel(pen, inr)}`;
   const yrs = Math.max(c.yrs, c.reach ? c.reach - y0 : 0, 5), r = p.ret / 100;
-  const pts = []; for (let k = 0; k <= yrs; k++){ const g = Math.pow(1 + r, k); pts.push({ yr: y0 + k, v: p.cur * g + (r > 0 ? p.save * 12 * (g - 1) / r : p.save * 12 * k), t: p.wr > 0 ? p.exp * Math.pow(1 + p.inf / 100, k) / (p.wr / 100) : 0 }); }
+  const pts = []; for (let k = 0; k <= yrs; k++){ const g = Math.pow(1 + r, k); pts.push({ yr: y0 + k, v: p.cur * g + (r > 0 ? p.save * 12 * (g - 1) / r : p.save * 12 * k), t: fireNum(p, k) }); }
   const W = wideW(), H = innerWidth <= 640 ? 220 : 260, L = innerWidth <= 640 ? 78 : 58, R = 10, T = 12, B = 26, n = pts.length;
   const max = niceMax(Math.max(...pts.map(q => Math.max(q.v, q.t))));
   const x = i => L + (W-L-R) * i / Math.max(1, n-1), yy = v => T + (H-T-B) * (1 - v / max);
@@ -4168,11 +4181,57 @@ function renderFire(pf){
     if (i % every === 0) s += `<text x="${x(i)}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : i === 0 ? 'start' : 'middle'}">${q.yr}</text>`; });
   $('#fireChart').innerHTML = s + '</svg>';
 }
+
+// ---------- German state pension (gesetzliche Rentenversicherung), Anubhav's ----------
+// Pension points: each year's pension-insurance gross (capped at the contribution ceiling) divided by the average
+// German salary that year; one point pays the current pension value a month. Figures for 2026.
+const DRV = { avg: 51944, ceiling: 8450, value: 42.52, minMonths: 60, year: 2026 };
+function germanPension(f, fireYear){
+  if (!f.penStart || !(f.penGross > 0) || !(f.birthYear > 1900)) return null;
+  const until = f.penUntil || fireYear, [sy, sm] = f.penStart.split('-').map(Number);
+  const months = Math.max(0, (until - sy) * 12 + (12 - sm + 1));           // through December of the last year
+  const gross = Math.min(f.penGross, DRV.ceiling), perYear = gross * 12 / DRV.avg;
+  const points = perYear * months / 12, monthly = points * DRV.value;
+  const age = f.penAge || 67;
+  return { months, points, perYear, monthly, perYearEur: perYear * DRV.value, year: f.birthYear + age, age, until, capped: f.penGross > DRV.ceiling, enough: months >= DRV.minMonths };
+}
+function pensionPanel(pen, inr){
+  const f = state.fire || {}, y0 = new Date().getFullYear();
+  const fld = (k, label, attrs, val, help) => `<label>${label}<input ${attrs} data-pen="${k}" value="${val ?? ''}">${help ? `<span class="src">${help}</span>` : ''}</label>`;
+  return `<section class="panel"><header><h2>German state pension</h2><span class="hint">Anubhav · from your payslips</span></header>
+    ${pen ? `<div class="lvgrid" style="margin-bottom:12px">
+      <div class="lvbox"><span class="lbl">Pension from ${pen.year}</span><span class="val">${eur0.format(pen.monthly)} <small>a month, in today’s euros</small></span><span class="muted" style="font-size:12.5px">${pen.points.toFixed(1)} pension points for ${Math.floor(pen.months / 12)} years ${pen.months % 12 ? 'and ' + (pen.months % 12) + ' months ' : ''}paid in, until ${pen.until}${inr ? ` · about ${hm0.format(eurToHome(pen.monthly))} a month` : ''}</span></div>
+      <div class="lvbox"><span class="lbl">Each year you pay in</span><span class="val">+${eur0.format(pen.perYearEur)} <small>a month of pension</small></span><span class="muted" style="font-size:12.5px">${pen.perYear.toFixed(2)} points a year at your salary${pen.capped ? ' (capped at the contribution ceiling)' : ''}</span></div>
+      <div class="lvbox"><span class="lbl">Minimum 5 years</span><span class="val">${pen.enough ? '<span class="pos">Met</span>' : `${Math.floor(pen.months / 12)} of 5 <small>years by ${pen.until}</small>`}</span><span class="muted" style="font-size:12.5px">${pen.enough ? 'You get a pension for these years, also when living in India.' : 'Under 5 years there’s no German pension on its own; years worked in India may count under the India agreement, or contributions can be refunded. Ask Deutsche Rentenversicherung.'}</span></div>
+    </div>` : `<p class="muted" style="margin:0 0 10px;font-size:13px">Fill these in to count your German pension in the FIRE number: from ${'the payslip line “Pension Insurance gross” (RV-Brutto)'}.</p>`}
+    <div class="fire-grid">
+      ${fld('penStart', 'Paying in since', 'type="month"', f.penStart, '')}
+      ${fld('penGross', 'Pension-insurance gross a month (€)', 'type="number" step="50" min="0" inputmode="decimal"', f.penGross, 'Payslip: “PI Gross” / RV-Brutto')}
+      ${fld('penUntil', 'Paying in Germany until (year)', `type="number" step="1" min="${y0}" max="${y0 + 45}" inputmode="numeric" placeholder="${f.fireYear ?? y0 + 20}"`, f.penUntil, 'Empty: your FIRE year')}
+      ${fld('birthYear', 'Birth year', 'type="number" step="1" min="1940" max="2010" inputmode="numeric"', f.birthYear, '')}
+      ${fld('penAge', 'Pension age', 'type="number" step="1" min="63" max="70" inputmode="numeric" placeholder="67"', f.penAge, '')}
+    </div>
+    <p class="hint">An estimate in today’s money: ${DRV.year} average salary ${eur0.format(DRV.avg)}, pension value ${DRV.value.toFixed(2)} € per point. Before tax and health insurance; future pension increases are assumed to follow inflation. Your yearly Renteninformation (after 5 years) gives the official figure.</p>
+  </section>`;
+}
+const PEN_KEYS = ['penStart', 'penGross', 'penUntil', 'birthYear', 'penAge'];
+document.addEventListener('change', async e => {
+  const i = e.target.closest('[data-pen]'); if (!i) return;
+  const k = i.dataset.pen, raw = i.value.trim();
+  const v = k === 'penStart' ? (/^\d{4}-\d{2}$/.test(raw) ? raw : null) : raw === '' ? null : Math.round(parseFloat(raw) * (k === 'penGross' ? 100 : 1)) / (k === 'penGross' ? 100 : 1);
+  if (raw !== '' && (v === null || (k !== 'penStart' && !isFinite(v)))) return toast('That isn’t a valid value.');
+  const next = { ...(state.fire || {}), [k]: v }, o = {};
+  for (const key of [...FIRE_KEYS, ...PEN_KEYS]) if (next[key] !== null && next[key] !== undefined && next[key] !== '') o[key] = next[key];
+  o.updatedAt = new Date().toISOString(); o.updatedBy = usernameOf(state.user);
+  state.fire = o; render();
+  try { await setDoc(doc(fs, 'settings', 'fire'), o); } catch (x){ toast(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); }
+});
 const FIRE_KEYS = ['expenses','inflation','fireYear','withdrawal','savings','returnPct'];
 async function saveFire(patch){
   const inr = HOME() === 'INR', key = inr ? 'fireInr' : 'fire';
   const next = { ...state[key], ...patch }, o = {};
   for (const k of FIRE_KEYS) if (typeof next[k] === 'number' && isFinite(next[k])) o[k] = next[k];
+  if (key === 'fire') for (const k of PEN_KEYS) if (next[k] !== null && next[k] !== undefined && next[k] !== '') o[k] = next[k];
   o.updatedAt = new Date().toISOString(); o.updatedBy = usernameOf(state.user);
   state[key] = o; render();
   try { await setDoc(doc(fs, 'settings', key), o); } catch (x){ toast(writeError(x)); }
