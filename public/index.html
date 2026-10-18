@@ -552,6 +552,7 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .sv.no summary strong{color:var(--muted);font-weight:500}.sv p{margin:0 0 10px;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
 .svctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 12px}.svctl label{display:grid;gap:4px;font-size:12.5px;color:var(--ink-2);min-width:0}
 .pschk{display:grid;gap:6px;margin:10px 0 0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);font-size:13px}.pschk p{margin:0}
+.psnote{display:grid;gap:6px;margin:10px 0 0;padding:10px 12px;border-radius:10px;background:var(--sunk);font-size:12.5px;color:var(--ink-2)}.psnote p{margin:0}
 .fire-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px}
 .fire-grid label{display:grid;gap:4px;align-content:start;font-size:12.5px;color:var(--ink-2)}
 .fire-grid input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:8px 10px;width:100%;min-width:0;font-family:var(--f-mono)}
@@ -4344,6 +4345,11 @@ function renderTax(){
   $('#wv-tax').innerHTML = `
     ${askToday ? `<div class="banner" id="wdAsk"><span class="left"><span><strong>Where are you working today?</strong> ${shortDate(t)}</span></span><span class="wdbtns">${Object.entries(WD_LABEL).map(([k, l]) => `<button type="button" class="btn ${k === 'office' || k === 'home' ? 'primary' : ''}" data-wdtoday="${k}">${l}</button>`).join('')}</span></div>` : ''}
     <div class="seg" role="radiogroup" aria-label="Tax year">${years.map(v => `<button type="button" role="radio" data-taxyear="${v}" aria-checked="${v === y}">${v}</button>`).join('')}</div>
+    ${(() => { const w = [], pm = [...new Set(state.payslips.filter(s => s.month?.startsWith(y + '')).map(s => s.month))].sort();
+        for (const j of taxJobs()) if (!(+j.km > 0) && (!j.to || j.to.startsWith(y + '') || j.from.startsWith(y + ''))) w.push(`<strong>${esc(j.name)}</strong> has 0 km, so its office days are worth nothing. Enter the one-way distance below.`);
+        const uncovered = pm.filter(m => !taxJobs().some(j => j.from.slice(0, 7) <= m && (!j.to || m <= j.to.slice(0, 7))));
+        if (uncovered.length) w.push(`You have payslips for ${uncovered.length > 2 ? monthLabel(uncovered[0]) + ' to ' + monthLabel(uncovered[uncovered.length - 1]) : uncovered.map(monthLabel).join(' and ')}, but no workplace covers ${uncovered.length > 1 ? 'those months' : 'that month'}. Add it below with its dates, so commuting and home office days count.`);
+        return w.length ? `<div class="pschk"><strong>Your workplaces need a look:</strong>${w.map(x => `<p>${x}</p>`).join('')}</div>` : ''; })()}
     ${!taxJobs().length ? `<div class="panel"><p class="empty" style="margin:0">Add your workplaces below (with the one-way distance from home) to count commuting and home office days.</p></div>` : `
     <section class="kpis w">
       <div class="kpi"><span class="lbl">Commuting allowance</span><span class="val">${eur0.format(c.commute - c.ticketOff)}</span><span class="sub">${n1(+c.office.toFixed(1))} office days${c.ticketOff ? ` · after the job ticket (${eur0.format(c.ticketOff)})` : ''}</span></div>
@@ -4528,7 +4534,7 @@ const median = a => { const b = [...a].sort((x, y) => x - y), n = b.length; retu
 function payYear(y, project = true){
   const slips = state.payslips.filter(s => s.month?.startsWith(y + '')).sort((a, b) => a.month.localeCompare(b.month) || String(a.at).localeCompare(String(b.at))).map(withIns);
   if (!slips.length) return null;
-  const tot = Object.fromEntries(PS_F.map(k => [k, 0])), byEmp = {}, groups = [], warn = [];
+  const tot = Object.fromEntries(PS_F.map(k => [k, 0])), byEmp = {}, groups = [], warn = [], notes = [];
   for (const s of slips) (byEmp[empKey(s.employer)] ||= []).push(s);
   for (const list of Object.values(byEmp)){
     const last = list[list.length - 1], ytd = { ...(last.ytd || {}) }, sum = Object.fromEntries(PS_F.map(k => [k, list.reduce((a, s) => a + (+s[k] || 0), 0)]));
@@ -4538,18 +4544,19 @@ function payYear(y, project = true){
     const g = { name: last.employer || '?', months: list.map(s => s.month), src: ytdOk ? `year-to-date on ${monthLabel(last.month)}` : `${list.length} month${list.length === 1 ? '' : 's'} added up`, v: {} };
     for (const k of PS_F) g.v[k] = ytdOk && ytd[k] !== undefined ? ytd[k] : sum[k];
     for (const k of PS_F) tot[k] += g.v[k];
-    if (ytd.taxGross > 0 && !ytdOk) warn.push(`${esc(g.name)}: the year-to-date tax gross on ${monthLabel(last.month)} (${eur0.format(ytd.taxGross)}) doesn’t fit the months (${eur0.format(sum.taxGross)}), so the months are added up instead. Check that slip.`);
+    if (ytd.taxGross > 0 && !ytdOk) notes.push(`${esc(g.name)}: the year-to-date figure read from ${monthLabel(last.month)} (${eur0.format(ytd.taxGross)}) is lower than the months added up (${eur0.format(sum.taxGross)}), so it’s probably a different gross (like the pension-insurance gross, which leaves out one-off pay). The months are used instead; nothing to do if all months are uploaded.`);
     const dup = list.map(s => s.month).filter((m, i, a) => a.indexOf(m) !== i);
     if (dup.length) warn.push(`${esc(g.name)}: ${[...new Set(dup)].map(monthLabel).join(', ')} uploaded twice.`);
     const ratios = list.filter(s => +s.taxGross > 0 && !(+s.oneOff > 0)).map(s => s.lst / s.taxGross), low = Math.min(...ratios);
     for (const s of list){
       const miss = (s.est || []).filter(k => !(ytdOk && ytd[k] !== undefined));
-      if (miss.length) warn.push(`${monthLabel(s.month)} (${esc(g.name)}): no ${miss.map(k => PS_LABEL[k].toLowerCase()).join(' or ')} on the slip as read, so ${miss.length > 1 ? 'they are' : 'it is'} estimated (${miss.map(k => eur0.format(s[k])).join(', ')}). Check the slip and fix it with Edit.`);
+      if (miss.length) (g.est ||= []).push(s.month);
       const r = +s.taxGross > 0 ? s.lst / s.taxGross : 0;
       if (!(+s.oneOff > 0) && r > 0.27 && (ratios.length < 2 || r > low * 1.2)){ s.suspect = true; warn.push(`${monthLabel(s.month)} (${esc(g.name)}): wage tax is ${(r * 100).toFixed(0)}% of tax gross, so this month probably includes a one-off payment (bonus, holiday pay). Enter it as “One-off pay” with Edit${list.length < 2 ? ', otherwise the rest of the year is projected from it' : ''}.`); }
       if (+s.taxGross > 0 && !(+s.lst > 0)) warn.push(`${monthLabel(s.month)} (${esc(g.name)}): no wage tax read.`);
       if (+s.taxGross > 0 && +s.lst / +s.taxGross > 0.45) warn.push(`${monthLabel(s.month)} (${esc(g.name)}): wage tax is ${(s.lst / s.taxGross * 100).toFixed(0)}% of tax gross, which is unusually high.`);
     }
+    if (g.est?.length) notes.push(`${esc(g.name)}: health and care insurance weren’t found on ${g.est.length === list.length ? 'the slips' : g.est.map(monthLabel).join(', ')}, so they’re estimated from the 2026 rates (about 509 € and 140 € a month at your pay). Close enough for the estimate; for exact figures, type them in with Edit.`);
     groups.push(g);
   }
   // The rest of the year: like the latest regular month (no one-off payment) of the latest employer.
@@ -4564,7 +4571,7 @@ function payYear(y, project = true){
   const gaps = []; for (let m = +slips[0].month.slice(5, 7); m <= lastM; m++){ const k = `${y}-${String(m).padStart(2, '0')}`; if (!slips.some(s => s.month === k) && !groups.some(g => g.src.startsWith('year'))) gaps.push(k); }
   if (gaps.length) warn.push(`No payslip for ${gaps.map(monthLabel).join(', ')}.`);
   if (+slips[0].month.slice(5, 7) > 1 && !groups.some(g => g.src.startsWith('year'))) warn.push(`Payslips start in ${monthLabel(slips[0].month)}: earlier months of the year aren’t counted.`);
-  return { slips, tot, proj, last, base, lastM, rest, groups, warn, months: new Set(slips.map(s => s.month)).size };
+  return { slips, tot, proj, last, base, lastM, rest, groups, warn, notes, months: new Set(slips.map(s => s.month)).size };
 }
 // The return: taxable income = tax gross − work costs (at least 1,230 €) − pension, health and care contributions
 // (health less 4% for sick pay) − church tax − donations (at least 36 €). Withheld minus due = back (or to pay).
@@ -4667,6 +4674,7 @@ function returnPanel(y){
     <div class="mwrap"><table class="mini"><colgroup><col><col style="width:28%"></colgroup><tbody>${rows.map(x => `<tr class="${x[0].startsWith('=') ? 'witot' : ''}"><td>${x[0]}${x[2] ? `<div class="muted" style="font-size:12px">${x[2]}</div>` : ''}</td><td class="num">${x[1] < 0 ? '−' : ''}${eur0.format(Math.abs(x[1]))}</td></tr>`).join('')}
       <tr class="witot"><td>${r.back >= 0 ? 'Back' : 'To pay'}</td><td class="num">${eur0.format(Math.abs(r.back))}</td></tr></tbody></table></div>
     ${p.warn.length ? `<div class="pschk"><strong>Check these, they change the result:</strong>${p.warn.map(w => `<p>${w}</p>`).join('')}</div>` : ''}
+    ${p.notes.length ? `<div class="psnote">${p.notes.map(w => `<p>${w}</p>`).join('')}</div>` : ''}
     <details class="psmore" ${p.warn.length ? 'open' : ''}><summary>Where the figures come from</summary><div class="mwrap"><table class="mini"><thead><tr><th>Employer</th><th class="num">Tax gross</th><th class="num">Wage tax + Soli</th><th class="num">Pension</th><th class="num">Health</th><th class="num">Care</th></tr></thead><tbody>
       ${p.groups.map(g => `<tr><td>${esc(g.name)}<div class="muted" style="font-size:12px">${g.months.length} slip${g.months.length === 1 ? '' : 's'} · ${g.src}</div></td><td class="num">${eur0.format(g.v.taxGross)}</td><td class="num">${eur0.format(g.v.lst + g.v.soli)}</td><td class="num">${eur0.format(g.v.rv)}</td><td class="num">${eur0.format(g.v.kv)}</td><td class="num">${eur0.format(g.v.pv)}</td></tr>`).join('')}
       ${project && p.rest ? `<tr><td>Projected ${p.rest} month${p.rest === 1 ? '' : 's'}<div class="muted" style="font-size:12px">${p.base.n > 1 ? `a normal month of the last ${p.base.n}` : `like ${monthLabel(p.base.month)}`}, without one-off pay · ${esc(p.base.employer || '')}</div></td><td class="num">${eur0.format(p.rest * (+p.base.taxGross || 0))}</td><td class="num">${eur0.format(p.rest * ((+p.base.lst || 0) + (+p.base.soli || 0)))}</td><td class="num">${eur0.format(p.rest * (+p.base.rv || 0))}</td><td class="num">${eur0.format(p.rest * (+p.base.kv || 0))}</td><td class="num">${eur0.format(p.rest * (+p.base.pv || 0))}</td></tr>` : ''}

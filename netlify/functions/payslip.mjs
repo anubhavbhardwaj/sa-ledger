@@ -22,7 +22,12 @@ Meaning (all for THIS month, in euros, positive numbers, employee share only):
 - pv: Pflegeversicherung / long-term care insurance, employee share.
 - net: Nettoverdienst / net pay (before other deductions like job bike or advances).
 - ytd: the same figures accumulated for the year so far (Jahreswerte, kumuliert, YTD) when the slip shows them; omit ytd or fields it doesn't show.
-Never use employer shares (AG-Anteil). Use null for a monthly figure the slip doesn't show. Never invent numbers.`;
+Labels you may see, German and English: Lohnsteuer/LSt/Wage tax/Income tax; Solidaritätszuschlag/SolZ/Soli; Kirchensteuer/KiSt/Church tax;
+RV/Rentenversicherung/PI/Pension insurance; AV/ALV/Arbeitslosenversicherung/UI/Unemployment insurance; KV/Krankenversicherung/HI/Health insurance
+(the contribution line, often "KV-Beitrag AN", "HI EE", "Health insurance employee"); PV/Pflegeversicherung/LTCI/Nursing care/Long-term care insurance.
+Lines like "KV-Brutto", "HI gross", "PI gross", "SV-Brutto" are bases, not contributions: never use them as kv, pv, rv or taxGross.
+In a year-to-date block, take ytd.taxGross from the tax gross line (Steuer-Brutto / Tax gross / LSt-Brutto), not from a pension or health insurance gross.
+Never use employer shares (AG-Anteil, ER). Use null for a monthly figure the slip doesn't show. Never invent numbers.`;
 
 // "7.668,75" (German), "7,668.75" or "7668.75" → 7668.75
 const num = v => { if (v === null || v === undefined || v === '') return null; const t = String(v).replace(/[^0-9.,]/g, ''); const n = typeof v === 'number' ? v : /,\d{1,2}$/.test(t) ? parseFloat(t.replace(/\./g, '').replace(',', '.')) : parseFloat(t.replace(/,/g, '')); return isFinite(n) && n >= 0 && n < 10_000_000 ? Math.round(n * 100) / 100 : null; };
