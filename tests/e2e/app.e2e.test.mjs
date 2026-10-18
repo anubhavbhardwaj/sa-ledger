@@ -236,3 +236,19 @@ test('taxes: commuting, home office, job ticket and tagged expenses add up; tapp
   assert.match(await app.text('#wv-tax'), /Training & books/);
   await clean(app);
 });
+
+test('taxes: a payslip typed in gives the return estimate (tax due vs wage tax withheld)', async () => {
+  const app = await openApp(), { page } = app;
+  await app.go('wealth'); await page.click('[data-wv="tax"]'); await page.click('[data-taxyear="2025"]'); await page.waitForTimeout(100);
+  assert.match(await app.text('#wv-tax'), /Upload this year’s payslips/);
+  await page.click('#psAddHand'); await page.waitForSelector('#psDlg[open]');
+  const set = async (k, v) => page.fill(`#psDlg [data-ps="0"][data-psk="${k}"]`, v);
+  await set('month', '2025-12'); await set('employer', 'Test GmbH');
+  for (const [k, v] of Object.entries({ taxGross: '92025', lst: '21000', soli: '0', kist: '0', rv: '8558', av: '1196', kv: '6103', pv: '1674' })) await set(k, v);
+  await page.click('#psSave'); await page.waitForTimeout(250);
+  const t = await app.text('#wv-tax');
+  // 92,025 − 1,230 − (8,558 + 0.96 × 6,103 + 1,674 + 36) = 74,668 taxable → 20,448 income tax (2025) + 59.26 Soli; 21,000 withheld
+  assert.match(t, /Taxable income\s*€74,668/); assert.match(t, /About\s*€493\s*back/);
+  assert.match(t, /Back, from payslips|Upload payslips/);
+  await clean(app);
+});

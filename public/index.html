@@ -538,6 +538,14 @@ table.snaps tr.row:hover td{background:var(--sunk)}
 .wdpick button[aria-pressed="true"]{background:var(--s1);border-color:var(--s1);color:#fff}
 .taxh3{font-size:13px;margin:14px 0 6px;color:var(--ink-2)}
 #wv-tax select[data-taxtag]{max-width:100%;font-size:12.5px}
+.psbig{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:15px}.psbig strong{font:700 34px/1.1 var(--f-display)}
+.psbig.pos strong{color:var(--good)}.psbig.neg strong{color:var(--danger)}
+.psbtns{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}.psbtns label.btn{cursor:pointer}
+.psmore{margin-top:12px}.psmore summary{cursor:pointer;font-weight:600;font-size:13px}
+label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.pscard{border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px;margin-bottom:10px}.psh{display:flex;justify-content:space-between;gap:8px}
+.pscard details summary{cursor:pointer;font-size:13px;color:var(--ink-2);margin-bottom:8px}
+#psDlg{width:min(720px,calc(100vw - 24px))}
 .fire-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px}
 .fire-grid label{display:grid;gap:4px;align-content:start;font-size:12.5px;color:var(--ink-2)}
 .fire-grid input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:8px 10px;width:100%;min-width:0;font-family:var(--f-mono)}
@@ -1012,6 +1020,15 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   </form>
 </dialog>
 
+<dialog id="psDlg">
+  <form id="psForm" novalidate onsubmit="return false">
+    <h3>Check the payslips</h3>
+    <p class="muted" style="margin:0;font-size:12.5px">Read by AI from the PDFs. Compare with the slips before saving: tax gross (Steuer-Brutto), wage tax and the employee shares of the insurances. Only the figures are saved, not the files.</p>
+    <div id="psBody"></div>
+    <div class="dlg-actions"><div class="right"><button class="btn" id="psCancel" type="button">Cancel</button><button class="btn primary" id="psSave" type="button">Save</button></div></div>
+  </form>
+</dialog>
+
 <dialog id="goalDlg">
   <form id="goalForm" novalidate>
     <h3 id="goalTitle">New goal</h3>
@@ -1388,7 +1405,7 @@ const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' +
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { workdays:{}, tax:{}, taxYear:null, taxMonth:null, home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], toBook:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null, store:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { workdays:{}, tax:{}, payslips:[], psDraft:[], psProject:true, taxYear:null, taxMonth:null, home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], toBook:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null, store:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -1459,6 +1476,10 @@ onAuthStateChanged(auth, user => {
     const tx = snap.docs.find(x => x.id === 'tax'); state.tax = tx ? tx.data() : {};
     pfCache = null; render();
   }, onErr('budgets')));
+  unsubs.push(onSnapshot(collection(fs, 'payslips'), snap => {
+    state.payslips = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(d => d.user === 'anubhav');
+    if (state.page === 'wealth') render();
+  }, () => {}));
   unsubs.push(onSnapshot(collection(fs, 'workdays'), snap => {
     state.workdays = Object.fromEntries(snap.docs.map(d => d.data()).filter(d => d.user === 'anubhav').map(d => [d.date, d.where]));
     if (state.page === 'wealth') render();
@@ -4241,9 +4262,9 @@ function dayKind(d){
   return { kind: (job.days || [1, 2, 3, 4]).includes(wd) ? 'office' : 'home', job, src: d > today() ? 'planned' : 'assumed' };
 }
 function monthsIn(y, from, to){ let n = 0; for (let m = 1; m <= 12; m++){ const k = `${y}-${String(m).padStart(2, '0')}`; if (k >= from && (!to || k <= to)) n++; } return n; }
-function taxYear(y){
+function taxYear(y, until = `${y}-12-31`){
   const c = { office: 0, home: 0, away: 0, off: 0, commute: 0, logged: 0, assumed: 0, planned: 0, byJob: {} };
-  for (let d = `${y}-01-01`; d <= `${y}-12-31`; d = addDays(d, 1)){
+  for (let d = `${y}-01-01`; d <= until; d = addDays(d, 1)){
     const k = dayKind(d); if (!k.job) continue;
     const j = c.byJob[k.job.name] ||= { office: 0, home: 0, km: +k.job.km || 0, commute: 0 };
     let off = 0, home = 0;
@@ -4253,10 +4274,11 @@ function taxYear(y){
     const eur = off * kmRate(y, +k.job.km || 0);
     c.office += off; c.home += home; c.commute += eur; j.office += off; j.home += home; j.commute += eur;
   }
-  c.ticket = (taxSet().tickets || []).reduce((s, t) => s + monthsIn(y, t.from, t.to) * (+t.monthly || 0), 0);
+  const um = until.slice(0, 7);
+  c.ticket = (taxSet().tickets || []).reduce((s, t) => s + monthsIn(y, t.from, !t.to || t.to > um ? um : t.to) * (+t.monthly || 0), 0);
   c.ticketOff = Math.min(c.ticket, c.commute);
   c.homeDays = Math.min(Math.round(c.home), 210); c.homeEur = c.homeDays * 6;
-  const ex = state.items.filter(i => i.date.startsWith(y + '') && i.tax && TAX_TYPES[i.tax]);
+  const ex = state.items.filter(i => i.date.startsWith(y + '') && i.date <= until && i.tax && TAX_TYPES[i.tax]);
   c.items = ex; c.by = {}; for (const i of ex) c.by[i.tax] = (c.by[i.tax] || 0) + (+i.amount || 0);
   c.wk = c.commute - c.ticketOff + c.homeEur + (c.by.work || 0) + (c.by.training || 0) + (c.by.advice || 0) + 16;
   c.extra = Math.max(0, c.wk - 1230);
@@ -4319,8 +4341,10 @@ function renderTax(){
       <div class="kpi"><span class="lbl">Commuting allowance</span><span class="val">${eur0.format(c.commute - c.ticketOff)}</span><span class="sub">${n1(+c.office.toFixed(1))} office days${c.ticketOff ? ` · after the job ticket (${eur0.format(c.ticketOff)})` : ''}</span></div>
       <div class="kpi"><span class="lbl">Home office</span><span class="val">${eur0.format(c.homeEur)}</span><span class="sub">${c.homeDays} days at 6 €</span></div>
       <div class="kpi"><span class="lbl">Work costs in total</span><span class="val">${eur0.format(c.wk)}</span><span class="sub">${c.extra > 0 ? eur0.format(c.extra) + ' above the 1,230 € you get anyway' : 'Below the 1,230 € flat amount'}</span></div>
-      <div class="kpi"><span class="lbl">About back</span><span class="val">${eur0.format(c.back)}</span><span class="sub">at ${f.rate ?? 42}% tax · ${c.planned ? `${c.planned} days still planned` : 'whole year counted'}</span></div>
+      ${(r => r ? `<div class="kpi"><span class="lbl">${r.back >= 0 ? 'Back, from payslips' : 'To pay, from payslips'}</span><span class="val">${eur0.format(Math.abs(r.back))}</span><span class="sub">see the estimate below</span></div>`
+        : `<div class="kpi"><span class="lbl">About back</span><span class="val">${eur0.format(c.back)}</span><span class="sub">from work costs at ${f.rate ?? 42}% tax · ${c.planned ? `${c.planned} days still planned` : 'whole year counted'}</span></div>`)(taxReturn(y, state.psProject !== false))}
     </section>`}
+    ${returnPanel(y)}
     ${taxJobs().length ? `<section class="panel"><header><h2>For ELSTER · ${y}</h2><span class="hint">Anlage N, Werbungskosten</span></header>
       <div class="mwrap"><table class="mini"><colgroup><col style="width:34%"><col><col style="width:22%"></colgroup><tbody>
       ${rows.map(r => `<tr><td>${r[0]}</td><td class="muted" style="font-size:12.5px">${r[1]}</td><td class="num">${r[2] < 0 ? '−' : ''}${eur0.format(Math.abs(r[2]))}</td></tr>`).join('')}
@@ -4384,6 +4408,140 @@ document.addEventListener('change', async e => {
     try { await setDoc(doc(fs, 'expenses', it.id), expenseDoc(it, { tax: i.value || null })); toast(i.value === 'no' ? 'Hidden from suggestions' : i.value ? 'Tagged: ' + TAX_TYPES[i.value] : 'Untagged'); } catch (x){ toast(writeError(x)); }
   }
 });
+
+
+// ---------- Payslips and the tax return estimate ----------
+// Income tax by §32a EStG (single), Soli with its exemption limit and phase-in, church tax 8% (Bavaria) when paid.
+const TARIFF = {
+  2025: { g: 12096, z2: 17443, z3: 68480, a: 932.30, c: 176.64, e: 1015.13, f: 10911.92, h: 19246.67, soli: 19950 },
+  2026: { g: 12348, z2: 17799, z3: 69878, a: 914.51, c: 173.10, e: 1034.87, f: 11135.63, h: 19470.38, soli: 20350 } };
+const tariff = y => TARIFF[y] || TARIFF[y < 2025 ? 2025 : 2026];
+function incomeTax(zve, y){
+  const T = tariff(y), x = Math.floor(Math.max(0, zve));
+  if (x <= T.g) return 0;
+  if (x <= T.z2){ const v = (x - T.g) / 1e4; return Math.floor((T.a * v + 1400) * v); }
+  if (x <= T.z3){ const z = (x - T.z2) / 1e4; return Math.floor((T.c * z + 2397) * z + T.e); }
+  return Math.floor(x <= 277825 ? 0.42 * x - T.f : 0.45 * x - T.h);
+}
+const soliOf = (t, y) => t <= tariff(y).soli ? 0 : Math.min(0.055 * t, 0.119 * (t - tariff(y).soli));
+const PS_F = ['taxGross', 'lst', 'soli', 'kist', 'rv', 'av', 'kv', 'pv'];
+const PS_LABEL = { taxGross: 'Tax gross', lst: 'Wage tax', soli: 'Soli', kist: 'Church tax', rv: 'Pension ins.', av: 'Unempl. ins.', kv: 'Health ins.', pv: 'Care ins.', net: 'Net pay' };
+// What the payslips of a year add up to: per employer the latest slip's year-to-date figures when it has them
+// (they include corrections), otherwise the months added up. Optionally the rest of the year like the latest month.
+function payYear(y, project = true){
+  const slips = state.payslips.filter(s => s.month?.startsWith(y + '')).sort((a, b) => a.month.localeCompare(b.month));
+  if (!slips.length) return null;
+  const tot = Object.fromEntries(PS_F.map(k => [k, 0])), byEmp = {};
+  for (const s of slips) (byEmp[s.employer || '?'] ||= []).push(s);
+  for (const list of Object.values(byEmp)){
+    const last = list[list.length - 1], ytd = last.ytd || {};
+    for (const k of PS_F) tot[k] += ytd[k] !== undefined && ytd.taxGross !== undefined ? ytd[k] : list.reduce((a, s) => a + (+s[k] || 0), 0);
+  }
+  const last = slips[slips.length - 1], lastM = +last.month.slice(5, 7), rest = project ? 12 - lastM : 0;
+  const proj = Object.fromEntries(PS_F.map(k => [k, tot[k] + rest * (+last[k] || 0)]));
+  return { slips, tot, proj, last, lastM, rest, months: new Set(slips.map(s => s.month)).size };
+}
+// The return: taxable income = tax gross − work costs (at least 1,230 €) − pension, health and care contributions
+// (health less 4% for sick pay) − church tax − donations (at least 36 €). Withheld minus due = back (or to pay).
+function taxReturn(y, project = true){
+  const p = payYear(y, project); if (!p) return null;
+  const v = project ? p.proj : p.tot, until = project ? `${y}-12-31` : addDays(addMonth(p.last.month, 1) + '-01', -1);
+  const c = taxYear(y, until);
+  const calc = (wk, don, r35) => {
+    const sa = v.rv + 0.96 * v.kv + v.pv + v.kist + Math.max(36, don);
+    const zve = Math.max(0, v.taxGross - Math.max(1230, wk) - sa);
+    const est = Math.max(0, incomeTax(zve, y) - r35), soli = soliOf(est, y), kist = v.kist > 0 ? 0.08 * est : 0;
+    return { sa, zve, est, soli, kist, due: est + soli + kist };
+  };
+  const withheld = v.lst + v.soli + v.kist, full = calc(c.wk, c.by.donation || 0, c.p35a), base = calc(0, 0, 0);
+  return { p, v, c, full, withheld, back: withheld - full.due, base: withheld - base.due };
+}
+// Text of a PDF row by row (items on the same line joined left to right), so tables stay readable for the model.
+async function pdfRows(file){
+  const pdfjs = await loadPdfjs(), pdf = await pdfOpen(pdfjs, file); let out = '';
+  for (let n = 1; n <= Math.min(pdf.numPages, 4); n++){
+    const items = (await (await pdf.getPage(n)).getTextContent()).items.filter(i => (i.str || '').trim());
+    const rows = [];
+    for (const i of items){ const yy = i.transform[5], r = rows.find(r => Math.abs(r.y - yy) < 3); r ? r.items.push(i) : rows.push({ y: yy, items: [i] }); }
+    rows.sort((a, b) => b.y - a.y);
+    out += rows.map(r => r.items.sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str.trim()).join('  |  ')).join('\n') + '\n\n';
+  }
+  return out;
+}
+async function psUpload(files){
+  const list = [...files].slice(0, 15); if (!list.length) return;
+  state.psDraft = []; psDialog(`Reading ${list.length} payslip${list.length === 1 ? '' : 's'}…`);
+  for (const f of list){
+    try {
+      const text = await pdfRows(f);
+      const { slip } = await (await api('/api/payslip', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) })).json();
+      state.psDraft.push({ ...slip, file: f.name });
+    } catch (x){ state.psDraft.push({ file: f.name, error: x.message || String(x) }); }
+    psDialog(state.psDraft.length < list.length ? `Reading ${state.psDraft.length + 1} of ${list.length}…` : '');
+  }
+}
+function psDialog(busy){
+  const d = $('#psDlg'), drafts = state.psDraft || [];
+  const inp = (i, k, v, ytd) => `<label>${PS_LABEL[k]}<input type="number" step="0.01" min="0" inputmode="decimal" data-ps="${i}" data-psk="${ytd ? 'ytd.' : ''}${k}" value="${v ?? ''}"></label>`;
+  $('#psBody').innerHTML = (busy ? `<p class="muted">${esc(busy)}</p>` : '') + drafts.map((s, i) => s.error ? `<div class="pscard"><strong>${esc(s.file)}</strong><p class="err" style="margin:6px 0 0">${esc(s.error)}</p></div>` : `<div class="pscard">
+      <div class="psh"><strong>${esc(s.file || 'Typed in')}</strong><button type="button" class="linkbtn" data-psdrop="${i}">Leave out</button></div>
+      <div class="fire-grid"><label>Month<input type="month" data-ps="${i}" data-psk="month" value="${s.month || ''}"></label><label>Employer<input data-ps="${i}" data-psk="employer" value="${esc(s.employer || '')}"></label>${[...PS_F, 'net'].map(k => inp(i, k, s[k])).join('')}</div>
+      <details ${s.ytd ? 'open' : ''}><summary>Year to date${s.ytd ? ' (found on the slip)' : ' (not on the slip)'}</summary><div class="fire-grid">${PS_F.map(k => inp(i, k, s.ytd?.[k], true)).join('')}</div></details></div>`).join('');
+  $('#psSave').disabled = !!busy || !drafts.some(s => !s.error);
+  if (!d.open) d.showModal();
+}
+document.addEventListener('input', e => {
+  const i = e.target.closest('[data-ps]'); if (!i) return;
+  const s = state.psDraft[+i.dataset.ps], k = i.dataset.psk, v = i.type === 'number' ? (i.value === '' ? null : +i.value) : i.value.trim();
+  if (k.startsWith('ytd.')){ s.ytd ||= {}; if (v === null) delete s.ytd[k.slice(4)]; else s.ytd[k.slice(4)] = v; } else s[k] = v;
+});
+document.addEventListener('click', async e => {
+  const t = e.target;
+  if (t.closest('[data-psdrop]')){ state.psDraft.splice(+t.closest('[data-psdrop]').dataset.psdrop, 1); return psDialog(''); }
+  if (t.id === 'psAddHand'){ state.psDraft = [{ month: (state.payslips.map(s => s.month).sort().pop() && addMonth(state.payslips.map(s => s.month).sort().pop(), 1)) || today().slice(0, 7), employer: state.payslips.slice().sort((a, b) => a.month.localeCompare(b.month)).pop()?.employer || '' }]; return psDialog(''); }
+  if (t.id === 'psCancel') return $('#psDlg').close();
+  if (t.closest('[data-psdel]')){ const id = t.closest('[data-psdel]').dataset.psdel; if (!confirm('Remove this payslip from the estimate?')) return; try { await deleteDoc(doc(fs, 'payslips', id)); } catch (x){ toast(writeError(x)); } return; }
+  if (t.id === 'psSave'){
+    const ok = state.psDraft.filter(s => !s.error);
+    const bad = ok.find(s => !/^\d{4}-\d{2}$/.test(s.month || '') || !(s.taxGross > 0) || s.lst === null || s.lst === undefined);
+    if (bad) return toast('Each payslip needs its month, tax gross and wage tax.');
+    t.disabled = true;
+    try {
+      const b = writeBatch(fs);
+      for (const s of ok){
+        const emp = (s.employer || 'Employer').slice(0, 60), o = { month: s.month, employer: emp, user: 'anubhav', at: new Date().toISOString(), by: usernameOf(state.user) };
+        for (const k of [...PS_F, 'net']) if (typeof s[k] === 'number' && isFinite(s[k])) o[k] = Math.round(s[k] * 100) / 100;
+        const y = {}; for (const k of PS_F) if (typeof s.ytd?.[k] === 'number' && isFinite(s.ytd[k])) y[k] = s.ytd[k];
+        if (Object.keys(y).length) o.ytd = y;
+        b.set(doc(fs, 'payslips', `anubhav_${s.month}_${emp.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x'}`), o);
+      }
+      await b.commit(); $('#psDlg').close(); state.taxYear = +ok[0].month.slice(0, 4); toast(`Saved ${ok.length} payslip${ok.length === 1 ? '' : 's'}`);
+    } catch (x){ toast(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); }
+    finally { t.disabled = false; }
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'psFile'){ const f = e.target.files; psUpload(f).catch(x => toast(x.message)); e.target.value = ''; }
+  if (e.target.id === 'psProject'){ state.psProject = e.target.checked; render(); }
+});
+function returnPanel(y){
+  const project = state.psProject !== false, r = taxReturn(y, project), f2 = v => eur0.format(Math.abs(v));
+  const head = `<header><h2>Tax return estimate · ${y}</h2><span class="hint"><label class="inl"><input type="checkbox" id="psProject" ${project ? 'checked' : ''}> Count the rest of the year like the latest payslip</label></span></header>`;
+  const upload = `<p class="psbtns"><label class="btn primary">Upload payslips (PDF)<input type="file" id="psFile" accept="application/pdf" multiple hidden></label><button type="button" class="btn" id="psAddHand">Type one in</button></p>`;
+  if (!r) return `<section class="panel">${head}<p class="muted" style="margin:0 0 10px;font-size:13px">Upload this year’s payslips and the app adds up the wage tax already paid, works out the tax actually due with your work costs and insurance, and shows what you’d get back.</p>${upload}</section>`;
+  const { p, v, c, full } = r, rows = [
+    ['Taxable pay', v.taxGross], ['− Work costs', -Math.max(1230, c.wk), c.wk > 1230 ? 'yours, see below' : 'the 1,230 € flat amount'],
+    ['− Pension, health and care insurance' + (v.kist ? ', church tax' : ''), -(full.sa - Math.max(36, c.by.donation || 0))], ['− Donations (at least 36 € flat)', -Math.max(36, c.by.donation || 0)],
+    ['= Taxable income', full.zve], ['Income tax' + (c.p35a ? ' (after §35a)' : '') + ' + Soli' + (v.kist ? ' + church tax' : ''), full.due], ['Already withheld', r.withheld]];
+  return `<section class="panel">${head}
+    <div class="psbig ${r.back >= 0 ? 'pos' : 'neg'}"><span>${r.back >= 0 ? 'About' : 'You’d pay about'}</span> <strong>${f2(r.back)}</strong> <span>${r.back >= 0 ? 'back' : 'extra'}</span></div>
+    <p class="muted" style="margin:2px 0 12px;font-size:13px">${p.months} month${p.months === 1 ? '' : 's'} of payslips up to ${monthLabel(p.last.month)}${project && p.rest ? `, ${p.rest} more month${p.rest === 1 ? '' : 's'} projected` : ''}. Your deductions add ${eur0.format(Math.max(0, r.back - r.base))}${Math.abs(r.base) >= 50 ? `; the rest (${r.base >= 0 ? '' : '−'}${f2(r.base)}) comes from how the wage tax was withheld${new Set(p.slips.map(s => s.employer)).size > 1 ? ', e.g. changing jobs' : ''}` : ''}.</p>
+    <div class="mwrap"><table class="mini"><colgroup><col><col style="width:28%"></colgroup><tbody>${rows.map(x => `<tr class="${x[0].startsWith('=') ? 'witot' : ''}"><td>${x[0]}${x[2] ? `<div class="muted" style="font-size:12px">${x[2]}</div>` : ''}</td><td class="num">${x[1] < 0 ? '−' : ''}${eur0.format(Math.abs(x[1]))}</td></tr>`).join('')}
+      <tr class="witot"><td>${r.back >= 0 ? 'Back' : 'To pay'}</td><td class="num">${eur0.format(Math.abs(r.back))}</td></tr></tbody></table></div>
+    <details class="psmore"><summary>Payslips (${p.slips.length})</summary><div class="mwrap"><table class="mini"><thead><tr><th>Month</th><th>Employer</th><th class="num">Tax gross</th><th class="num">Wage tax</th><th></th></tr></thead><tbody>${p.slips.map(s => `<tr><td>${monthLabel(s.month)}</td><td>${esc(s.employer || '')}${s.ytd ? ' <span class="chip">YTD</span>' : ''}</td><td class="num">${eur0.format(s.taxGross || 0)}</td><td class="num">${eur0.format(s.lst || 0)}</td><td><button type="button" class="linkbtn" data-psdel="${s.id}" aria-label="Remove">✕</button></td></tr>`).join('')}</tbody></table></div></details>
+    ${upload}
+    <p class="hint">Single filer, ${y} tariff. Health insurance counts less 4% (sick pay); unemployment insurance isn’t deductible at your income. Bonuses or a 13th salary later in the year change the result. A rough estimate, not tax advice.</p></section>`;
+}
 
 // ---------- German state pension (gesetzliche Rentenversicherung), Anubhav's ----------
 // Pension points: each year's pension-insurance gross (capped at the contribution ceiling) divided by the average

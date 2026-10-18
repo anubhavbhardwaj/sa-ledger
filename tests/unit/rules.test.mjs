@@ -8,7 +8,7 @@ const keys = name => { const m = app.match(new RegExp(`const ${name} = \\[([^\\]
 
 test('the rules file parses into every collection the app writes', () => {
   const a = allowedFields();
-  for (const c of ['expenses', 'income', 'transfers', 'trips', 'accounts', 'checkins', 'invSnapshots', 'bookings', 'toBook', 'settings', 'pushTokens', 'workdays']) assert.ok(a[c]?.length, c);
+  for (const c of ['expenses', 'income', 'transfers', 'trips', 'accounts', 'checkins', 'invSnapshots', 'bookings', 'toBook', 'settings', 'pushTokens', 'workdays', 'payslips']) assert.ok(a[c]?.length, c);
 });
 
 // Every field list the app saves with must be allowed by the rules, or the save fails with "permission denied".

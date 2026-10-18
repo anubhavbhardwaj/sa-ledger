@@ -48,3 +48,15 @@ test('workday answer: saves with a valid signature, refuses anything else', asyn
   assert.equal((await handle(post({ date: '2026-09-01', where: 'home', sig: sign('2026-09-01', KEY) }), { env, db, now })).status, 400, 'expired');
   assert.equal(saved.length, 1);
 });
+
+import { clean as cleanSlip, handle as payslip } from '../../netlify/functions/payslip.mjs';
+import { verify, req, fakeGroq } from '../support/fakes.mjs';
+test('payslip: numbers in German or English format, employee shares, year to date kept', async () => {
+  const s = cleanSlip({ month: '2026-08', employer: 'MMS', taxGross: '7.668,75', lst: 1712.5, rv: '713.19', kv: null, ytd: { taxGross: '61,421.30', lst: 'x' } });
+  assert.equal(s.taxGross, 7668.75); assert.equal(s.rv, 713.19); assert.equal(s.kv, null);
+  assert.deepEqual(s.ytd, { taxGross: 61421.3 });
+  assert.equal(cleanSlip({ month: 'August' }).month, null);
+  const r = await payslip(req({ text: 'Entgeltabrechnung August 2026 '.repeat(5) }), { env: { GROQ_API_KEY: 'g' }, verify, fetch: fakeGroq({ month: '2026-08', employer: 'MMS', taxGross: 7668.75, lst: 1700 }) });
+  assert.equal((await r.json()).slip.lst, 1700);
+  assert.equal((await payslip(req({ text: 'x' }), { env: { GROQ_API_KEY: 'g' }, verify })).status, 400);
+});
