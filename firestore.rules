@@ -116,10 +116,10 @@ service cloud.firestore {
     }
     function validTax() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['jobs','tickets','rate','ask','updatedAt','updatedBy'])
+      return d.keys().hasOnly(['jobs','tickets','rate','ask','savers','updatedAt','updatedBy'])
         && (!('jobs' in d) || (d.jobs is list && d.jobs.size() <= 10))
         && (!('tickets' in d) || (d.tickets is list && d.tickets.size() <= 10))
-        && optNum(d, 'rate') && (!('ask' in d) || d.ask is bool);
+        && optNum(d, 'rate') && (!('ask' in d) || d.ask is bool) && (!('savers' in d) || d.savers is map);
     }
     function validFxMonths() {
       let d = request.resource.data;
@@ -157,11 +157,11 @@ service cloud.firestore {
     // and the employee shares of the insurances, plus year-to-date figures when the slip shows them. No files.
     function validPayslip() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['month','employer','user','taxGross','lst','soli','kist','rv','av','kv','pv','net','ytd','at','by'])
+      return d.keys().hasOnly(['month','employer','user','taxGross','oneOff','lst','soli','kist','rv','av','kv','pv','net','ytd','at','by'])
         && d.keys().hasAll(['month','user','taxGross','lst'])
         && d.month is string && d.month.matches('^[0-9]{4}-[0-9]{2}$') && d.user == 'anubhav'
         && (!('employer' in d) || str(d.employer, 60))
-        && optNum(d, 'taxGross') && optNum(d, 'lst') && optNum(d, 'soli') && optNum(d, 'kist')
+        && optNum(d, 'taxGross') && optNum(d, 'oneOff') && optNum(d, 'lst') && optNum(d, 'soli') && optNum(d, 'kist')
         && optNum(d, 'rv') && optNum(d, 'av') && optNum(d, 'kv') && optNum(d, 'pv') && optNum(d, 'net')
         && (!('ytd' in d) || d.ytd is map)
         && (!('by' in d) || str(d.by, 20)) && (!('at' in d) || str(d.at, 40));

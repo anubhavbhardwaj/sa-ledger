@@ -5,19 +5,20 @@ import { member, json, verifyToken, firestore } from '../lib/members.mjs';
 import { beat } from '../lib/health.mjs';
 
 const MODEL = 'openai/gpt-oss-120b';
-export const FIELDS = ['taxGross', 'lst', 'soli', 'kist', 'rv', 'av', 'kv', 'pv', 'net'];
+export const FIELDS = ['taxGross', 'oneOff', 'lst', 'soli', 'kist', 'rv', 'av', 'kv', 'pv', 'net'];
 export const PROMPT = `You read one German payslip (Entgeltabrechnung, Verdienstabrechnung, Remuneration statement; German or English labels).
 Return JSON only:
-{"month":"YYYY-MM","employer":"short company name",
- "taxGross":0,"lst":0,"soli":0,"kist":0,"rv":0,"av":0,"kv":0,"pv":0,"net":0,
+{"month":"YYYY-MM","employer":"short company name, the same way every month (e.g. \"PAYBACK\", \"MediaMarktSaturn\")",
+ "taxGross":0,"oneOff":0,"lst":0,"soli":0,"kist":0,"rv":0,"av":0,"kv":0,"pv":0,"net":0,
  "ytd":{"taxGross":0,"lst":0,"soli":0,"kist":0,"rv":0,"av":0,"kv":0,"pv":0}}
 Meaning (all for THIS month, in euros, positive numbers, employee share only):
 - month: the pay period (Abrechnungsmonat), not the print date.
-- taxGross: gross pay subject to wage tax (Steuer-Brutto, St-Brutto, steuerpflichtiges Brutto, Tax gross, LSt-Brutto). Not the total gross if they differ.
+- taxGross: this month's gross pay subject to wage tax (Steuer-Brutto, St-Brutto, steuerpflichtiges Brutto, LSt-Brutto, Tax gross), including one-off payments. Not the total gross if they differ, never a year-to-date value, never an insurance base (KV-/RV-/PI-Brutto).
+- oneOff: the part of taxGross that is a one-off payment this month (sonstiger Bezug, Einmalzahlung, bonus, holiday or Christmas pay, vacation payout); 0 if none.
 - lst: Lohnsteuer / wage tax withheld. soli: Solidaritätszuschlag. kist: Kirchensteuer / church tax (0 if none).
-- rv: Rentenversicherung / pension insurance, employee share (AN-Anteil, RV-AN).
+- rv: Rentenversicherung / pension insurance contribution, employee share (AN-Anteil, RV-AN). The contribution in euros, not the insurance gross it is based on.
 - av: Arbeitslosenversicherung / unemployment insurance, employee share.
-- kv: Krankenversicherung / health insurance, employee share including the additional contribution (Zusatzbeitrag).
+- kv: Krankenversicherung / health insurance contribution, employee share including the additional contribution (Zusatzbeitrag). If you pay private insurance and get an employer subsidy, the premium minus the subsidy.
 - pv: Pflegeversicherung / long-term care insurance, employee share.
 - net: Nettoverdienst / net pay (before other deductions like job bike or advances).
 - ytd: the same figures accumulated for the year so far (Jahreswerte, kumuliert, YTD) when the slip shows them; omit ytd or fields it doesn't show.
@@ -28,7 +29,7 @@ const num = v => { if (v === null || v === undefined || v === '') return null; c
 export function clean(o = {}){
   const s = { month: /^\d{4}-\d{2}$/.test(o.month) ? o.month : null, employer: String(o.employer || '').trim().slice(0, 60) || null };
   for (const k of FIELDS) s[k] = num(o[k]);
-  const y = {}; for (const k of FIELDS.filter(k => k !== 'net')){ const v = num(o.ytd?.[k]); if (v !== null) y[k] = v; }
+  const y = {}; for (const k of FIELDS.filter(k => k !== 'net' && k !== 'oneOff')){ const v = num(o.ytd?.[k]); if (v !== null) y[k] = v; }
   if (Object.keys(y).length) s.ytd = y;
   return s;
 }

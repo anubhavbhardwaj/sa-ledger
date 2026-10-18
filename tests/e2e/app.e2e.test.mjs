@@ -252,3 +252,25 @@ test('taxes: a payslip typed in gives the return estimate (tax due vs wage tax w
   assert.match(t, /Back, from payslips|Upload payslips/);
   await clean(app);
 });
+
+test('taxes: figure check flags missing insurance and doubled months; ways to save feed the estimate', async () => {
+  const app = await openApp(), { page } = app;
+  const base = { user: 'anubhav', taxGross: 7669, lst: 1650, soli: 0, kist: 0, rv: 713, av: 100, kv: 509, pv: 140 };
+  await app.seed({ payslips: {
+    'anubhav_2025-11_acme': { ...base, month: '2025-11', employer: 'ACME GmbH' },
+    'anubhav_2025-12_acme': { ...base, month: '2025-12', employer: 'Acme', kv: null, pv: null, ytd: { taxGross: 92025, lst: 19800, soli: 0, kist: 0, rv: 8556, av: 1200 } },
+  } });
+  await app.go('wealth'); await page.click('[data-wv="tax"]'); await page.click('[data-taxyear="2025"]'); await page.waitForTimeout(150);
+  let t = await app.text('#wv-tax');
+  assert.match(t, /Dec 2025 \(Acme\): no health ins\., care ins\. read/);
+  assert.match(t, /Acme\s*2 slips · year-to-date on Dec 2025\s*€92,025/, 'one employer despite the name variants, year-to-date used');
+  const before = +t.match(/(?:About|You’d pay about)\s*€([\d,]+)/)[1].replace(/,/g, '') * (/You’d pay about/.test(t) ? -1 : 1);
+  await page.click('summary:has-text("Support for your parents in India")');
+  await page.fill('[data-sv="parents"][data-svk="amount"]', '9000'); await page.dispatchEvent('[data-sv="parents"][data-svk="amount"]', 'change'); await page.waitForTimeout(200);
+  t = await app.text('#wv-tax');
+  const after = +t.match(/(?:About|You’d pay about)\s*€([\d,]+)/)[1].replace(/,/g, '') * (/You’d pay about/.test(t) ? -1 : 1);
+  // capped at 6,174 € for both parents: at 42% plus Soli, about 2,600 to 2,900 € more back
+  assert.ok(after - before > 2500 && after - before < 3000, `parents support adds 42% of 6,174 € plus Soli (got ${after - before})`);
+  assert.match(t, /Support for your parents in India.*Claiming/);
+  await clean(app);
+});
