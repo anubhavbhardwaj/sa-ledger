@@ -84,7 +84,7 @@ service cloud.firestore {
     }
 
     // Shared settings: 'budgets', 'fire' and 'fireInr' (FIRE plans in euros and rupees), 'fx' (rate on the 1st of each month),
-    // 'bookings' (the address booking emails are forwarded to), 'leave' (vacation, work-from-abroad days and travel budget per year)
+    // 'bookings' (the address booking emails are forwarded to), 'leave' (vacation, work-from-abroad days and travel budget per year),
     // 'goals' (monthly investing and emergency fund goals) and 'tax' (workplaces, job ticket and tax rate for the Taxes view).
     function validBudgets() {
       let d = request.resource.data;
