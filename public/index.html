@@ -4508,13 +4508,30 @@ const PS_LABEL = { oneOff: 'One-off pay in it', taxGross: 'Tax gross', lst: 'Wag
 // (they include corrections), otherwise the months added up. Optionally the rest of the year like the latest month.
 // "PAYBACK GmbH" and "Payback" are the same employer.
 const empKey = e => String(e || '?').toLowerCase().replace(/\b(gmbh|ag|se|kg|co|mbh|ug|ltd|deutschland|germany)\b/g, '').replace(/[^a-z0-9]/g, '') || '?';
+// Health and care insurance the slip didn't show (or the reading missed): estimated from the 2026 rules, employee
+// share of health 7.3% + half the average extra 2.9%, care 2.4% (childless), both on pay up to 5,812.50 € a month.
+function withIns(s){
+  if (+s.kv > 0 && +s.pv > 0) return { ...s };
+  const base = Math.min(Math.max(0, (+s.taxGross || 0) - (+s.oneOff || 0)), 5812.5), o = { ...s, est: [] };
+  if (!(+s.kv > 0)){ o.kv = Math.round(base * 0.0875 * 100) / 100; o.est.push('kv'); }
+  if (!(+s.pv > 0)){ o.pv = Math.round(base * 0.024 * 100) / 100; o.est.push('pv'); }
+  return o;
+}
+// A normal month without one-off pay: the one-off part comes off the gross, and roughly 44% of it (top rate and
+// Soli) off the wage tax; insurances shrink in proportion.
+function regular(s){
+  const one = +s.oneOff || 0, tg = +s.taxGross || 0; if (!(one > 0) || !(tg > one)) return s;
+  const f = (tg - one) / tg, lst = Math.max(0, (+s.lst || 0) - 0.44 * one);
+  return { ...s, taxGross: tg - one, lst, soli: (+s.soli || 0) * (s.lst > 0 ? lst / s.lst : f), kist: (+s.kist || 0) * (s.lst > 0 ? lst / s.lst : f), rv: (+s.rv || 0) * f, av: (+s.av || 0) * f };
+}
+const median = a => { const b = [...a].sort((x, y) => x - y), n = b.length; return n ? (n % 2 ? b[(n - 1) / 2] : (b[n / 2 - 1] + b[n / 2]) / 2) : 0; };
 function payYear(y, project = true){
-  const slips = state.payslips.filter(s => s.month?.startsWith(y + '')).sort((a, b) => a.month.localeCompare(b.month) || String(a.at).localeCompare(String(b.at)));
+  const slips = state.payslips.filter(s => s.month?.startsWith(y + '')).sort((a, b) => a.month.localeCompare(b.month) || String(a.at).localeCompare(String(b.at))).map(withIns);
   if (!slips.length) return null;
   const tot = Object.fromEntries(PS_F.map(k => [k, 0])), byEmp = {}, groups = [], warn = [];
   for (const s of slips) (byEmp[empKey(s.employer)] ||= []).push(s);
   for (const list of Object.values(byEmp)){
-    const last = list[list.length - 1], ytd = last.ytd || {}, sum = Object.fromEntries(PS_F.map(k => [k, list.reduce((a, s) => a + (+s[k] || 0), 0)]));
+    const last = list[list.length - 1], ytd = { ...(last.ytd || {}) }, sum = Object.fromEntries(PS_F.map(k => [k, list.reduce((a, s) => a + (+s[k] || 0), 0)]));
     // Year-to-date figures win when they look right: at least what the uploaded months add up to (they may cover
     // months not uploaded), and not more than 12 times a normal month.
     const ytdOk = ytd.taxGross > 0 && ytd.taxGross >= sum.taxGross * 0.97 && ytd.taxGross <= Math.max(...list.map(s => +s.taxGross || 0)) * 13;
@@ -4524,18 +4541,26 @@ function payYear(y, project = true){
     if (ytd.taxGross > 0 && !ytdOk) warn.push(`${esc(g.name)}: the year-to-date tax gross on ${monthLabel(last.month)} (${eur0.format(ytd.taxGross)}) doesn’t fit the months (${eur0.format(sum.taxGross)}), so the months are added up instead. Check that slip.`);
     const dup = list.map(s => s.month).filter((m, i, a) => a.indexOf(m) !== i);
     if (dup.length) warn.push(`${esc(g.name)}: ${[...new Set(dup)].map(monthLabel).join(', ')} uploaded twice.`);
+    const ratios = list.filter(s => +s.taxGross > 0 && !(+s.oneOff > 0)).map(s => s.lst / s.taxGross), low = Math.min(...ratios);
     for (const s of list){
-      const miss = ['rv', 'kv', 'pv'].filter(k => !(+s[k] > 0) && !(ytdOk && ytd[k] !== undefined));
-      if (miss.length) warn.push(`${monthLabel(s.month)} (${esc(g.name)}): no ${miss.map(k => PS_LABEL[k].toLowerCase()).join(', ')} read. Missing insurance makes the tax due too high.`);
+      const miss = (s.est || []).filter(k => !(ytdOk && ytd[k] !== undefined));
+      if (miss.length) warn.push(`${monthLabel(s.month)} (${esc(g.name)}): no ${miss.map(k => PS_LABEL[k].toLowerCase()).join(' or ')} on the slip as read, so ${miss.length > 1 ? 'they are' : 'it is'} estimated (${miss.map(k => eur0.format(s[k])).join(', ')}). Check the slip and fix it with Edit.`);
+      const r = +s.taxGross > 0 ? s.lst / s.taxGross : 0;
+      if (!(+s.oneOff > 0) && r > 0.27 && (ratios.length < 2 || r > low * 1.2)){ s.suspect = true; warn.push(`${monthLabel(s.month)} (${esc(g.name)}): wage tax is ${(r * 100).toFixed(0)}% of tax gross, so this month probably includes a one-off payment (bonus, holiday pay). Enter it as “One-off pay” with Edit${list.length < 2 ? ', otherwise the rest of the year is projected from it' : ''}.`); }
       if (+s.taxGross > 0 && !(+s.lst > 0)) warn.push(`${monthLabel(s.month)} (${esc(g.name)}): no wage tax read.`);
       if (+s.taxGross > 0 && +s.lst / +s.taxGross > 0.45) warn.push(`${monthLabel(s.month)} (${esc(g.name)}): wage tax is ${(s.lst / s.taxGross * 100).toFixed(0)}% of tax gross, which is unusually high.`);
     }
     groups.push(g);
   }
   // The rest of the year: like the latest regular month (no one-off payment) of the latest employer.
-  const last = slips[slips.length - 1], cur = byEmp[empKey(last.employer)], base = [...cur].reverse().find(s => !(+s.oneOff > 0)) || last;
+  // The rest of the year: the latest employer's normal month (median of up to its last 3 slips, one-off pay taken out,
+  // months that look like they hold a bonus left out when there are others).
+  const last = slips[slips.length - 1], cur = byEmp[empKey(last.employer)];
+  const pool = (cur.filter(s => !s.suspect).length ? cur.filter(s => !s.suspect) : cur).slice(-3).map(regular);
+  const base = { ...last, ...Object.fromEntries(PS_F.map(k => [k, median(pool.map(s => +s[k] || 0))])), month: pool[pool.length - 1].month, n: pool.length };
   const lastM = +last.month.slice(5, 7), rest = project ? 12 - lastM : 0;
   const proj = Object.fromEntries(PS_F.map(k => [k, tot[k] + rest * (+base[k] || 0)]));
+  if (project && rest >= 6 && pool.length < 3) warn.push(`${rest} months are projected from ${pool.length === 1 ? 'one payslip' : pool.length + ' payslips'}. Upload more months, or untick “Count the rest of the year” to see only what’s on the slips.`);
   const gaps = []; for (let m = +slips[0].month.slice(5, 7); m <= lastM; m++){ const k = `${y}-${String(m).padStart(2, '0')}`; if (!slips.some(s => s.month === k) && !groups.some(g => g.src.startsWith('year'))) gaps.push(k); }
   if (gaps.length) warn.push(`No payslip for ${gaps.map(monthLabel).join(', ')}.`);
   if (+slips[0].month.slice(5, 7) > 1 && !groups.some(g => g.src.startsWith('year'))) warn.push(`Payslips start in ${monthLabel(slips[0].month)}: earlier months of the year aren’t counted.`);
@@ -4644,7 +4669,7 @@ function returnPanel(y){
     ${p.warn.length ? `<div class="pschk"><strong>Check these, they change the result:</strong>${p.warn.map(w => `<p>${w}</p>`).join('')}</div>` : ''}
     <details class="psmore" ${p.warn.length ? 'open' : ''}><summary>Where the figures come from</summary><div class="mwrap"><table class="mini"><thead><tr><th>Employer</th><th class="num">Tax gross</th><th class="num">Wage tax + Soli</th><th class="num">Pension</th><th class="num">Health</th><th class="num">Care</th></tr></thead><tbody>
       ${p.groups.map(g => `<tr><td>${esc(g.name)}<div class="muted" style="font-size:12px">${g.months.length} slip${g.months.length === 1 ? '' : 's'} · ${g.src}</div></td><td class="num">${eur0.format(g.v.taxGross)}</td><td class="num">${eur0.format(g.v.lst + g.v.soli)}</td><td class="num">${eur0.format(g.v.rv)}</td><td class="num">${eur0.format(g.v.kv)}</td><td class="num">${eur0.format(g.v.pv)}</td></tr>`).join('')}
-      ${project && p.rest ? `<tr><td>Projected ${p.rest} month${p.rest === 1 ? '' : 's'}<div class="muted" style="font-size:12px">like ${monthLabel(p.base.month)} · ${esc(p.base.employer || '')}</div></td><td class="num">${eur0.format(p.rest * (+p.base.taxGross || 0))}</td><td class="num">${eur0.format(p.rest * ((+p.base.lst || 0) + (+p.base.soli || 0)))}</td><td class="num">${eur0.format(p.rest * (+p.base.rv || 0))}</td><td class="num">${eur0.format(p.rest * (+p.base.kv || 0))}</td><td class="num">${eur0.format(p.rest * (+p.base.pv || 0))}</td></tr>` : ''}
+      ${project && p.rest ? `<tr><td>Projected ${p.rest} month${p.rest === 1 ? '' : 's'}<div class="muted" style="font-size:12px">${p.base.n > 1 ? `a normal month of the last ${p.base.n}` : `like ${monthLabel(p.base.month)}`}, without one-off pay · ${esc(p.base.employer || '')}</div></td><td class="num">${eur0.format(p.rest * (+p.base.taxGross || 0))}</td><td class="num">${eur0.format(p.rest * ((+p.base.lst || 0) + (+p.base.soli || 0)))}</td><td class="num">${eur0.format(p.rest * (+p.base.rv || 0))}</td><td class="num">${eur0.format(p.rest * (+p.base.kv || 0))}</td><td class="num">${eur0.format(p.rest * (+p.base.pv || 0))}</td></tr>` : ''}
       </tbody></table></div><p class="hint">Average wage tax rate so far: ${(p.tot.lst / Math.max(1, p.tot.taxGross) * 100).toFixed(1)}% of tax gross; at your income about 20 to 25% is normal.</p></details>
     <details class="psmore"><summary>Payslips (${p.slips.length})</summary><div class="mwrap"><table class="mini"><thead><tr><th>Month</th><th>Employer</th><th class="num">Tax gross</th><th class="num">Wage tax</th><th class="num">Pension, health, care</th><th></th></tr></thead><tbody>${p.slips.map(s => `<tr><td>${monthLabel(s.month)}</td><td>${esc(s.employer || '')}${s.ytd ? ' <span class="chip">YTD</span>' : ''}${+s.oneOff > 0 ? ' <span class="chip">one-off</span>' : ''}</td><td class="num">${eur0.format(s.taxGross || 0)}</td><td class="num">${eur0.format(s.lst || 0)}</td><td class="num">${eur0.format((+s.rv || 0) + (+s.kv || 0) + (+s.pv || 0))}</td><td style="white-space:nowrap"><button type="button" class="linkbtn" data-psedit="${s.id}">Edit</button> <button type="button" class="linkbtn" data-psdel="${s.id}" aria-label="Remove">✕</button></td></tr>`).join('')}</tbody></table></div></details>
     ${upload}

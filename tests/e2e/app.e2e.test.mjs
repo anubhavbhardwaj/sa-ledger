@@ -262,7 +262,7 @@ test('taxes: figure check flags missing insurance and doubled months; ways to sa
   } });
   await app.go('wealth'); await page.click('[data-wv="tax"]'); await page.click('[data-taxyear="2025"]'); await page.waitForTimeout(150);
   let t = await app.text('#wv-tax');
-  assert.match(t, /Dec 2025 \(Acme\): no health ins\., care ins\. read/);
+  assert.match(t, /Dec 2025 \(Acme\): no health ins\. or care ins\. on the slip as read, so they are estimated \(€509, €140\)/);
   assert.match(t, /Acme\s*2 slips · year-to-date on Dec 2025\s*€92,025/, 'one employer despite the name variants, year-to-date used');
   const before = +t.match(/(?:About|You’d pay about)\s*€([\d,]+)/)[1].replace(/,/g, '') * (/You’d pay about/.test(t) ? -1 : 1);
   await page.click('summary:has-text("Support for your parents in India")');
@@ -272,5 +272,19 @@ test('taxes: figure check flags missing insurance and doubled months; ways to sa
   // capped at 6,174 € for both parents: at 42% plus Soli, about 2,600 to 2,900 € more back
   assert.ok(after - before > 2500 && after - before < 3000, `parents support adds 42% of 6,174 € plus Soli (got ${after - before})`);
   assert.match(t, /Support for your parents in India.*Claiming/);
+  await clean(app);
+});
+
+test('taxes: one January slip with a bonus is not projected for the whole year', async () => {
+  const app = await openApp(), { page } = app;
+  await app.seed({ payslips: { 'anubhav_2025-01_mms': { month: '2025-01', employer: 'MediaMarktSaturn', user: 'anubhav', taxGross: 15220, lst: 4600, soli: 121, kist: 0, rv: 1178, av: 200 } } });
+  await app.go('wealth'); await page.click('[data-wv="tax"]'); await page.click('[data-taxyear="2025"]'); await page.waitForTimeout(150);
+  let t = await app.text('#wv-tax');
+  assert.match(t, /probably includes a one-off payment/); assert.match(t, /projected from one payslip/); assert.match(t, /estimated/);
+  await page.click('summary:has-text("Payslips (1)")'); await page.click('[data-psedit="anubhav_2025-01_mms"]'); await page.fill('#psDlg [data-ps="0"][data-psk="oneOff"]', '7550'); await page.click('#psSave'); await page.waitForTimeout(250);
+  t = await app.text('#wv-tax');
+  assert.doesNotMatch(t, /probably includes a one-off/);
+  // 15,220 + 11 × 7,670 = 99,590 taxable pay, instead of 12 × 15,220
+  assert.match(t, /Taxable pay\s*€99,590/);
   await clean(app);
 });
