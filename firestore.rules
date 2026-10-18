@@ -83,7 +83,8 @@ service cloud.firestore {
     }
 
     // Shared settings: 'budgets', 'fire' and 'fireInr' (FIRE plans in euros and rupees), 'fx' (rate on the 1st of each month),
-    // 'bookings' (the address booking emails are forwarded to) and 'leave' (vacation, work-from-abroad days and travel budget per year).
+    // 'bookings' (the address booking emails are forwarded to), 'leave' (vacation, work-from-abroad days and travel budget per year)
+    // and 'goals' (monthly investing and emergency fund goals).
     function validBudgets() {
       let d = request.resource.data;
       return d.keys().hasOnly(['items','total','updatedAt','updatedBy'])
@@ -101,6 +102,10 @@ service cloud.firestore {
       let d = request.resource.data;
       return d.keys().hasOnly(['email','updatedAt','updatedBy']) && str(d.email, 120);
     }
+    function validGoals() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['items','updatedAt','updatedBy']) && d.items is list && d.items.size() <= 20;
+    }
     function validLeave() {
       let d = request.resource.data;
       return d.keys().hasOnly(['years','updatedAt','updatedBy']) && d.years is map && d.years.size() <= 20;
@@ -117,7 +122,8 @@ service cloud.firestore {
         || ((id == 'fire' || id == 'fireInr') && validFire())
         || (id == 'fx' && validFxMonths())
         || (id == 'bookings' && validBookingSettings())
-        || (id == 'leave' && validLeave()));
+        || (id == 'leave' && validLeave())
+        || (id == 'goals' && validGoals()));
     }
 
     // Money moved between own accounts (incl. investing and card payments). Not spending.

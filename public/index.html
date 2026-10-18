@@ -109,6 +109,15 @@ details.tgroup > summary{font:700 13px/1.2 var(--f-body);text-transform:uppercas
 details.tgroup > summary::-webkit-details-marker{display:none}
 details.tgroup > summary::before{content:'▸ ';}
 details.tgroup[open] > summary::before{content:'▾ ';}
+.goal{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
+.goal:first-of-type{border-top:0}
+.goal .gh{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.goal .gh strong{font-size:14.5px}
+.goal .gv{font:700 18px/1.2 var(--f-display)}
+.goal .gv small{font:400 13px var(--f-body);color:var(--muted)}
+.gdots{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--muted)}
+.gdots i{width:22px;height:8px;border-radius:4px;background:var(--sunk);display:inline-block}
+.gdots i.hit{background:var(--good)}.gdots i.miss{background:var(--danger);opacity:.55}.gdots i.now{outline:1.5px solid var(--accent);outline-offset:1px}
 .lvprow{display:grid;grid-template-columns:minmax(0,2fr) 90px minmax(0,1.2fr) minmax(0,1.2fr) 34px;gap:8px;align-items:end}
 .lvprow label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
 .lvprow input{font:inherit;border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--ground);color:var(--ink);min-width:0;box-sizing:border-box;width:100%}
@@ -770,6 +779,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <div class="pagehead"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
       <section class="kpis" id="kpis" aria-label="Summary"></section>
       <section class="panel" id="budgetPanel" hidden></section>
+      <section class="panel" id="goalsP"></section>
       <div class="grid">
         <section class="panel span-7">
           <header><h2>Income vs spending</h2><span class="legend"><span><i style="background:var(--c-inc)"></i>Income</span><span><i style="background:var(--c-exp)"></i>Spending</span></span></header>
@@ -980,6 +990,25 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><button class="btn small" type="button" id="lvpAdd">+ Another trip</button><button class="btn primary" type="button" id="lvpGo">Find the best dates</button></div>
     <p class="err" id="lvpErr" hidden></p>
     <div id="lvpOut"></div>
+  </form>
+</dialog>
+
+<dialog id="goalDlg">
+  <form id="goalForm" novalidate>
+    <h3 id="goalTitle">New goal</h3>
+    <div class="seg" role="radiogroup" aria-label="Kind of goal" id="goalKind">
+      <button type="button" role="radio" data-gkind="invest">Monthly investing</button><button type="button" role="radio" data-gkind="emergency">Emergency fund</button>
+    </div>
+    <div class="fields">
+      <label class="f">Whose<select id="g-owner"><option>Both</option><option>Anubhav</option><option>Sulekha</option></select></label>
+      <label class="f g-invest">Invest at least (€ a month)<input id="g-amount" type="number" min="1" step="50" inputmode="decimal" placeholder="e.g. 2000"></label>
+      <label class="f g-emergency">Months of spending to keep<input id="g-months" type="number" min="1" max="24" step="1" inputmode="numeric" placeholder="6"></label>
+      <label class="f g-emergency">Or a fixed amount (€)<input id="g-fixed" type="number" min="0" step="500" inputmode="decimal" placeholder="optional"></label>
+      <div class="f full g-emergency"><span class="muted" style="font-size:12.5px">Kept in these accounts</span><div id="g-accounts" class="wichips" style="margin:4px 0 0"></div></div>
+    </div>
+    <p class="muted" id="goalHint" style="margin:0;font-size:12.5px"></p>
+    <p class="err" id="goalErr" hidden></p>
+    <div class="dlg-actions"><button class="btn danger" id="goalDel" type="button" hidden>Delete goal</button><div class="right"><button class="btn" id="goalCancel" type="button">Cancel</button><button class="btn primary" type="submit">Save goal</button></div></div>
   </form>
 </dialog>
 
@@ -1406,6 +1435,7 @@ onAuthStateChanged(auth, user => {
     const fi = snap.docs.find(x => x.id === 'fireInr'); state.fireInr = fi ? fi.data() : {};
     const bs = snap.docs.find(x => x.id === 'bookings'); state.bkSettings = bs ? bs.data() : {};
     const lv = snap.docs.find(x => x.id === 'leave'); state.leave = lv ? lv.data() : {};
+    const gl = snap.docs.find(x => x.id === 'goals'); state.goals = gl ? gl.data().items || [] : [];
     pfCache = null; render();
   }, onErr('budgets')));
   unsubs.push(onSnapshot(collection(fs, 'health'), snap => {
@@ -1568,7 +1598,7 @@ function renderMonths(ms){
 // Overview ignores bar filters: it is the unfiltered picture of the chosen period.
 function renderOverview(ms){
   $('#ovTitle').textContent = 'Overview · ' + periodName();
-  loadRates(); renderTodo(); fillMonthRates();
+  loadRates(); renderTodo(); fillMonthRates(); renderGoals();
   const rows = state.items.filter(inPeriod);
   const total = sum(rows);
   let deltaHtml = '<span class="sub">No earlier month to compare</span>';
@@ -2964,6 +2994,101 @@ document.addEventListener('input', e => {
   const r = e.target.closest && e.target.closest('[data-lvi]'); if (!r || !state.lvPlan) return;
   const T = state.lvPlan.trips[+r.dataset.lvi], k = e.target.dataset.lvk; if (!T || !k) return;
   T[k] = k === 'nights' ? Math.max(0, Math.round(+e.target.value || 0)) : e.target.value;
+});
+
+// ---------- goals: monthly investing (habit) and an emergency fund kept in chosen accounts ----------
+state.goals = [];
+const goalOwnerVal = (by, owner) => !by ? 0 : owner === 'Both' ? by.total : (by.by[owner] || 0);
+// Average monthly daily-life spending (no trips) over the last 6 full months with spending.
+function avgMonthlySpend(){
+  const cm = thisMonth(), by = {};
+  state.items.forEach(i => { const m = i.date.slice(0, 7); if (m < cm && !i.tripId) by[m] = (by[m] || 0) + (+i.amount || 0); });
+  const ms = Object.keys(by).sort().slice(-6);
+  return ms.length >= 3 ? { v: ms.reduce((a, m) => a + by[m], 0) / ms.length, n: ms.length } : null;
+}
+function goalInvest(g){
+  const cm = thisMonth(), months = [5, 4, 3, 2, 1, 0].map(k => addMonth(cm, -k));
+  const hist = months.map(m => ({ m, v: goalOwnerVal(investedBy(m), g.owner) }));
+  // Months before anything was invested at all don't count as misses.
+  const first = [...state.snaps.map(x => x.month), ...state.transfers.filter(t => transferType(t) === 'Investment').map(t => t.date.slice(0, 7))].sort()[0] || cm;
+  const now = hist[hist.length - 1], done = hist.slice(0, -1).filter(h => h.m >= first);
+  const hits = done.filter(h => h.v >= g.amount).length;
+  const [y, mo] = cm.split('-').map(Number), daysLeft = new Date(y, mo, 0).getDate() - +today().slice(8, 10);
+  return { now, hist, hits, of: done.length, daysLeft };
+}
+function goalEmergency(g){
+  const avg = avgMonthlySpend(), target = +g.fixed > 0 ? +g.fixed : avg ? Math.round(avg.v * (g.months || 6) / 100) * 100 : null;
+  const accs = (g.accounts || []).map(id => state.accounts.find(a => a.id === id)).filter(Boolean);
+  let have = 0, missing = [];
+  for (const a of accs){ const e = estimate(a); if (!e || (e.base.virtual && Math.abs(e.balance) < 0.5)) missing.push(a.name); else have += toEur(a, e.balance); }
+  return { target, avg, accs, have, missing };
+}
+function renderGoals(){
+  const el = $('#goalsP'); if (!el) return;
+  const G = state.goals || [];
+  const head = `<header><h2>Goals</h2><span class="right"><button class="btn small" type="button" data-goalnew>+ Goal</button></span></header>`;
+  if (!G.length){ el.innerHTML = head + `<p class="muted" style="margin:0;font-size:13px">Set a monthly investing habit or an emergency fund, and see each month whether you’re on track.</p>`; return; }
+  const bar = (v, t) => `<span class="lvbar"><i style="width:${Math.min(100, t ? v / t * 100 : 0)}%;background:${v >= t ? 'var(--good)' : 'var(--accent)'}"></i></span>`;
+  el.innerHTML = head + G.map((g, i) => {
+    const who = g.owner === 'Both' ? '' : ` · ${esc(g.owner)}`;
+    if (g.type === 'invest'){
+      const x = goalInvest(g), v = x.now.v, left = g.amount - v;
+      return `<div class="goal"><div class="gh"><strong>Invest ${eur0.format(g.amount)} a month${who}</strong><button class="linkbtn" type="button" data-goaledit="${i}">Edit</button></div>
+        <span class="gv">${eur0.format(v)} <small>of ${eur0.format(g.amount)} in ${MON[+x.now.m.slice(5, 7) - 1]}</small></span>${bar(v, g.amount)}
+        <span class="muted" style="font-size:12.5px">${left <= 0 ? '<span class="pos">Done for this month</span>' : `${eur0.format(left)} to go · ${x.daysLeft} day${x.daysLeft === 1 ? '' : 's'} left`}</span>
+        <span class="gdots" title="Last 6 months">${x.hist.map((h, j) => `<i class="${j === x.hist.length - 1 ? (h.v >= g.amount ? 'hit now' : 'now') : h.v >= g.amount ? 'hit' : 'miss'}" title="${monthLabel(h.m)}: ${eur0.format(h.v)}"></i>`).join('')} <span>${x.hits} of the last ${x.of} months</span></span></div>`;
+    }
+    const x = goalEmergency(g);
+    return `<div class="goal"><div class="gh"><strong>Emergency fund${who}</strong><button class="linkbtn" type="button" data-goaledit="${i}">Edit</button></div>
+      ${x.target ? `<span class="gv">${eur0.format(x.have)} <small>of ${eur0.format(x.target)}</small></span>${bar(x.have, x.target)}
+      <span class="muted" style="font-size:12.5px">${x.have >= x.target ? '<span class="pos">Covered</span>' : `${eur0.format(x.target - x.have)} to go`} · ${+g.fixed > 0 ? 'fixed target' : `${g.months || 6} months × ${eur0.format(x.avg.v)} average daily-life spending`} · in ${x.accs.length ? esc(x.accs.map(a => a.name).join(', ')) : 'no accounts yet'}${x.missing.length ? ` · <span class="tbl warn">no balance yet for ${esc(x.missing.join(', '))}: check it in under Wealth</span>` : ''}</span>`
+        : `<span class="muted" style="font-size:12.5px">Needs 3 months of spending to work out the target, or set a fixed amount. <button class="linkbtn" type="button" data-goaledit="${i}">Set it</button></span>`}</div>`;
+  }).join('');
+}
+function goalKind(k){
+  state.goalEdit.type = k;
+  $$('#goalKind [data-gkind]').forEach(b => b.setAttribute('aria-checked', b.dataset.gkind === k));
+  $$('.g-invest').forEach(x => x.hidden = k !== 'invest'); $$('.g-emergency').forEach(x => x.hidden = k !== 'emergency');
+  const avg = avgMonthlySpend();
+  $('#goalHint').textContent = k === 'invest' ? 'Counts what goes into investment accounts each month (monthly values under Wealth, else transfers in).'
+    : avg ? `Your daily-life spending averages ${eur0.format(avg.v)} a month (last ${avg.n} full months, trips left out).` : 'Not enough months of spending yet to work out a target: set a fixed amount for now.';
+}
+function openGoal(i){
+  const g = i == null ? { type: (state.goals || []).some(x => x.type === 'invest') ? 'emergency' : 'invest', owner: 'Both', months: 6 } : { ...state.goals[i] };
+  state.goalEdit = { ...g, i };
+  $('#goalTitle').textContent = i == null ? 'New goal' : 'Edit goal';
+  $('#g-owner').value = g.owner || 'Both'; $('#g-amount').value = g.amount || ''; $('#g-months').value = g.months || ''; $('#g-fixed').value = g.fixed || '';
+  const cash = state.accounts.filter(a => a.type === 'bank' || a.type === 'cash');
+  $('#g-accounts').innerHTML = cash.length ? cash.map(a => `<label class="wichip"><input type="checkbox" value="${esc(a.id)}" ${(g.accounts || []).includes(a.id) ? 'checked' : ''}> ${esc(a.name)} <span class="am">${esc(a.owner)}</span></label>`).join('') : '<span class="muted" style="font-size:12.5px">Add your bank accounts under Wealth first.</span>';
+  $('#goalDel').hidden = i == null; $('#goalErr').hidden = true;
+  goalKind(g.type); $('#goalDlg').showModal();
+}
+async function saveGoals(items, msg){
+  await setDoc(doc(fs, 'settings', 'goals'), { items, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) }); toast(msg);
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-goalnew]')){ openGoal(null); return; }
+  const ed = e.target.closest('[data-goaledit]'); if (ed){ openGoal(+ed.dataset.goaledit); return; }
+  const k = e.target.closest('#goalKind [data-gkind]'); if (k){ goalKind(k.dataset.gkind); return; }
+});
+$('#goalCancel').addEventListener('click', () => $('#goalDlg').close());
+$('#goalDel').addEventListener('click', async () => {
+  const i = state.goalEdit?.i; if (i == null) return;
+  try { await saveGoals((state.goals || []).filter((_, j) => j !== i), 'Goal deleted'); $('#goalDlg').close(); } catch (x){ const er = $('#goalErr'); er.textContent = writeError(x); er.hidden = false; }
+});
+$('#goalForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const E = state.goalEdit, err = $('#goalErr'), fail = m => { err.textContent = m; err.hidden = false; };
+  const g = { type: E.type, owner: $('#g-owner').value };
+  if (g.type === 'invest'){ g.amount = Math.round(+$('#g-amount').value || 0); if (!(g.amount > 0)) return fail('How much a month?'); }
+  else {
+    g.months = Math.round(+$('#g-months').value || 0) || 6; const fx = Math.round(+$('#g-fixed').value || 0); if (fx > 0) g.fixed = fx;
+    g.accounts = $$('#g-accounts input:checked').map(x => x.value);
+    if (!g.accounts.length) return fail('Pick the accounts the emergency fund is kept in.');
+  }
+  const items = [...(state.goals || [])]; if (E.i == null) items.push(g); else items[E.i] = g;
+  try { await saveGoals(items.slice(0, 20), E.i == null ? 'Goal added' : 'Goal saved'); $('#goalDlg').close(); }
+  catch (x){ fail(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); }
 });
 
 // trip dialog

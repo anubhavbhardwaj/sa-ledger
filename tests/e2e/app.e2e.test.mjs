@@ -167,3 +167,23 @@ test('visualizations: spend by store, and tapping a store filters everything to 
   assert.match(await app.text('#vzBanner'), /2 transactions · €75\.00.*Store: Rewe/);
   await clean(app);
 });
+
+test('goals: monthly investing and an emergency fund, set up from the Overview', async () => {
+  const app = await openApp(), { page } = app, m = month(0);
+  const exp = {}; for (let k = 1; k <= 6; k++){ const mm = month(-k); exp['r' + k] = { amount: 1500, date: mm + '-05', store: 'Rent', category: 'Rent', account: 'DKB', spender: 'Anubhav', createdAt: 'x' }; exp['g' + k] = { amount: 500, date: mm + '-10', store: 'Rewe', category: 'Groceries', account: 'DKB', spender: 'Anubhav', createdAt: 'x' }; }
+  exp.trip = { amount: 900, date: month(-1) + '-12', store: 'Flight', category: 'Travel', account: 'DKB', spender: 'Anubhav', tripId: 't1', createdAt: 'x' };
+  await app.seed({
+    accounts: { dkb: { name: 'DKB', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: d(-400) }, tr: { name: 'Trade Republic', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
+    checkins: { c1: { accountId: 'dkb', date: d(0), balance: 9000, createdAt: new Date().toISOString() } },
+    invSnapshots: { ['tr_' + m]: { accountId: 'tr', month: m, investment: 800, value: 20000 }, ['tr_' + month(-1)]: { accountId: 'tr', month: month(-1), investment: 2100, value: 19000 } },
+    expenses: exp,
+  });
+  await page.waitForSelector('#goalsP [data-goalnew]');
+  await page.click('[data-goalnew]'); await page.fill('#g-amount', '2000'); await page.click('#goalForm [type=submit]'); await page.waitForTimeout(150);
+  await page.click('[data-goalnew]'); assert.match(await app.text('#goalHint'), /averages €2,000 a month/, 'trips left out of the average');
+  await page.check('#g-accounts input[value="dkb"]'); await page.click('#goalForm [type=submit]'); await page.waitForTimeout(150);
+  const g = await app.text('#goalsP');
+  assert.match(g, /Invest €2,000 a month.*€800 of €2,000/); assert.match(g, /€1,200 to go/);
+  assert.match(g, /Emergency fund.*€9,000 of €12,000/); assert.match(g, /1 of the last 1 months/); assert.match(g, /€3,000 to go · 6 months × €2,000/);
+  await clean(app);
+});
