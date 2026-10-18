@@ -1,6 +1,6 @@
 // S&A Ledger service worker: makes the app installable and lets it open offline.
 // Your expense data is NOT cached here; Firestore keeps its own offline copy.
-const VERSION = 'sa-ledger-v5';
+const VERSION = 'sa-ledger-v6';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -64,12 +64,23 @@ self.addEventListener('push', e => {
   const title = d.title || 'S&A Ledger';
   e.waitUntil(self.registration.showNotification(title, {
     body: d.body || '', tag: d.tag || undefined, renotify: !!d.tag, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png',
-    data: { url: d.url || '/#overview' },
+    data: { url: d.url || '/#overview', date: d.date, sig: d.sig },
+    actions: (() => { try { return d.actions ? JSON.parse(d.actions) : []; } catch { return []; } })(),
   }));
 });
 
+// "Office or home today?" answered with a button: save it straight away; if that fails, open the app to answer there.
+async function answerWorkday(n, where){
+  try {
+    const r = await fetch('/api/workday', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date: n.data.date, where, sig: n.data.sig }) });
+    if (!r.ok) throw new Error(r.status);
+    await self.registration.showNotification('Saved: ' + (where === 'office' ? 'office day' : 'home office day'), { tag: 'workday', silent: true, icon: '/icons/icon-192.png', body: 'Change it any time in Wealth → Taxes.', data: { url: '/#workday' } });
+  } catch { return self.clients.openWindow('/#workday'); }
+}
+
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  if ((e.action === 'office' || e.action === 'home') && e.notification.data?.sig){ e.waitUntil(answerWorkday(e.notification, e.action)); return; }
   const url = new URL(e.notification.data?.url || '/#overview', self.location.origin).href;
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async list => {
     const open = list.find(c => c.url.startsWith(self.location.origin));

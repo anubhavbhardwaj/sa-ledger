@@ -207,3 +207,32 @@ test('FIRE: the German state pension from the payslip lowers the FIRE number', a
   assert.match(t, /Minimum 5 years\s*Met/);
   await clean(app);
 });
+
+test('taxes: commuting, home office, job ticket and tagged expenses add up; tapping a day and tagging save', async () => {
+  const app = await openApp(), { page } = app;
+  await app.seed({
+    settings: { tax: { jobs: [{ name: 'Office', from: '2025-07-01', to: '2025-07-31', km: 80, mode: 'log', days: [1, 2, 3, 4] }], tickets: [{ from: '2025-07', to: '2025-07', monthly: 63 }], rate: 42 } },
+    workdays: { 'anubhav_2025-07-07': { date: '2025-07-07', user: 'anubhav', where: 'home' } },
+    expenses: {
+      e1: { amount: 1000, date: '2025-05-10', store: 'Saturn', category: 'Electronics', account: 'DKB', spender: 'Anubhav', tax: 'work', createdAt: 'x' },
+      e2: { amount: 30, date: '2025-06-01', store: 'Udemy', category: 'Education', account: 'DKB', spender: 'Anubhav', createdAt: 'x' },
+    },
+  });
+  await app.go('wealth'); await page.click('[data-wv="tax"]'); await page.click('[data-taxyear="2025"]'); await page.waitForTimeout(150);
+  let t = await app.text('#wv-tax');
+  // July 2025: 19 Mon-Thu, one answered "home" → 18 office days × (20 × 0.30 + 60 × 0.38 = 28.80 €) = 518 €, minus the 63 € ticket
+  assert.match(t, /Commuting allowance\s*€455/); assert.match(t, /18 office days/);
+  assert.match(t, /Home office\s*€30/); assert.match(t, /5 days at 6/);
+  // 455.40 + 30 + 1,000 + 16 = 1,501 €; 271 € above the flat amount × 42% = 114 €
+  assert.match(t, /Work costs in total\s*€1,501/); assert.match(t, /About back\s*€114/);
+  assert.match(t, /Could these count\?[\s\S]*Udemy/);
+  await page.click('[data-wdcell="2025-07-08"]'); await page.waitForTimeout(150);
+  t = await app.text('#wv-tax');
+  assert.match(t, /17 office days/, 'tapping an assumed office day makes it a home day'); assert.match(t, /Home office\s*€36/);
+  await page.click('[data-wdcell="2025-07-08"]'); await page.waitForTimeout(150);
+  t = await app.text('#wv-tax');
+  assert.match(t, /17 office days/); assert.match(t, /Home office\s*€30/, 'then away: no commute, no home office');
+  await page.selectOption('[data-taxtag="e2"]', 'training'); await page.waitForTimeout(200);
+  assert.match(await app.text('#wv-tax'), /Training & books/);
+  await clean(app);
+});

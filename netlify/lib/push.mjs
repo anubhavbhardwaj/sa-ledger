@@ -13,12 +13,12 @@ function app() {
   return initializeApp({ credential: cert(sa) });
 }
 
-// tokens: [{ id (the FCM token), email }]. msg: { title, body, tag, url }. Returns tokens that no longer work.
+// tokens: [{ id (the FCM token), email }]. msg: { title, body, tag, url, ttl, data (extra string fields) }. Returns tokens that no longer work.
 export async function sendTo(tokens, msg, send = m => getMessaging(app()).send(m)) {
   const dead = [];
   await Promise.all(tokens.map(async t => {
     try {
-      await send({ token: t.id, data: { title: msg.title, body: msg.body, tag: msg.tag || '', url: msg.url || '/#overview' },
+      await send({ token: t.id, data: { ...(msg.data || {}), title: msg.title, body: msg.body, tag: msg.tag || '', url: msg.url || '/#overview' },
         webpush: { headers: { Urgency: 'high', TTL: String(msg.ttl || 3600) } } });
     } catch (e) {
       const code = e?.errorInfo?.code || e?.code || '';

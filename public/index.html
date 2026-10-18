@@ -520,6 +520,24 @@ table.snaps tr.row:hover td{background:var(--sunk)}
 .checks li{display:grid;grid-template-columns:20px 1fr auto;gap:8px;align-items:baseline}
 .checks .ok{color:var(--good);font-weight:700}.checks .bad{color:var(--danger);font-weight:700}
 .checks .n{font-family:var(--f-mono);font-size:12.5px;color:var(--ink-2)}
+.wdcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;max-width:420px}
+.wdh{font-size:11px;color:var(--muted);text-align:center;font-weight:600}
+.wdc{aspect-ratio:1;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:500 13px var(--f-body);cursor:pointer;opacity:.6;padding:0}
+.wdc.logged,.wdc.holiday,.wdc.weekend,.wdc.share{opacity:1}
+.wdc[disabled]{cursor:default}.wdc.weekend,.wdc.none{background:transparent;border-color:transparent;color:var(--muted)}
+.wdc.office{background:var(--s1);border-color:var(--s1);color:#fff}.wdc.home{background:var(--s3);border-color:var(--s3);color:#fff}
+.wdc.away{background:var(--s4);border-color:var(--s4);color:#fff}.wdc.off{background:var(--sunk);color:var(--ink-2)}
+.wdc.holiday{background:transparent;border-style:dashed;color:var(--muted)}.wdc.share{background:linear-gradient(135deg,var(--s1) 50%,var(--s3) 50%);color:#fff;border:0}
+.wdc.today{outline:2px solid var(--ink);outline-offset:1px}
+.wdleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;margin:10px 0 0}.wdleg span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;background:var(--sunk)}
+.wdleg .office::before{background:var(--s1)}.wdleg .home::before{background:var(--s3)}.wdleg .away::before{background:var(--s4)}.wdleg .share::before{background:linear-gradient(135deg,var(--s1) 50%,var(--s3) 50%)}
+.wdnav{display:inline-flex;gap:10px;align-items:center;font-weight:600}.wdbtns{display:flex;flex-wrap:wrap;gap:6px}
+.taxjobs{display:grid;gap:12px}.taxjob{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 12px;padding:12px;border:1px solid var(--line);border-radius:10px;align-items:end}
+.taxjob label{display:grid;gap:4px;font-size:12.5px;color:var(--ink-2);min-width:0}.taxjob input,.taxjob select{min-width:0;width:100%}
+.wdpick{display:flex;gap:3px}.wdpick button{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:5px 0;font-size:12px;cursor:pointer;color:var(--muted)}
+.wdpick button[aria-pressed="true"]{background:var(--s1);border-color:var(--s1);color:#fff}
+.taxh3{font-size:13px;margin:14px 0 6px;color:var(--ink-2)}
+#wv-tax select[data-taxtag]{max-width:100%;font-size:12.5px}
 .fire-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px}
 .fire-grid label{display:grid;gap:4px;align-content:start;font-size:12.5px;color:var(--ink-2)}
 .fire-grid input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:8px 10px;width:100%;min-width:0;font-family:var(--f-mono)}
@@ -856,7 +874,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <div class="pagehead">
           <div><h1>Wealth</h1><p id="wSub">Investments, cash and your FIRE plan</p></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><div class="seg" role="radiogroup" aria-label="Show amounts in" id="homeSeg"><button type="button" role="radio" data-home="EUR" title="Show in euros">€</button><button type="button" role="radio" data-home="INR" title="Show in rupees">₹</button></div>
-          <div class="seg" role="radiogroup" aria-label="Show" id="wSeg"><button type="button" role="radio" data-wv="inv">Investments</button><button type="button" role="radio" data-wv="cash">Cash &amp; cards</button><button type="button" role="radio" data-wv="fire">FIRE</button></div></div>
+          <div class="seg" role="radiogroup" aria-label="Show" id="wSeg"><button type="button" role="radio" data-wv="inv">Investments</button><button type="button" role="radio" data-wv="cash">Cash &amp; cards</button><button type="button" role="radio" data-wv="fire">FIRE</button><button type="button" role="radio" data-wv="tax">Taxes</button></div></div>
         </div>
 
         <section class="panel" id="nwAllP" hidden><header><h2>Net worth</h2><span class="hint" id="nwAllHint"></span></header><div id="nwAll"></div>
@@ -883,6 +901,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         </div>
 
         <div id="wv-fire" class="wview" hidden></div>
+        <div id="wv-tax" class="wview" hidden style="display:grid;gap:16px"></div>
       </div>
       <div id="accDetail" hidden style="display:grid;gap:16px"></div>
     </div>
@@ -1282,6 +1301,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
           <label class="f exp-only">Sub category<input id="f-subcategory" data-list="dl-subcategory" autocomplete="off" placeholder="e.g. Flight, Taxi"></label>
           <label class="f exp-only">Country<input id="f-country" data-list="dl-country" autocomplete="off"></label>
           <label class="f full exp-only">Trip<select id="f-trip"></select></label>
+          <label class="f full exp-only">Tax<select id="f-tax"><option value="">Not for taxes</option><option value="work">Work equipment</option><option value="training">Training &amp; books</option><option value="advice">Tax software &amp; advice</option><option value="donation">Donation</option><option value="household">Household services</option><option value="trades">Tradespeople (labour)</option><option value="no">Not tax relevant</option></select></label>
           <label class="f full">Comment<input id="f-comment" autocomplete="off"></label>
         </div>
       </div>
@@ -1344,7 +1364,7 @@ const bkInboxCol = collection(fs, "bookingInbox");
 const TRIP_TYPE = { visit:'Visit', holiday:'Holiday', other:'Other', office:'Office' };
 const TRIP_KIND = { visit:'Visits', holiday:'Holidays', other:'Other trips', office:'Office trips' };
 const TRIP_DOT = { visit:'var(--s1)', holiday:'var(--s2)', other:'var(--s3)', office:'var(--s7)' };
-const EXP_KEYS = ['amount','date','store','category','subcategory','account','spender','country','comment','createdAt','createdBy','updatedBy','tripId','currency','origAmount','fxRate'];
+const EXP_KEYS = ['amount','date','store','category','subcategory','account','spender','country','comment','createdAt','createdBy','updatedBy','tripId','currency','origAmount','fxRate','tax'];
 const CURRENCIES = ['EUR','INR','CHF','USD','GBP','CZK','PLN','HUF','DKK','SEK','NOK','TRY','JPY','CAD','AUD','SGD','THB'];
 const FIXED_GUESS = /^(rent|insurance|phone\/internet|subscriptions|fitness)$/i;
 const money = (v, c = 'EUR') => { if (Math.abs(v) < 0.005) v = 0; try { return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en-IE', {style:'currency', currency:c}).format(v); } catch { return c + ' ' + (+v).toFixed(2); } };
@@ -1362,13 +1382,13 @@ const CC = {Germany:'DE', Italy:'IT', India:'IN', France:'FR', Spain:'ES', Switz
 const DIMS = ['category','spender','account','country','tripKind','tripName','store'];
 const LABEL = {category:'Category', spender:'Spender', account:'Account', country:'Country', tripKind:'Trip type', tripName:'Trip', store:'Store'};
 const PAGES = ['overview','transactions','trips','wealth','visualizations'];
-const FIELDS = ['amount','date','store','category','subcategory','account','spender','country','comment'];
+const FIELDS = ['amount','date','store','category','subcategory','account','spender','country','comment','tax'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' + y; };
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], toBook:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null, store:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { workdays:{}, tax:{}, taxYear:null, taxMonth:null, home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], toBook:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null, store:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -1436,8 +1456,13 @@ onAuthStateChanged(auth, user => {
     const bs = snap.docs.find(x => x.id === 'bookings'); state.bkSettings = bs ? bs.data() : {};
     const lv = snap.docs.find(x => x.id === 'leave'); state.leave = lv ? lv.data() : {};
     const gl = snap.docs.find(x => x.id === 'goals'); state.goals = gl ? gl.data().items || [] : [];
+    const tx = snap.docs.find(x => x.id === 'tax'); state.tax = tx ? tx.data() : {};
     pfCache = null; render();
   }, onErr('budgets')));
+  unsubs.push(onSnapshot(collection(fs, 'workdays'), snap => {
+    state.workdays = Object.fromEntries(snap.docs.map(d => d.data()).filter(d => d.user === 'anubhav').map(d => [d.date, d.where]));
+    if (state.page === 'wealth') render();
+  }, () => {}));
   unsubs.push(onSnapshot(collection(fs, 'health'), snap => {
     state.health = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
     renderBadge(); if ($('#hlDlg').open) renderHealth();
@@ -1552,12 +1577,14 @@ function route(){
   const h = location.hash.replace('#','');
   if (h === 'add'){ history.replaceState(null, '', '#overview'); if (state.user) setTimeout(openAdd, 0); else state.wantAdd = true; }
   if (h === 'accounts'){ state.wv = 'cash'; history.replaceState(null, '', '#wealth'); }
+  // From the 9:00 "Office or home today?" notification: the Taxes view, which asks at the top.
+  if (h === 'workday'){ state.wv = 'tax'; state.taxYear = null; state.taxMonth = null; state.openAcc = null; history.replaceState(null, '', '#wealth'); }
   // Something shared to the app (see sw.js): open it as a booking once signed in.
   if (h === 'share'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(takeShared, 0); else state.wantShare = true; }
   // From a "New booking to add" notification: open the forwarded booking (or the list when there are several).
   if (h === 'bookings'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(openBkInboxFromLink, 0); else state.wantBkInbox = true; }
   if (h === 'booking'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(() => bkOpen({ source: 'upload' }), 0); }
-  state.page = h === 'accounts' ? 'wealth' : h === 'share' || h === 'booking' || h === 'bookings' ? 'trips' : PAGES.includes(h) ? h : 'overview';
+  state.page = h === 'accounts' || h === 'workday' ? 'wealth' : h === 'share' || h === 'booking' || h === 'bookings' ? 'trips' : PAGES.includes(h) ? h : 'overview';
   if (state.page !== 'trips') state.openTrip = null;
   if (state.page !== 'wealth') state.openAcc = null;
   $('#months').hidden = state.page === 'trips' || state.page === 'wealth';
@@ -2362,7 +2389,7 @@ function openEdit(id, kind = 'expense'){
   if (it.currency && it.currency !== 'EUR' && it.origAmount){ F('amount').value = it.origAmount; setCur(it.currency, it.fxRate); }
   else setCur('EUR');
   { const me = cap(usernameOf(state.user));
-    setMore(!!(it.tripId || it.subcategory || it.comment
+    setMore(!!(it.tripId || it.subcategory || it.comment || (it.tax && it.tax !== 'no')
       || (kind === 'expense' && it.spender && it.spender !== me) || (kind === 'income' && it.earner && it.earner !== me))); }
   state.editKind = kind;
   setKind(kind, false);
@@ -2446,6 +2473,7 @@ $('#form').addEventListener('submit', async e => {
   }
   const rec = { amount, date, ...need, subcategory:F('subcategory').value.trim(), spender:F('spender').value, country:F('country').value.trim(), comment:F('comment').value.trim(), ...fx };
   if (F('trip').value) rec.tripId = F('trip').value;
+  if (F('tax').value) rec.tax = F('tax').value;
   try {
     if (state.editing){
       const old = editOld();
@@ -3926,7 +3954,7 @@ function renderWealth(){
   if (open){ open.type === 'investment' ? renderInvDetail(open) : renderAccDetail(open); fillMonthRates(); return; }
   $$('#wSeg [data-wv]').forEach(b => b.setAttribute('aria-checked', b.dataset.wv === state.wv));
   $$('#homeSeg [data-home]').forEach(b => b.setAttribute('aria-checked', b.dataset.home === HOME()));
-  ['inv','cash','fire'].forEach(v => $('#wv-' + v).hidden = v !== state.wv);
+  ['inv','cash','fire','tax'].forEach(v => $('#wv-' + v).hidden = v !== state.wv);
   const pf = portfolio();
   const cash = state.accounts.filter(a => a.type !== 'investment').reduce((x,a) => { const e = estimate(a); return x + (e ? eurToHome(toEur(a, e.balance)) : 0); }, 0);
   const nw = pf.value + cash;
@@ -3937,6 +3965,7 @@ function renderWealth(){
   if (state.wv === 'inv') renderInvestments(pf);
   if (state.wv === 'cash') renderCash();
   if (state.wv === 'fire') renderFire(pf);
+  if (state.wv === 'tax') renderTax();
   fillMonthRates();
 }
 
@@ -4181,6 +4210,180 @@ function renderFire(pf){
     if (i % every === 0) s += `<text x="${x(i)}" y="${H-6}" text-anchor="${i === n-1 ? 'end' : i === 0 ? 'start' : 'middle'}">${q.yr}</text>`; });
   $('#fireChart').innerHTML = s + '</svg>';
 }
+
+
+// ---------- Taxes: Anubhav's German return (Werbungskosten), commuting and home office days ----------
+// Workplaces in settings/tax.jobs: { name, from, to, km (one-way, shortest road), mode: 'log' (day by day, weekly
+// pattern for days not answered) or 'share' (a % of workdays at the office, the rest at home), share, days [1..5] }.
+// The daily answers are in workdays/anubhav_<date>. tickets: [{ from 'YYYY-MM', to, monthly }] for a tax-free job ticket.
+const TAX_TYPES = { work: 'Work equipment', training: 'Training & books', advice: 'Tax software & advice', donation: 'Donation', household: 'Household services', trades: 'Tradespeople (labour)' };
+const WD_LABEL = { office: 'Office', home: 'Home', away: 'Away', off: 'Off' };
+const WD_NEXT = { '': 'office', office: 'home', home: 'away', away: 'off', off: '' };
+const TAX_SUGGEST = /saturn|media ?markt|amazon|apple|cyberport|notebooksbilliger|ikea|udemy|coursera|o'?reilly|book|thalia|hugendubel|taxfix|wiso|smartsteuer|steuer|spende|donat|unicef|red cross|rotes kreuz|handwerk|clean|reinigung|putz|electrician|plumber|linkedin|software|laptop|monitor|headset|keyboard|desk|schreibtisch/i;
+const taxSet = () => state.tax || {};
+const taxJobs = () => (taxSet().jobs || []).slice().sort((a, b) => a.from.localeCompare(b.from));
+const jobOn = d => taxJobs().find(j => j.from <= d && (!j.to || d <= j.to));
+// Commuting allowance for one office day: from 2026 0.38 € per km from the first km; before, 0.30 € for the first 20.
+const kmRate = (y, km) => y >= 2026 ? 0.38 * km : Math.min(km, 20) * 0.30 + Math.max(0, km - 20) * 0.38;
+function onTrip(d){ return state.trips.some(t => ['Anubhav', 'Both'].includes(t.traveller) && t.start && t.end && t.start <= d && d <= t.end); }
+// One day: { kind: office|home|away|off|share|holiday|weekend|none, job, src: logged|assumed|planned|trip|share }
+function dayKind(d){
+  const wd = new Date(d + 'T12:00:00Z').getUTCDay();
+  if (wd === 0 || wd === 6) return { kind: 'weekend' };
+  if (holidaysBY(+d.slice(0, 4)).has(d)) return { kind: 'holiday', name: holidaysBY(+d.slice(0, 4)).get(d) };
+  const job = jobOn(d); if (!job) return { kind: 'none' };
+  const log = state.workdays[d];
+  if (log) return { kind: log, job, src: 'logged' };
+  const sd = state.leave?.years?.[d.slice(0, 4)]?.shutdown;
+  if (sd?.start && sd?.end && d >= sd.start && d <= sd.end) return { kind: 'off', job, src: 'shutdown' };
+  if (onTrip(d)) return { kind: 'away', job, src: 'trip' };
+  if (job.mode === 'share') return { kind: 'share', job, src: 'share' };
+  return { kind: (job.days || [1, 2, 3, 4]).includes(wd) ? 'office' : 'home', job, src: d > today() ? 'planned' : 'assumed' };
+}
+function monthsIn(y, from, to){ let n = 0; for (let m = 1; m <= 12; m++){ const k = `${y}-${String(m).padStart(2, '0')}`; if (k >= from && (!to || k <= to)) n++; } return n; }
+function taxYear(y){
+  const c = { office: 0, home: 0, away: 0, off: 0, commute: 0, logged: 0, assumed: 0, planned: 0, byJob: {} };
+  for (let d = `${y}-01-01`; d <= `${y}-12-31`; d = addDays(d, 1)){
+    const k = dayKind(d); if (!k.job) continue;
+    const j = c.byJob[k.job.name] ||= { office: 0, home: 0, km: +k.job.km || 0, commute: 0 };
+    let off = 0, home = 0;
+    if (k.kind === 'share'){ off = (+k.job.share || 0) / 100; home = 1 - off; }
+    else if (k.kind === 'office') off = 1; else if (k.kind === 'home') home = 1; else c[k.kind]++;
+    if (off || home) c[k.src === 'logged' ? 'logged' : k.src === 'planned' ? 'planned' : 'assumed']++;
+    const eur = off * kmRate(y, +k.job.km || 0);
+    c.office += off; c.home += home; c.commute += eur; j.office += off; j.home += home; j.commute += eur;
+  }
+  c.ticket = (taxSet().tickets || []).reduce((s, t) => s + monthsIn(y, t.from, t.to) * (+t.monthly || 0), 0);
+  c.ticketOff = Math.min(c.ticket, c.commute);
+  c.homeDays = Math.min(Math.round(c.home), 210); c.homeEur = c.homeDays * 6;
+  const ex = state.items.filter(i => i.date.startsWith(y + '') && i.tax && TAX_TYPES[i.tax]);
+  c.items = ex; c.by = {}; for (const i of ex) c.by[i.tax] = (c.by[i.tax] || 0) + (+i.amount || 0);
+  c.wk = c.commute - c.ticketOff + c.homeEur + (c.by.work || 0) + (c.by.training || 0) + (c.by.advice || 0) + 16;
+  c.extra = Math.max(0, c.wk - 1230);
+  const rate = (taxSet().rate ?? 42) / 100;
+  c.p35a = Math.min(0.2 * (c.by.household || 0), 4000) + Math.min(0.2 * (c.by.trades || 0), 1200);
+  c.back = c.extra * rate + Math.max(0, (c.by.donation || 0) - 36) * rate + c.p35a;
+  return c;
+}
+async function saveTax(patch){
+  const o = { ...taxSet(), ...patch, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) };
+  for (const k of Object.keys(o)) if (!['jobs', 'tickets', 'rate', 'ask', 'updatedAt', 'updatedBy'].includes(k) || o[k] === undefined || o[k] === null) delete o[k];
+  state.tax = o; render();
+  try { await setDoc(doc(fs, 'settings', 'tax'), o); } catch (x){ toast(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); }
+}
+async function setWorkday(d, where){
+  const id = 'anubhav_' + d;
+  if (where){ state.workdays[d] = where; render(); try { await setDoc(doc(fs, 'workdays', id), { date: d, user: 'anubhav', where, by: usernameOf(state.user), at: new Date().toISOString() }); } catch (x){ toast(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); } }
+  else { delete state.workdays[d]; render(); try { await deleteDoc(doc(fs, 'workdays', id)); } catch (x){ toast(writeError(x)); } }
+}
+function renderTax(){
+  const y = state.taxYear || +today().slice(0, 4), c = taxYear(y), t = today(), tk = dayKind(t), f = taxSet();
+  const lastJobMonth = () => { for (let m = 12; m >= 1; m--){ const k = `${y}-${String(m).padStart(2, '0')}`; if (taxJobs().some(j => j.from.slice(0, 7) <= k && (!j.to || k <= j.to.slice(0, 7)))) return k; } return y + '-12'; };
+  const mo = state.taxMonth && state.taxMonth.startsWith(y + '') ? state.taxMonth : (t.startsWith(y + '') ? t.slice(0, 7) : lastJobMonth());
+  const years = [...new Set([+t.slice(0, 4) - 1, +t.slice(0, 4), y, ...taxJobs().map(j => +j.from.slice(0, 4))])].sort();
+  const askToday = y === +t.slice(0, 4) && tk.job && tk.job.mode === 'log' && !state.workdays[t] && !['weekend', 'holiday'].includes(tk.kind);
+  // calendar of the month
+  const first = mo + '-01', lead = (new Date(first + 'T12:00:00Z').getUTCDay() + 6) % 7, cells = [];
+  for (let i = 0; i < lead; i++) cells.push('<span></span>');
+  for (let d = first; d.startsWith(mo); d = addDays(d, 1)){
+    const k = dayKind(d), we = k.kind === 'weekend';
+    const cls = k.kind === 'share' ? 'share' : k.kind, tip = k.kind === 'holiday' ? k.name : k.kind === 'share' ? `${k.job.share}% office (split)` : k.job ? `${WD_LABEL[k.kind] || k.kind}${k.src === 'logged' ? '' : k.src === 'trip' ? ' (trip)' : k.src === 'shutdown' ? ' (shutdown)' : ` (${k.src})`}` : '';
+    cells.push(`<button type="button" class="wdc ${cls} ${k.src === 'logged' ? 'logged' : ''} ${d === t ? 'today' : ''}" ${we || !k.job || k.kind === 'holiday' || k.kind === 'share' ? 'disabled' : `data-wdcell="${d}"`} title="${esc(tip)}" aria-label="${d}: ${esc(tip || 'no workplace')}">${+d.slice(8)}</button>`);
+  }
+  const mCount = { office: 0, home: 0, away: 0, off: 0 };
+  for (let d = first; d.startsWith(mo); d = addDays(d, 1)){ const k = dayKind(d); if (k.kind === 'share'){ mCount.office += k.job.share / 100; mCount.home += 1 - k.job.share / 100; } else if (mCount[k.kind] !== undefined) mCount[k.kind]++; }
+  const n1 = v => Number.isInteger(v) ? v : v.toFixed(1);
+  const rows = [
+    ...Object.entries(c.byJob).map(([n, j]) => [`Commuting: ${esc(n)}`, `${n1(j.office)} office days × ${j.km} km × ${y >= 2026 ? '0.38 €' : '0.30/0.38 €'}`, j.commute]),
+    ...(c.ticket ? [['Tax-free job ticket', `${eur0.format(c.ticket)} paid by your employer, taken off the commuting allowance`, -c.ticketOff]] : []),
+    ['Home office days', `${c.homeDays} days × 6 €${c.home > 210 ? ' (max 210)' : ''}`, c.homeEur],
+    ...['work', 'training', 'advice'].filter(k => c.by[k]).map(k => [TAX_TYPES[k], `${c.items.filter(i => i.tax === k).length} receipts`, c.by[k]]),
+    ['Account fees (flat)', 'no receipt needed', 16]];
+  const tagged = c.items.slice().sort((a, b) => b.date.localeCompare(a.date));
+  const sugg = state.items.filter(i => i.date.startsWith(y + '') && !i.tax && !i.tripId && TAX_SUGGEST.test(`${i.store} ${i.category} ${i.subcategory || ''} ${i.comment || ''}`)).slice(0, 12);
+  const sel = (i) => `<select data-taxtag="${i.id}" aria-label="Tax type for ${esc(i.store)}"><option value="">Not tagged</option>${Object.entries(TAX_TYPES).map(([k, l]) => `<option value="${k}" ${i.tax === k ? 'selected' : ''}>${l}</option>`).join('')}<option value="no">Not tax relevant</option></select>`;
+  const jobRow = (j, i) => `<div class="taxjob" data-jobi="${i}">
+      <label>Workplace<input data-job="name" value="${esc(j.name || '')}" placeholder="e.g. PAYBACK"></label>
+      <label>From<input type="date" data-job="from" value="${j.from || ''}"></label>
+      <label>Until<input type="date" data-job="to" value="${j.to || ''}"><span class="src">Empty: still there</span></label>
+      <label>One-way km<input type="number" min="0" max="999" step="1" inputmode="numeric" data-job="km" value="${j.km ?? ''}"><span class="src">Shortest road route</span></label>
+      <label>Counting<select data-job="mode"><option value="log" ${j.mode !== 'share' ? 'selected' : ''}>Day by day (9:00 question)</option><option value="share" ${j.mode === 'share' ? 'selected' : ''}>Split of workdays</option></select></label>
+      ${j.mode === 'share' ? `<label>% at the office<input type="number" min="0" max="100" step="5" data-job="share" value="${j.share ?? 50}"></label>`
+        : `<label>Office days<span class="wdpick">${['Mo', 'Tu', 'We', 'Th', 'Fr'].map((l, k) => `<button type="button" data-jobday="${k + 1}" aria-pressed="${(j.days || [1, 2, 3, 4]).includes(k + 1)}">${l}</button>`).join('')}</span><span class="src">For days not answered</span></label>`}
+      <button type="button" class="linkbtn" data-jobdel="${i}">Remove</button></div>`;
+  $('#wv-tax').innerHTML = `
+    ${askToday ? `<div class="banner" id="wdAsk"><span class="left"><span><strong>Where are you working today?</strong> ${shortDate(t)}</span></span><span class="wdbtns">${Object.entries(WD_LABEL).map(([k, l]) => `<button type="button" class="btn ${k === 'office' || k === 'home' ? 'primary' : ''}" data-wdtoday="${k}">${l}</button>`).join('')}</span></div>` : ''}
+    <div class="seg" role="radiogroup" aria-label="Tax year">${years.map(v => `<button type="button" role="radio" data-taxyear="${v}" aria-checked="${v === y}">${v}</button>`).join('')}</div>
+    ${!taxJobs().length ? `<div class="panel"><p class="empty" style="margin:0">Add your workplaces below (with the one-way distance from home) to count commuting and home office days.</p></div>` : `
+    <section class="kpis w">
+      <div class="kpi"><span class="lbl">Commuting allowance</span><span class="val">${eur0.format(c.commute - c.ticketOff)}</span><span class="sub">${n1(+c.office.toFixed(1))} office days${c.ticketOff ? ` · after the job ticket (${eur0.format(c.ticketOff)})` : ''}</span></div>
+      <div class="kpi"><span class="lbl">Home office</span><span class="val">${eur0.format(c.homeEur)}</span><span class="sub">${c.homeDays} days at 6 €</span></div>
+      <div class="kpi"><span class="lbl">Work costs in total</span><span class="val">${eur0.format(c.wk)}</span><span class="sub">${c.extra > 0 ? eur0.format(c.extra) + ' above the 1,230 € you get anyway' : 'Below the 1,230 € flat amount'}</span></div>
+      <div class="kpi"><span class="lbl">About back</span><span class="val">${eur0.format(c.back)}</span><span class="sub">at ${f.rate ?? 42}% tax · ${c.planned ? `${c.planned} days still planned` : 'whole year counted'}</span></div>
+    </section>`}
+    ${taxJobs().length ? `<section class="panel"><header><h2>For ELSTER · ${y}</h2><span class="hint">Anlage N, Werbungskosten</span></header>
+      <div class="mwrap"><table class="mini"><colgroup><col style="width:34%"><col><col style="width:22%"></colgroup><tbody>
+      ${rows.map(r => `<tr><td>${r[0]}</td><td class="muted" style="font-size:12.5px">${r[1]}</td><td class="num">${r[2] < 0 ? '−' : ''}${eur0.format(Math.abs(r[2]))}</td></tr>`).join('')}
+      <tr class="witot"><td>Total</td><td class="muted" style="font-size:12.5px">${c.wk > 1230 ? 'enter these, they beat the flat amount' : 'the 1,230 € flat amount is higher; it applies anyway'}</td><td class="num">${eur0.format(c.wk)}</td></tr>
+      ${c.by.donation ? `<tr><td>Donations</td><td class="muted" style="font-size:12.5px">Sonderausgaben</td><td class="num">${eur0.format(c.by.donation)}</td></tr>` : ''}
+      ${c.p35a ? `<tr><td>Household services and tradespeople</td><td class="muted" style="font-size:12.5px">§35a: 20% off your tax (labour part only)</td><td class="num">${eur0.format(c.p35a)}</td></tr>` : ''}
+      </tbody></table></div>
+      <p class="hint">Workdays: ${c.logged} answered, ${c.assumed} from the weekly pattern or the split${c.planned ? `, ${c.planned} planned for the rest of the year` : ''}. Trips, the company shutdown and holidays count as no commute.</p></section>
+    <section class="panel"><header><h2>Workdays</h2><span class="wdnav"><button type="button" class="linkbtn" data-taxmonth="${addMonth(mo, -1)}" ${addMonth(mo, -1).startsWith(y + '') ? '' : 'disabled'}>‹</button> ${monthLabel(mo)} <button type="button" class="linkbtn" data-taxmonth="${addMonth(mo, 1)}" ${addMonth(mo, 1).startsWith(y + '') ? '' : 'disabled'}>›</button></span></header>
+      <div class="wdcal" role="group" aria-label="Workdays in ${monthLabel(mo)}">${['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(l => `<span class="wdh">${l}</span>`).join('')}${cells.join('')}</div>
+      <p class="wdleg"><span class="office">Office ${n1(+mCount.office.toFixed(1))}</span><span class="home">Home ${n1(+mCount.home.toFixed(1))}</span><span class="away">Away ${mCount.away}</span><span class="off">Off ${mCount.off}</span><span class="share">Split</span></p>
+      <p class="hint">Tap a day to change it: office, home, away (trip or working from abroad), off (vacation, sick), then back to the pattern. Faded days aren’t answered yet.</p></section>` : ''}
+    <section class="panel"><header><h2>Tagged expenses · ${y}</h2><span class="hint">Tick “Tax” on an expense, or tag a suggestion</span></header>
+      ${tagged.length ? `<div class="mwrap"><table class="mini"><tbody>${tagged.map(i => `<tr><td>${shortDate(i.date)}</td><td>${esc(i.store)}</td><td>${sel(i)}</td><td class="num">${eur.format(+i.amount)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted" style="margin:0;font-size:13px">Nothing tagged yet.</p>'}
+      ${sugg.length ? `<h3 class="taxh3">Could these count?</h3><div class="mwrap"><table class="mini"><tbody>${sugg.map(i => `<tr><td>${shortDate(i.date)}</td><td>${esc(i.store)}<div class="muted" style="font-size:12px">${esc(i.category)}</div></td><td>${sel(i)}</td><td class="num">${eur.format(+i.amount)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+      <p class="hint">Work equipment over 952 € (with VAT) is spread over its useful life, except computers and software, which count in full. Mixed private use: only the work share. Keep the receipts.</p></section>
+    <section class="panel"><header><h2>Workplaces and settings</h2><span class="hint">Anubhav · German return</span></header>
+      <div class="taxjobs">${taxJobs().map(jobRow).join('')}</div>
+      <p style="margin:6px 0 14px"><button type="button" class="btn" data-jobadd>Add workplace</button></p>
+      <div class="fire-grid">
+        ${(f.tickets?.length ? f.tickets : [{}]).map((tk2, i) => `<label>Free job ticket from<input type="month" data-ticket="from" data-ti="${i}" value="${tk2.from || ''}"><span class="src">Paid by the employer, tax-free</span></label>
+        <label>Until<input type="month" data-ticket="to" data-ti="${i}" value="${tk2.to || ''}"><span class="src">Empty: still running</span></label>
+        <label>Ticket value a month (€)<input type="number" min="0" step="1" data-ticket="monthly" data-ti="${i}" value="${tk2.monthly ?? ''}" placeholder="63"><span class="src">Deutschlandticket 2026: 63 €</span></label>`).join('')}
+        <label>Your top tax rate (%)<input type="number" min="0" max="50" step="1" data-taxrate value="${f.rate ?? 42}"><span class="src">For the “about back” figure</span></label>
+        <label>9:00 question<select data-taxask><option value="on" ${f.ask !== false ? 'selected' : ''}>On, workdays</option><option value="off" ${f.ask === false ? 'selected' : ''}>Off</option></select><span class="src">Needs notifications on this phone</span></label>
+      </div>
+      <p class="hint">A rough estimate, not tax advice. A tax-free job ticket from your employer is subtracted from the commuting allowance (it shows on your Lohnsteuerbescheinigung). Home office days only count on days without the office.</p></section>`;
+}
+function jobsFromDom(){
+  return $$('#wv-tax .taxjob').map(r => {
+    const g = k => r.querySelector(`[data-job="${k}"]`), j = { name: g('name').value.trim() || 'Workplace', from: g('from').value, km: Math.max(0, Math.round(+g('km').value || 0)), mode: g('mode').value };
+    if (g('to').value) j.to = g('to').value;
+    if (j.mode === 'share') j.share = Math.min(100, Math.max(0, +(g('share')?.value ?? 50)));
+    else j.days = [...r.querySelectorAll('[data-jobday]')].filter(b => b.getAttribute('aria-pressed') === 'true').map(b => +b.dataset.jobday);
+    return j;
+  }).filter(j => /^\d{4}-\d{2}-\d{2}$/.test(j.from));
+}
+function ticketsFromDom(){
+  const by = {}; $$('#wv-tax [data-ticket]').forEach(i => { (by[i.dataset.ti] ||= {})[i.dataset.ticket] = i.value; });
+  return Object.values(by).filter(t => /^\d{4}-\d{2}$/.test(t.from || '')).map(t => ({ from: t.from, ...(/^\d{4}-\d{2}$/.test(t.to || '') ? { to: t.to } : {}), monthly: Math.max(0, +t.monthly || 63) }));
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-wdtoday],[data-wdcell],[data-taxyear],[data-taxmonth],[data-jobday],[data-jobadd],[data-jobdel]'); if (!b || !b.closest('#wv-tax')) return;
+  if (b.dataset.wdtoday) return setWorkday(today(), b.dataset.wdtoday);
+  // An unanswered day flips from what the pattern says (office ↔ home); answered days cycle on, back to the pattern.
+  if (b.dataset.wdcell){ const d = b.dataset.wdcell, log = state.workdays[d], k = dayKind(d).kind; return setWorkday(d, log ? WD_NEXT[log] : k === 'office' ? 'home' : 'office'); }
+  if (b.dataset.taxyear){ state.taxYear = +b.dataset.taxyear; state.taxMonth = null; return render(); }
+  if (b.dataset.taxmonth){ state.taxMonth = b.dataset.taxmonth; return render(); }
+  if (b.dataset.jobday){ b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); return saveTax({ jobs: jobsFromDom() }); }
+  if ('jobadd' in b.dataset){ const last = taxJobs().slice(-1)[0]; return saveTax({ jobs: [...taxJobs(), { name: 'Workplace', from: last?.to ? addDays(last.to, 1) : today(), km: 0, mode: 'log', days: [1, 2, 3, 4] }] }); }
+  if (b.dataset.jobdel){ const r = b.closest('.taxjob'); r.remove(); return saveTax({ jobs: jobsFromDom() }); }
+});
+document.addEventListener('change', async e => {
+  const i = e.target; if (!i.closest('#wv-tax')) return;
+  if (i.dataset.job) return saveTax({ jobs: jobsFromDom() });
+  if (i.dataset.ticket) return saveTax({ tickets: ticketsFromDom() });
+  if ('taxrate' in i.dataset){ const v = +i.value; if (isFinite(v) && v >= 0 && v <= 50) saveTax({ rate: v }); return; }
+  if ('taxask' in i.dataset) return saveTax({ ask: i.value !== 'off' });
+  if (i.dataset.taxtag){
+    const it = state.items.find(x => x.id === i.dataset.taxtag); if (!it) return;
+    try { await setDoc(doc(fs, 'expenses', it.id), expenseDoc(it, { tax: i.value || null })); toast(i.value === 'no' ? 'Hidden from suggestions' : i.value ? 'Tagged: ' + TAX_TYPES[i.value] : 'Untagged'); } catch (x){ toast(writeError(x)); }
+  }
+});
 
 // ---------- German state pension (gesetzliche Rentenversicherung), Anubhav's ----------
 // Pension points: each year's pension-insurance gross (capped at the contribution ceiling) divided by the average
@@ -5727,6 +5930,7 @@ const HEALTH = [
   { id: 'gmail', name: 'Gmail script (forwarded bookings)', note: 'every 10 minutes', every: 40 * H_MIN, setup: 'No report yet. Update the script in Google with the latest tools/gmail-bookings.gs so it checks in here.' },
   { id: 'backup', name: 'Drive backup', note: 'every night', every: 26 * H_HOUR },
   { id: 'daily', name: 'Evening reminder', note: 'daily at 21:00', every: 26 * H_HOUR },
+  { id: 'workday', name: 'Office or home question', note: 'workdays at 9:00', every: 4 * 24 * H_HOUR },
   { id: 'inbound', name: 'Forwarded emails received', onDemand: true },
   { id: 'capture', name: 'Payment notifications captured', onDemand: true },
   { id: 'extract', name: 'Reading bookings (AI)', onDemand: true },
