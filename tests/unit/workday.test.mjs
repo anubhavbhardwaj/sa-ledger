@@ -60,3 +60,20 @@ test('payslip: numbers in German or English format, employee shares, year to dat
   assert.equal((await r.json()).slip.lst, 1700);
   assert.equal((await payslip(req({ text: 'x' }), { env: { GROQ_API_KEY: 'g' }, verify })).status, 400);
 });
+
+test('payslip: a Groq 400 (JSON didn’t validate) falls back to its failed generation, then to plain mode', async () => {
+  const resp = (status, body) => ({ ok: status < 300, status, json: async () => body });
+  const calls = [];
+  // 1) 400 with a usable failed_generation
+  let r = await payslip(req({ text: 'Entgeltabrechnung Oktober 2026 '.repeat(5) }), { env: { GROQ_API_KEY: 'g' }, verify,
+    fetch: async (u, o) => { calls.push(JSON.parse(o.body)); return resp(400, { error: { code: 'json_validate_failed', failed_generation: 'Here: {"month":"2026-10","employer":"PAYBACK","taxGross":8500,"lst":2000}' } }); } });
+  assert.equal(r.status, 200); assert.equal((await r.json()).slip.taxGross, 8500); assert.equal(calls.length, 1);
+  // 2) 400 without it: asks again without JSON mode
+  calls.length = 0;
+  r = await payslip(req({ text: 'Entgeltabrechnung Oktober 2026 '.repeat(5) }), { env: { GROQ_API_KEY: 'g' }, verify,
+    fetch: async (u, o) => { const b = JSON.parse(o.body); calls.push(b); return b.response_format ? resp(400, { error: { code: 'json_validate_failed', message: 'Failed to generate JSON' } }) : resp(200, { choices: [{ message: { content: '```json\n{"month":"2026-10","taxGross":8500,"lst":1990}\n```' } }] }); } });
+  assert.equal(r.status, 200); assert.equal((await r.json()).slip.lst, 1990); assert.equal(calls.length, 2); assert.equal(calls[1].response_format, undefined);
+  // 3) both fail: a readable message with the reason
+  r = await payslip(req({ text: 'Entgeltabrechnung Oktober 2026 '.repeat(5) }), { env: { GROQ_API_KEY: 'g' }, verify, fetch: async () => resp(400, { error: { code: 'context_length_exceeded', message: 'too long' } }) });
+  assert.equal(r.status, 502); assert.match((await r.json()).error, /context_length_exceeded/);
+});

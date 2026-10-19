@@ -39,6 +39,15 @@ export function clean(o = {}){
   return s;
 }
 
+// The first {...} in a model answer, parsed; null if there is none.
+export function parseObj(t){
+  if (!t || typeof t !== 'string') return null;
+  try { const o = JSON.parse(t); if (o && typeof o === 'object') return o; } catch {}
+  const a = t.indexOf('{'), z = t.lastIndexOf('}');
+  if (a < 0 || z <= a) return null;
+  try { const o = JSON.parse(t.slice(a, z + 1)); return o && typeof o === 'object' ? o : null; } catch { return null; }
+}
+
 export async function handle(req, { env = process.env, verify = verifyToken, fetch: f = fetch } = {}){
   if (req.method !== 'POST') return json(405, { error: 'Use POST' });
   if (!env.GROQ_API_KEY) return json(503, { error: 'This needs GROQ_API_KEY in Netlify (same key as Ask AI).' });
@@ -46,13 +55,26 @@ export async function handle(req, { env = process.env, verify = verifyToken, fet
   let body; try { body = await req.json(); } catch { return json(400, { error: 'Bad request' }); }
   const text = String(body.text || '').slice(0, 30000);
   if (text.trim().length < 50) return json(400, { error: 'No text found in this PDF. Type the figures in instead.' });
-  const r = await f('https://api.groq.com/openai/v1/chat/completions', {
+  // JSON mode first. Groq answers 400 "json_validate_failed" when the model's JSON didn't validate (often a
+  // reasoning run that hit the token limit); its failed_generation is often still usable. Otherwise ask again
+  // without JSON mode and take the JSON object out of the text.
+  const ask = jsonMode => f('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + env.GROQ_API_KEY },
-    body: JSON.stringify({ model: env.GROQ_MODEL || MODEL, temperature: 0, max_completion_tokens: 2000, reasoning_effort: 'medium',
-      response_format: { type: 'json_object' }, messages: [{ role: 'system', content: PROMPT }, { role: 'user', content: text }] }),
+    body: JSON.stringify({ model: env.GROQ_MODEL || MODEL, temperature: 0, max_completion_tokens: 6000, reasoning_effort: 'low',
+      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+      messages: [{ role: 'system', content: PROMPT + (jsonMode ? '' : '\nAnswer with the JSON object only, no other text.') }, { role: 'user', content: text }] }),
   });
-  if (!r.ok) return json(502, { error: r.status === 429 ? 'Groq’s rate limit was reached. Try again in a minute.' : 'Groq error ' + r.status });
-  let out; try { out = JSON.parse((await r.json()).choices?.[0]?.message?.content || '{}'); } catch { return json(502, { error: 'The AI answer wasn’t readable. Try again.' }); }
+  let out = null, last = '';
+  for (const jsonMode of [true, false]){
+    const r = await ask(jsonMode);
+    if (r.status === 429) return json(502, { error: 'Groq’s rate limit was reached. Try again in a minute.' });
+    let b = null; try { b = await r.json(); } catch {}
+    out = parseObj(r.ok ? b?.choices?.[0]?.message?.content : b?.error?.failed_generation);
+    if (out) break;
+    last = r.ok ? 'unreadable answer' : `${r.status} ${b?.error?.code || ''} ${String(b?.error?.message || '').slice(0, 160)}`.trim();
+    console.error('payslip: Groq', jsonMode ? 'JSON mode' : 'plain', last);
+  }
+  if (!out) return json(502, { error: 'The AI couldn’t read this payslip (' + last + '). Try again, or type the figures in.' });
   return json(200, { slip: clean(out) });
 }
 
