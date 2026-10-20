@@ -553,6 +553,8 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .svctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 12px}.svctl label{display:grid;gap:4px;font-size:12.5px;color:var(--ink-2);min-width:0}
 .pschk{display:grid;gap:6px;margin:10px 0 0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);font-size:13px}.pschk p{margin:0}
 .psnote{display:grid;gap:6px;margin:10px 0 0;padding:10px 12px;border-radius:10px;background:var(--sunk);font-size:12.5px;color:var(--ink-2)}.psnote p{margin:0}
+.syncbtn{white-space:nowrap}.syncbtn.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.pend{font-size:11px;font-weight:600;color:var(--warn);background:var(--warn-soft);border-radius:999px;padding:1px 7px;white-space:nowrap}
 .fire-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px}
 .fire-grid label{display:grid;gap:4px;align-content:start;font-size:12.5px;color:var(--ink-2)}
 .fire-grid input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:8px 10px;width:100%;min-width:0;font-family:var(--f-mono)}
@@ -774,6 +776,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <a class="tab" href="#wealth" data-page="wealth">Wealth</a>
     </nav>
     <button class="btn primary" id="addBtn" type="button">+ <span class="long">Add expense</span></button>
+    <button class="btn small syncbtn" id="syncBtn" type="button" hidden></button>
     <button class="btn small inboxbtn" id="inboxBtn" type="button" hidden>To review <span class="badge" id="inboxCount">0</span></button>
     <div class="prof">
       <button class="avatar" id="profBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="profMenu" aria-label="Menu: trips, budgets, settings"><span id="profInitial">A</span><span class="pbadge" id="profBadge" hidden>0</span></button>
@@ -1346,7 +1349,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, writeBatch, disableNetwork, enableNetwork } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // Public project identifiers. They grant no access by themselves; firestore.rules does the protecting.
 const firebaseConfig = {
@@ -1369,8 +1372,9 @@ const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 setPersistence(auth, browserLocalPersistence).catch(() => {});
 let fs;
-try { fs = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); }
-catch { fs = initializeFirestore(fbApp, {}); }
+// Long polling is used automatically on networks that block Firestore's streaming connection (some office networks).
+try { fs = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }), experimentalAutoDetectLongPolling: true }); }
+catch { fs = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }); }
 const expensesCol = collection(fs, "expenses");
 const incomeCol = collection(fs, "income");
 const transfersCol = collection(fs, "transfers");
@@ -1396,6 +1400,46 @@ const curSym = c => { try { return new Intl.NumberFormat(c === 'INR' ? 'en-IN' :
 const origHtml = r => r.currency && r.currency !== 'EUR' && r.origAmount ? `<span class="orig">${money(r.origAmount, r.currency)}</span>` : '';
 const settingsCol = collection(fs, "settings");
 const INCOME_CATS = ['Salary','Bonus','Refund','Interest','Gift','Other'];
+
+// ---------- sync status ----------
+// Expenses, income and transfers are watched with metadata, so the app knows when an entry is only saved on this
+// device (offline, or a phone that woke up with a dead connection) and when it's showing saved data instead of live.
+const META = { includeMetadataChanges: true };
+const SYNC = { pending: {}, cache: {}, since: Date.now() };
+function synced(name, fn){
+  let first = true;
+  return snap => {
+    SYNC.pending[name] = snap.docs.filter(d => d.metadata?.hasPendingWrites).length;
+    SYNC.cache[name] = !!snap.metadata?.fromCache;
+    renderSync();
+    // Metadata-only changes (an entry got uploaded) only need the "not synced" marks to go; data changes need everything.
+    const changed = first || !snap.docChanges || snap.docChanges().length > 0;
+    first = false;
+    if (changed || snap.docs.some(d => d.metadata?.hasPendingWrites) !== (SYNC.lastPending?.[name] || false)) fn(snap);
+    (SYNC.lastPending ||= {})[name] = snap.docs.some(d => d.metadata?.hasPendingWrites);
+  };
+}
+function renderSync(){
+  const b = document.getElementById('syncBtn'); if (!b) return;
+  const pending = Object.values(SYNC.pending).reduce((a, n) => a + n, 0), offline = Object.values(SYNC.cache).some(Boolean);
+  if (pending){ b.hidden = false; b.className = 'btn small syncbtn warn'; b.textContent = `${pending} not uploaded · retry`; b.title = 'Saved on this device only. Tap to reconnect and upload.'; }
+  else if (offline && Date.now() - SYNC.since > 8000){ b.hidden = false; b.className = 'btn small syncbtn'; b.textContent = 'Offline · reconnect'; b.title = 'Showing data saved on this device. Tap to reconnect.'; }
+  else b.hidden = true;
+}
+// Reconnect: drop and reopen the connection, which also uploads anything waiting.
+let reconnecting = false;
+async function reconnect(quiet){
+  if (reconnecting) return; reconnecting = true;
+  try { await disableNetwork(fs); await enableNetwork(fs); if (!quiet) toast('Reconnected'); }
+  catch { if (!quiet) toast('Couldn’t reconnect. Check the internet connection.'); }
+  finally { reconnecting = false; SYNC.since = Date.now(); setTimeout(renderSync, 9000); }
+}
+const needsKick = () => Object.values(SYNC.pending).some(n => n > 0) || Object.values(SYNC.cache).some(Boolean);
+// Phones often resume the app with a dead connection; kick it when the app comes back or the network returns.
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.user && needsKick()) reconnect(true); });
+window.addEventListener('online', () => { if (state.user) reconnect(true); });
+document.addEventListener('click', e => { if (e.target.id === 'syncBtn') reconnect(false); });
+setInterval(renderSync, 5000);
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -1436,14 +1480,14 @@ onAuthStateChanged(auth, user => {
       : 'Lost connection to the database (' + err.code + '). Reload to reconnect.';
     toast($('#status').textContent);
   };
-  unsubs.push(onSnapshot(expensesCol, snap => {
-    state.items = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort(byDate);
+  unsubs.push(onSnapshot(expensesCol, META, synced('expenses', snap => {
+    state.items = snap.docs.map(d => ({ ...d.data(), id: d.id, _pending: d.metadata?.hasPendingWrites })).sort(byDate);
     state.ready = true; derive(); render();
-  }, onErr('the ledger')));
-  unsubs.push(onSnapshot(transfersCol, snap => {
-    state.transfers = snap.docs.map(d => ({ ...d.data(), id: d.id, kind:'transfer' })).sort(byDate);
+  }), onErr('the ledger')));
+  unsubs.push(onSnapshot(transfersCol, META, synced('transfers', snap => {
+    state.transfers = snap.docs.map(d => ({ ...d.data(), id: d.id, kind:'transfer', _pending: d.metadata?.hasPendingWrites })).sort(byDate);
     pfCache = null; render();
-  }, onErr('transfers')));
+  }), onErr('transfers')));
   unsubs.push(onSnapshot(accountsCol, snap => {
     state.accounts = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => a.name.localeCompare(b.name));
     state.accByName = Object.fromEntries(state.accounts.map(a => [a.name.toLowerCase(), a]));
@@ -1457,10 +1501,10 @@ onAuthStateChanged(auth, user => {
     state.checkins = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     render();
   }, onErr('check-ins')));
-  unsubs.push(onSnapshot(incomeCol, snap => {
-    state.income = snap.docs.map(d => ({ ...d.data(), id: d.id, kind:'income' })).sort(byDate);
+  unsubs.push(onSnapshot(incomeCol, META, synced('income', snap => {
+    state.income = snap.docs.map(d => ({ ...d.data(), id: d.id, kind:'income', _pending: d.metadata?.hasPendingWrites })).sort(byDate);
     render();
-  }, onErr('income')));
+  }), onErr('income')));
   unsubs.push(onSnapshot(inboxCol, snap => {
     state.inbox = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => String(b.receivedAt).localeCompare(String(a.receivedAt)));
     renderInbox(); render();
@@ -1715,7 +1759,7 @@ function renderOverview(ms){
     </div>` : `
     <div class="r" data-edit="${esc(r.id)}" data-kind="expense" tabindex="0" role="button">
       <span class="d">${r.date.slice(8,10)} ${MON[+r.date.slice(5,7)-1]}</span>
-      <span><span class="store">${esc(r.store)}</span><br><span class="meta">${esc(r.category)} · ${esc(r.account)} · ${esc(r.spender)}${r.tripId && state.tripMap[r.tripId] ? ' · ' + esc(state.tripMap[r.tripId].name) : ''}</span></span>
+      <span><span class="store">${esc(r.store)}</span>${r._pending ? ' <span class="pend" title="Saved on this device, not uploaded yet">not synced</span>' : ''}<br><span class="meta">${esc(r.category)} · ${esc(r.account)} · ${esc(r.spender)}${r.tripId && state.tripMap[r.tripId] ? ' · ' + esc(state.tripMap[r.tripId].name) : ''}</span></span>
       <span class="a">${eur.format(r.amount)}${origHtml(r)}</span>
     </div>`).join('') : `<div class="empty">${state.ready ? 'Nothing in this period yet. Add an expense or income with the + button.' : 'Loading…'}</div>`;
 }
@@ -1786,7 +1830,7 @@ function renderTransactions(){
   $('#rows').innerHTML = rows.map(r => `
     <tr class="row" data-edit="${esc(r.id)}" tabindex="0">
       <td class="date"><span class="dd">${r.date.slice(8,10)}</span> <span class="mm">${MON[+r.date.slice(5,7)-1]}${state.period==='all'?' '+r.date.slice(2,4):''}</span></td>
-      <td><div class="store">${esc(r.store)}</div><div class="mmeta">${esc(r.category)}${r.subcategory?' · '+esc(r.subcategory):''} · ${esc(r.account)} · ${esc(r.spender)}${r.tripId && state.tripMap[r.tripId] ? ' · ' + esc(state.tripMap[r.tripId].name) : ''}</div>${r.comment?`<div class="cmt">${esc(r.comment)}</div>`:''}</td>
+      <td><div class="store">${esc(r.store)}${r._pending ? ' <span class="pend" title="Saved on this device, not uploaded yet">not synced</span>' : ''}</div><div class="mmeta">${esc(r.category)}${r.subcategory?' · '+esc(r.subcategory):''} · ${esc(r.account)} · ${esc(r.spender)}${r.tripId && state.tripMap[r.tripId] ? ' · ' + esc(state.tripMap[r.tripId].name) : ''}</div>${r.comment?`<div class="cmt">${esc(r.comment)}</div>`:''}</td>
       <td class="dcol">${esc(r.category)}${r.subcategory?`<span class="tag">${esc(r.subcategory)}</span>`:''}${r.tripId && state.tripMap[r.tripId] ? `<span class="tag" title="${esc(tripLabel(state.tripMap[r.tripId]))}">${esc(state.tripMap[r.tripId].name)}</span>` : ''}</td>
       <td class="acct dcol">${esc(r.account)}</td>
       <td class="dcol">${esc(r.spender)}</td>

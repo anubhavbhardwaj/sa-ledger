@@ -288,3 +288,17 @@ test('taxes: one January slip with a bonus is not projected for the whole year',
   assert.match(t, /Taxable pay\s*€99,590/);
   await clean(app);
 });
+
+test('sync: an entry saved only on this device is marked, and reconnecting uploads it', async () => {
+  const app = await openApp(), { page } = app;
+  await page.evaluate(() => { window.__pending = { 'expenses/p1': true }; });
+  await app.seed({ expenses: { p1: { amount: 9.5, date: d(0), store: 'Bakery', category: 'Groceries', account: 'DKB', spender: 'Anubhav', createdAt: 'x' } } });
+  await app.go('transactions'); await page.waitForTimeout(200);
+  assert.match(await app.text('#page-transactions'), /Bakery not synced/);
+  assert.match(await app.text('#syncBtn'), /1 not uploaded/);
+  await page.click('#syncBtn'); await page.waitForTimeout(250);
+  assert.doesNotMatch(await app.text('#page-transactions'), /not synced/);
+  assert.equal(await page.isHidden('#syncBtn'), true);
+  assert.equal(await page.evaluate(() => window.__netKicks), 1);
+  await clean(app);
+});
