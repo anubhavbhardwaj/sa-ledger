@@ -787,6 +787,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <button class="pm-item" role="menuitem" type="button" data-addbk=""><span>Add booking</span><small>ticket, PDF or screenshot</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="health"><span>System health</span><small id="pmHealth"></small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="sync"><span>Sync check</span><small>is this device up to date?</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="alerts"><span>Notifications</span><small id="pmAlerts">off on this phone</small></button>
         <hr>
         <button class="pm-item" role="menuitem" type="button" data-pm="import"><span>Import CSV</span><small>into expenses</small></button>
@@ -1287,6 +1288,14 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 
 <dialog id="codeView" aria-label="Ticket code"><img alt="Ticket code"><p></p></dialog>
 
+<dialog id="syDlg">
+  <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:520px">
+    <h3>Sync check</h3>
+    <p class="muted" style="margin:0;font-size:13px">Compares what this device shows with what the database has. Run it on the device where an entry is missing, and on the one where it shows.</p>
+    <div id="syBody" style="display:grid;gap:10px;font-size:13.5px"></div>
+    <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="syUpload">Upload now</button><button class="btn primary" type="button" id="syCheck">Check with server</button><button class="btn" type="submit">Close</button></div></div>
+  </form>
+</dialog>
 <dialog id="hlDlg">
   <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:520px">
     <h3>System health</h3>
@@ -1349,7 +1358,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, writeBatch, disableNetwork, enableNetwork } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, writeBatch, disableNetwork, enableNetwork, getDocsFromServer, query, where, waitForPendingWrites } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // Public project identifiers. They grant no access by themselves; firestore.rules does the protecting.
 const firebaseConfig = {
@@ -4728,6 +4737,48 @@ function returnPanel(y){
     <p class="hint">Single filer, ${y} tariff. Health insurance counts less 4% (sick pay); unemployment insurance isn’t deductible at your income. Bonuses or a 13th salary later in the year change the result. A rough estimate, not tax advice.</p></section>`;
 }
 
+// ---------- Sync check: what this device has vs what the database has ----------
+const APP_VERSION = '2026-10-20';
+const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
+function syncReport(extra = ''){
+  const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
+  const offline = Object.values(SYNC.cache).some(Boolean);
+  $('#syBody').innerHTML = `
+    <div>App version <strong>${APP_VERSION}</strong> · signed in as <strong>${esc(usernameOf(state.user))}</strong> · ${navigator.onLine ? 'internet: yes' : '<span class="neg">internet: no</span>'} · database: ${offline ? '<span class="neg">showing saved data (not live)</span>' : '<span class="pos">live</span>'}</div>
+    <div>${pend.length ? `<strong class="neg">${pend.length} entr${pend.length === 1 ? 'y' : 'ies'} saved only on this device:</strong><ul style="margin:4px 0 0;padding-left:18px">${pend.map(i => `<li>${syRow(i)}</li>`).join('')}</ul><span class="muted">Tap “Upload now” with a good connection.</span>` : '<span class="pos">Nothing waiting to upload on this device.</span>'}</div>
+    ${extra}`;
+}
+async function syncCheck(){
+  const since = addDays(today(), -30), b = $('#syCheck'); b.disabled = true; b.textContent = 'Checking…';
+  try {
+    const cols = [['expenses', expensesCol, state.items], ['income', incomeCol, state.income], ['transfers', transfersCol, state.transfers]];
+    let out = '';
+    for (const [name, col, local] of cols){
+      const srv = await Promise.race([getDocsFromServer(query(col, where('date', '>=', since))), new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 15000))]);
+      const srvIds = new Set(srv.docs.map(d => d.id)), loc = local.filter(i => i.date >= since), locIds = new Set(loc.map(i => i.id));
+      const onlyHere = loc.filter(i => !srvIds.has(i.id)), onlyServer = srv.docs.filter(d => !locIds.has(d.id)).map(d => ({ ...d.data(), id: d.id }));
+      out += `<div><strong>${name}</strong> (last 30 days): ${srv.docs.length} on the server, ${loc.length} on this device${!onlyHere.length && !onlyServer.length ? ' <span class="pos">· match</span>' : ''}
+        ${onlyHere.length ? `<div class="neg">Only on this device: <ul style="margin:2px 0;padding-left:18px">${onlyHere.map(i => `<li>${syRow(i)}</li>`).join('')}</ul></div>` : ''}
+        ${onlyServer.length ? `<div class="neg">On the server but not shown here: <ul style="margin:2px 0;padding-left:18px">${onlyServer.map(i => `<li>${syRow(i)}</li>`).join('')}</ul>Close and reopen the app; if it stays, tell Claude.</div>` : ''}</div>`;
+    }
+    syncReport(out);
+  } catch (x){
+    syncReport(`<div class="neg">Couldn’t reach the database from this device (${esc(x?.code || x?.message || String(x))}). Check the internet connection, or try another network: some office or hotel Wi-Fi blocks it.</div>`);
+  } finally { b.disabled = false; b.textContent = 'Check with server'; }
+}
+document.addEventListener('click', async e => {
+  if (e.target.id === 'syCheck') return syncCheck();
+  if (e.target.id === 'syUpload'){
+    const b = e.target; b.disabled = true; b.textContent = 'Uploading…';
+    try {
+      await reconnect(true);
+      await Promise.race([waitForPendingWrites(fs), new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 20000))]);
+      toast('Everything on this device is uploaded'); syncReport();
+    } catch (x){ syncReport(`<div class="neg">${x?.message === 'timeout' ? 'Still waiting after 20 seconds: the database isn’t reachable from this device right now.' : 'Upload failed: ' + esc(x?.code || x?.message || String(x))}</div>`); }
+    finally { b.disabled = false; b.textContent = 'Upload now'; }
+  }
+});
+
 // ---------- German state pension (gesetzliche Rentenversicherung), Anubhav's ----------
 // Pension points: each year's pension-insurance gross (capped at the contribution ceiling) divided by the average
 // German salary that year; one point pays the current pension value a month. Figures for 2026.
@@ -7088,6 +7139,7 @@ pm.addEventListener('click', async e => {
   if (a === 'budgets') openBudgets(false);
   if (a === 'alerts') openAlerts();
   if (a === 'health'){ renderHealth(); $('#hlDlg').showModal(); }
+  if (a === 'sync'){ syncReport(); $('#syDlg').showModal(); }
   if (a === 'backup') downloadBackup();
   if (a === 'restore') $('#rsFile').click();
   if (a === 'import'){ if (state.page !== 'transactions') location.hash = 'transactions'; state.txKind = 'expense'; $('#importFile').click(); }

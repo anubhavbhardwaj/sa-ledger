@@ -302,3 +302,13 @@ test('sync: an entry saved only on this device is marked, and reconnecting uploa
   assert.equal(await page.evaluate(() => window.__netKicks), 1);
   await clean(app);
 });
+
+test('sync check: compares this device with the server', async () => {
+  const app = await openApp(), { page } = app;
+  await app.seed({ expenses: { s1: { amount: 28.98, date: d(-1), store: 'Pewex', category: 'Groceries', account: 'Wise', spender: 'Sulekha', createdAt: 'x', createdBy: 'sulekha' } } });
+  await page.click('#profBtn'); await page.click('[data-pm="sync"]'); await page.waitForSelector('#syDlg[open]');
+  assert.match(await app.text('#syBody'), /Nothing waiting to upload/);
+  await page.click('#syCheck'); await page.waitForTimeout(200);
+  assert.match(await app.text('#syBody'), /expenses \(last 30 days\): 1 on the server, 1 on this device · match/);
+  await clean(app);
+});

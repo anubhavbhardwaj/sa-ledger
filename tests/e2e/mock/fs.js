@@ -19,3 +19,6 @@ export function writeBatch(){ const ops=[]; return { set(r,d){check(r.col,d); op
 export async function disableNetwork(){ window.__netKicks = (window.__netKicks||0)+1; }
 export async function enableNetwork(){ if (window.__pending) window.__pending = {}; Object.keys(stores).forEach(emit); }
 export function __emit(c){ emit(c); }
+export function query(c){ return c; } export function where(){ return null; }
+export async function getDocsFromServer(c){ return { docs: [...st(c.col)].map(([id,d])=>({id,data:()=>d})) }; }
+export async function waitForPendingWrites(){ }
