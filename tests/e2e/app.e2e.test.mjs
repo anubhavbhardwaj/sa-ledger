@@ -312,3 +312,22 @@ test('sync check: compares this device with the server', async () => {
   assert.match(await app.text('#syBody'), /expenses \(last 30 days\): 1 on the server, 1 on this device · match/);
   await clean(app);
 });
+
+test('bookings: a large camera photo is scaled down and read', async () => {
+  const app = await openApp({ mobile: true }), { page } = app;
+  const sent = [];
+  await page.route('http://app.test/api/extract', async r => { sent.push(r.request().postDataJSON()); await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ bookings: [{ type: 'hotel', title: 'Hotel Test, Rome', start: '2027-03-25', end: '2027-03-28', price: 300, currency: 'EUR' }] }) }); });
+  await page.click('#profBtn'); await page.click('[data-addbk]:not([hidden])'); await page.waitForSelector('#bkDlg[open]');
+  assert.match(await app.text('#bkDrop'), /Take photo/);
+  await page.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 4000; c.height = 3000; const g = c.getContext('2d'), img = g.createImageData(4000, 3000);
+    for (let i = 0; i < img.data.length; i++) img.data[i] = Math.random() * 255; g.putImageData(img, 0, 0);
+    const b = await new Promise(r => c.toBlob(r, 'image/png')), dt = new DataTransfer();
+    dt.items.add(new File([b], 'IMG_1.png', { type: 'image/png' }));
+    const inp = document.getElementById('bkCam'); inp.files = dt.files; inp.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => /Hotel Test/.test(document.getElementById('bkReview')?.textContent || ''), null, { timeout: 20000 });
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].image || '', /^data:image\/jpeg;base64,/, 'the photo goes to the reader as a JPEG');
+  await clean(app);
+});

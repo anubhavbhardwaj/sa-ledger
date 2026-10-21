@@ -555,6 +555,7 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .psnote{display:grid;gap:6px;margin:10px 0 0;padding:10px 12px;border-radius:10px;background:var(--sunk);font-size:12.5px;color:var(--ink-2)}.psnote p{margin:0}
 .syncbtn{white-space:nowrap}.syncbtn.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
 .pend{font-size:11px;font-weight:600;color:var(--warn);background:var(--warn-soft);border-radius:999px;padding:1px 7px;white-space:nowrap}
+.bkbtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .fire-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px}
 .fire-grid label{display:grid;gap:4px;align-content:start;font-size:12.5px;color:var(--ink-2)}
 .fire-grid input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:8px 10px;width:100%;min-width:0;font-family:var(--f-mono)}
@@ -784,7 +785,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <div class="pm-head">Signed in as <strong id="whoName"></strong></div>
         <a class="pm-item" role="menuitem" href="#trips"><span>Trips</span><small id="pmTrips"></small></a>
         <button class="pm-item pm-alert" role="menuitem" type="button" data-addbk="" id="pmBkInbox" hidden><span>Forwarded bookings</span><small id="pmBkInboxN"></small></button>
-        <button class="pm-item" role="menuitem" type="button" data-addbk=""><span>Add booking</span><small>ticket, PDF or screenshot</small></button>
+        <button class="pm-item" role="menuitem" type="button" data-addbk=""><span>Add booking</span><small>ticket, PDF, screenshot or photo</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="health"><span>System health</span><small id="pmHealth"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="sync"><span>Sync check</span><small>is this device up to date?</small></button>
@@ -1231,9 +1232,10 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <h3 id="bkTitle">Add booking</h3>
     <div id="bkPick" style="display:grid;gap:14px">
       <div class="bkdrop" id="bkDrop">
-        <p style="margin:0">A ticket, boarding pass or confirmation: PDF or screenshot. The details and any QR code are read automatically.</p>
-        <button class="btn primary" type="button" id="bkChoose">Choose file</button>
+        <p style="margin:0">A ticket, boarding pass or confirmation: PDF, screenshot or a photo of it. The details and any QR code are read automatically.</p>
+        <div class="bkbtns"><button class="btn primary" type="button" id="bkCamBtn">Take photo</button><button class="btn" type="button" id="bkChoose">Choose file</button></div>
         <input type="file" id="bkFile" accept="application/pdf,.pdf,image/*" multiple hidden>
+        <input type="file" id="bkCam" accept="image/*" capture="environment" hidden>
       </div>
       <label class="f">Or paste the confirmation email<textarea id="bkPaste" rows="3" placeholder="Paste the text of a booking email" style="resize:vertical"></textarea></label>
       <div class="bkinbox" id="bkInboxList"></div>
@@ -6168,8 +6170,21 @@ async function bkDismissInbox(id){
   for (const f of it.files || []) api('/api/booking-file?id=' + encodeURIComponent(f.id), { method: 'DELETE' }).catch(() => {});
   toast('Dismissed');
 }
+// Phone camera photos are several MB: scale them to 2400 px (plenty for text and QR codes) so they read fast and a
+// copy fits in Drive. Smaller images and PDFs are left as they are.
+async function shrinkPhoto(f){
+  if (!/^image\/(jpeg|png|webp|heic|heif)/i.test(f.type || '') || f.size < 1.5 * 1024 * 1024) return f;
+  try {
+    const bmp = await createImageBitmap(f), k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+    return b ? new File([b], (f.name || 'photo').replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : f;
+  } catch { return f; }
+}
 async function bkFromFiles(files){
-  const sources = [...files].slice(0, 5).map(f => ({ name: f.name || 'shared file', mime: f.type, blob: f }));
+  files = await Promise.all([...files].slice(0, 5).map(shrinkPhoto));
+  const sources = files.map(f => ({ name: f.name || 'shared file', mime: f.type, blob: f }));
   if (!sources.length) return;
   try { await bkProcess(sources); } catch (x){ bkFail(x); }
 }
@@ -6192,6 +6207,8 @@ async function takeShared(){
 }
 
 $('#bkChoose').addEventListener('click', () => $('#bkFile').click());
+$('#bkCamBtn').addEventListener('click', () => $('#bkCam').click());
+$('#bkCam').addEventListener('change', e => { const f = [...e.target.files].map(x => new File([x], 'Photo ' + today() + '.' + ((x.type || 'image/jpeg').split('/')[1] || 'jpg'), { type: x.type || 'image/jpeg' })); e.target.value = ''; bkFromFiles(f); });
 $('#bkFile').addEventListener('change', e => { const f = [...e.target.files]; e.target.value = ''; bkFromFiles(f); });
 $('#bkDrop').addEventListener('dragover', e => { e.preventDefault(); $('#bkDrop').classList.add('over'); });
 $('#bkDrop').addEventListener('dragleave', () => $('#bkDrop').classList.remove('over'));
