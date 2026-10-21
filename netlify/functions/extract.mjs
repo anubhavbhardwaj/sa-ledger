@@ -11,7 +11,9 @@ import { member, json, verifyToken, firestore } from '../lib/members.mjs';
 import { beat } from '../lib/health.mjs';
 
 const DEFAULT_MODEL = 'openai/gpt-oss-120b';
-const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+// Groq retired Llama 4 Scout in July 2026; Qwen 3.8 27B reads images (up to 3 per request). If a configured model is
+// gone, the next one in the list is tried.
+export const VISION_MODELS = ['qwen/qwen3.8-27b'];
 const MAX_IMAGE = 4_000_000;   // characters of the base64 data URL (Groq's limit for inline images)
 const MAX_TEXT = 60000;   // about 15k tokens; the model reads far more, but keeps cost and time low
 export const TYPES = ['flight', 'train', 'bus', 'ferry', 'hotel', 'car', 'event', 'restaurant', 'other'];
@@ -53,26 +55,51 @@ export async function handle(req, { env = process.env, verify = verifyToken, fet
   if (text.trim().length < 20 && !codes.length && !image) return json(400, { error: 'There’s no readable text in that file. If it’s a scan or photo, add the details by hand.' });
   const user = `Document${body.name ? ' "' + String(body.name).slice(0, 120) + '"' : ''}${body.subject ? ', email subject: ' + String(body.subject).slice(0, 200) : ''}${body.date ? ', received ' + String(body.date).slice(0, 30) : ''}:\n\n${text}\n\nScanned codes:\n${codes.join('\n') || '(none)'}${image ? '\n\nThe booking itself is in the attached image.' : ''}`;
 
-  const r = await f('https://api.groq.com/openai/v1/chat/completions', {
+  const call = (model, withImage, jsonMode = true) => f('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: 'Bearer ' + env.GROQ_API_KEY },
-    body: JSON.stringify(image ? {
-      model: env.GROQ_VISION_MODEL || VISION_MODEL, temperature: 0, max_completion_tokens: 4000, response_format: { type: 'json_object' },
+    body: JSON.stringify(withImage ? {
+      model, temperature: 0, max_completion_tokens: 4000, reasoning_effort: 'none',
+      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
       messages: [{ role: 'system', content: PROMPT }, { role: 'user', content: [{ type: 'text', text: user }, { type: 'image_url', image_url: { url: image } }] }],
     } : {
-      model: env.GROQ_EXTRACT_MODEL || env.GROQ_MODEL || DEFAULT_MODEL, temperature: 0, max_completion_tokens: 4000,
-      reasoning_effort: 'low', response_format: { type: 'json_object' },
+      model, temperature: 0, max_completion_tokens: 4000, reasoning_effort: 'low',
+      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
       messages: [{ role: 'system', content: PROMPT }, { role: 'user', content: user }],
     }),
   });
-  if (!r.ok) {
-    const t = await r.text().catch(() => '');
-    return json(502, { error: r.status === 429 ? 'Groq’s rate limit was reached. Try again in a minute.' : 'Groq error ' + r.status + (t ? ': ' + t.slice(0, 200) : '') });
+  // Models to try in order. A model that's gone (404, or 400 "does not exist / decommissioned") moves on to the next;
+  // with text to go on, the text model is the last resort for an image.
+  const textModel = env.GROQ_EXTRACT_MODEL || env.GROQ_MODEL || DEFAULT_MODEL;
+  const plan = image
+    ? [...new Set([env.GROQ_VISION_MODEL, ...VISION_MODELS].filter(Boolean))].map(m => [m, true]).concat(text.trim().length >= 20 || codes.length ? [[textModel, false]] : [])
+    : [[textModel, false]];
+  let parsed = null, last = '';
+  for (const [model, withImage] of plan){
+    for (const jsonMode of [true, false]){
+      const r = await call(model, withImage, jsonMode);
+      if (r.status === 429) return json(502, { error: 'Groq’s rate limit was reached. Try again in a minute.' });
+      let b = null; try { b = await r.json(); } catch {}
+      const msg = String(b?.error?.message || ''), code = String(b?.error?.code || '');
+      if (!r.ok && (r.status === 404 || /model_not_found|decommission|does not exist|not have access/i.test(code + ' ' + msg))){ last = `${model}: ${msg || r.status}`; console.error('extract: model unavailable', last); break; }
+      parsed = parseObj(r.ok ? b?.choices?.[0]?.message?.content : b?.error?.failed_generation);
+      if (parsed) break;
+      last = r.ok ? 'unreadable answer' : `${r.status} ${code} ${msg.slice(0, 160)}`.trim();
+      if (r.ok || jsonMode === false) break;
+    }
+    if (parsed) break;
   }
-  const out = await r.json();
-  let parsed;
-  try { parsed = JSON.parse(out.choices?.[0]?.message?.content || '{}'); } catch { return json(502, { error: 'The AI answer wasn’t readable. Try again.' }); }
+  if (!parsed) return json(502, { error: 'The AI couldn’t read this (' + last + '). Try again, or add the details by hand.' });
   return json(200, { bookings: clean(parsed.bookings, codes.length) });
+}
+
+// The first {...} in a model answer, parsed (models sometimes wrap JSON in text or code fences); null if none.
+export function parseObj(t){
+  if (!t || typeof t !== 'string') return null;
+  try { const o = JSON.parse(t); if (o && typeof o === 'object') return o; } catch {}
+  const a = t.indexOf('{'), z = t.lastIndexOf('}');
+  if (a < 0 || z <= a) return null;
+  try { const o = JSON.parse(t.slice(a, z + 1)); return o && typeof o === 'object' ? o : null; } catch { return null; }
 }
 
 const s = (v, n) => (typeof v === 'string' || typeof v === 'number') && String(v).trim() ? String(v).trim().slice(0, n) : undefined;

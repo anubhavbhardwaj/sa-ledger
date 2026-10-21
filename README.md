@@ -48,8 +48,8 @@ screenshot to the installed app (Android share sheet), or by forwarding the conf
   BarcodeDetector (Chrome on Android and macOS; not Firefox, Safari or Chrome on Windows). Each code is kept as a
   small image on the booking, ready to show full screen.
 - `netlify/functions/extract.mjs` (`/api/extract`) asks Groq to sort the text into bookings (one per flight leg,
-  train, stay…). Screenshots and scanned PDFs go to a vision model (`GROQ_VISION_MODEL`, default
-  `meta-llama/llama-4-scout-17b-16e-instruct`). Uses the same `GROQ_API_KEY`.
+  train, stay…). Screenshots, photos and scanned PDFs go to a vision model (`GROQ_VISION_MODEL`, default
+  `qwen/qwen3.8-27b`; if a model has been retired, the next one is tried). Uses the same `GROQ_API_KEY`.
 - `netlify/functions/booking-file.mjs` (`/api/booking-file`) keeps the original file in Google Drive, folder
   "S&A Ledger bookings", using the same `GDRIVE_*` variables as the backup. Files up to 4 MB.
 - Forwarded emails: `netlify/functions/inbound.mjs` (`/api/inbound`) receives them. The free way, with no extra

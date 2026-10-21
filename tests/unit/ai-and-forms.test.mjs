@@ -45,3 +45,16 @@ test('evening reminder: quiet when the day is logged and nothing waits', () => {
   const due = dueLines([{ what: 'Hotel', tripId: 't', byDate: '2026-10-17', done: false }], { t: { name: 'Rome' } }, '2026-10-16');
   assert.deepEqual(due, ['Hotel (Rome) by tomorrow']);
 });
+
+import { handle as extract } from '../../netlify/functions/extract.mjs';
+test('booking extraction: a retired vision model is skipped for the next one', async () => {
+  const resp = (status, body) => ({ ok: status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
+  const seen = [];
+  const r = await extract(req({ text: '', image: 'data:image/jpeg;base64,AAAA', name: 'Photo.jpg' }), { env: { GROQ_API_KEY: 'g', GROQ_VISION_MODEL: 'meta-llama/llama-4-scout-17b-16e-instruct' }, verify,
+    fetch: async (u, o) => { const b = JSON.parse(o.body); seen.push(b.model);
+      return b.model.startsWith('meta-llama') ? resp(404, { error: { message: 'The model `meta-llama/llama-4-scout-17b-16e-instruct` does not exist or you do not have access to it.', code: 'model_not_found' } })
+        : resp(200, { choices: [{ message: { content: '{"bookings":[{"type":"hotel","title":"Hotel Test, Rome","start":"2027-03-25","end":"2027-03-28"}]}' } }] }); } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(seen, ['meta-llama/llama-4-scout-17b-16e-instruct', 'qwen/qwen3.8-27b']);
+  assert.equal((await r.json()).bookings[0].title, 'Hotel Test, Rome');
+});
