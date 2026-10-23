@@ -20,9 +20,10 @@ export async function stop(){ await browser?.close(); }
 const aiAnswer = body => { const ids = [...body.messages[1].content.matchAll(/^\[(\w+)\]/gm)].map(m => m[1]);
   return { summary: 'Test pick: the first options.', picks: ids.slice(0, 2).map((id, i) => ({ id, label: i ? 'Second' : 'First', why: 'Chosen by the test model.' })) }; };
 
-export async function openApp({ mobile = false, serp = {}, user = 'anubhav' } = {}){
+export async function openApp({ mobile = false, serp = {}, user = 'anubhav', init = null } = {}){
   const ctx = await browser.newContext({ serviceWorkers: 'block', ...(mobile ? { viewport: { width: 390, height: 844 }, isMobile: true, deviceScaleFactor: 2 } : { viewport: { width: 1200, height: 1000 } }) });
   const page = await ctx.newPage();
+  if (init) await page.addInitScript(init);
   const errors = [], api = { calls: [], serp: [] };
   page.on('pageerror', e => errors.push(e.message));
   const cache = memoryCache(), serpFetch = fakeSerpApi({ calls: api.serp, ...serp });

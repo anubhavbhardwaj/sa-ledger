@@ -1360,7 +1360,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, writeBatch, disableNetwork, enableNetwork, getDocsFromServer, query, where, waitForPendingWrites } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, writeBatch, disableNetwork, enableNetwork, getDocsFromServer, query, where, waitForPendingWrites } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // Public project identifiers. They grant no access by themselves; firestore.rules does the protecting.
 const firebaseConfig = {
@@ -1383,8 +1383,20 @@ const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 setPersistence(auth, browserLocalPersistence).catch(() => {});
 let fs;
-// Long polling is used automatically on networks that block Firestore's streaming connection (some office networks).
-try { fs = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }), experimentalAutoDetectLongPolling: true }); }
+// How this device talks to the database.
+// - The installed app keeps a saved copy (works offline, entries upload later). A browser tab keeps everything in
+//   memory instead: with several tabs sharing a saved copy, only one of them holds the live connection, and when the
+//   browser puts that tab to sleep the others stop updating ("showing saved data").
+// - Safe mode (set automatically when the live connection keeps failing, see the sync watchdog): memory only and
+//   long polling, which works through networks that block Firestore's streaming connection.
+const FS_SAFE = (() => { try { return localStorage.getItem('fsSafe') === '1'; } catch { return false; } })();
+const STANDALONE = (() => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch { return false; } })();
+const FS_MODE = FS_SAFE ? 'safe' : STANDALONE ? 'saved copy' : 'browser';
+try {
+  fs = initializeFirestore(fbApp, {
+    localCache: FS_MODE === 'saved copy' ? persistentLocalCache({ tabManager: persistentMultipleTabManager() }) : memoryLocalCache(),
+    ...(FS_SAFE ? { experimentalForceLongPolling: true } : { experimentalAutoDetectLongPolling: true }) });
+}
 catch { fs = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }); }
 const expensesCol = collection(fs, "expenses");
 const incomeCol = collection(fs, "income");
@@ -1451,6 +1463,24 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && st
 window.addEventListener('online', () => { if (state.user) reconnect(true); });
 document.addEventListener('click', e => { if (e.target.id === 'syncBtn') reconnect(false); });
 setInterval(renderSync, 5000);
+// Watchdog: online, visible, but the data isn't live for 20 seconds. Reconnect up to twice; if it's still not live,
+// switch this device to safe mode and reload once (at most once an hour).
+const STALE_MS = window.__staleMs || 20000;
+let kicks = 0;
+setInterval(async () => {
+  if (!state.user || !navigator.onLine || document.hidden) return;
+  if (!Object.values(SYNC.cache).some(Boolean)){ kicks = 0; SYNC.staleAt = 0; return; }
+  SYNC.staleAt ||= Date.now();
+  if (Date.now() - SYNC.staleAt < STALE_MS) return;
+  SYNC.staleAt = Date.now();
+  if (kicks < 2){ kicks++; await reconnect(true); return; }
+  if (FS_SAFE) return;
+  try {
+    if (Date.now() - (+localStorage.getItem('fsSafeAt') || 0) < 3600e3) return;
+    localStorage.setItem('fsSafe', '1'); localStorage.setItem('fsSafeAt', String(Date.now()));
+  } catch { return; }
+  if (!Object.values(SYNC.pending).some(n => n > 0)) location.reload();
+}, window.__staleMs ? 500 : 5000);
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -4740,13 +4770,13 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-20';
+const APP_VERSION = '2026-10-23';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
   const offline = Object.values(SYNC.cache).some(Boolean);
   $('#syBody').innerHTML = `
-    <div>App version <strong>${APP_VERSION}</strong> · signed in as <strong>${esc(usernameOf(state.user))}</strong> · ${navigator.onLine ? 'internet: yes' : '<span class="neg">internet: no</span>'} · database: ${offline ? '<span class="neg">showing saved data (not live)</span>' : '<span class="pos">live</span>'}</div>
+    <div>App version <strong>${APP_VERSION}</strong> · connection: <strong>${FS_MODE}</strong>${FS_SAFE ? ' <button type="button" class="linkbtn" id="syNormal">back to normal</button>' : ''} · signed in as <strong>${esc(usernameOf(state.user))}</strong> · ${navigator.onLine ? 'internet: yes' : '<span class="neg">internet: no</span>'} · database: ${offline ? '<span class="neg">showing saved data (not live)</span>' : '<span class="pos">live</span>'}</div>
     <div>${pend.length ? `<strong class="neg">${pend.length} entr${pend.length === 1 ? 'y' : 'ies'} saved only on this device:</strong><ul style="margin:4px 0 0;padding-left:18px">${pend.map(i => `<li>${syRow(i)}</li>`).join('')}</ul><span class="muted">Tap “Upload now” with a good connection.</span>` : '<span class="pos">Nothing waiting to upload on this device.</span>'}</div>
     ${extra}`;
 }
@@ -4761,7 +4791,7 @@ async function syncCheck(){
       const onlyHere = loc.filter(i => !srvIds.has(i.id)), onlyServer = srv.docs.filter(d => !locIds.has(d.id)).map(d => ({ ...d.data(), id: d.id }));
       out += `<div><strong>${name}</strong> (last 30 days): ${srv.docs.length} on the server, ${loc.length} on this device${!onlyHere.length && !onlyServer.length ? ' <span class="pos">· match</span>' : ''}
         ${onlyHere.length ? `<div class="neg">Only on this device: <ul style="margin:2px 0;padding-left:18px">${onlyHere.map(i => `<li>${syRow(i)}</li>`).join('')}</ul></div>` : ''}
-        ${onlyServer.length ? `<div class="neg">On the server but not shown here: <ul style="margin:2px 0;padding-left:18px">${onlyServer.map(i => `<li>${syRow(i)}</li>`).join('')}</ul>Close and reopen the app; if it stays, tell Claude.</div>` : ''}</div>`;
+        ${onlyServer.length ? `<div class="neg">On the server but not shown here: <ul style="margin:2px 0;padding-left:18px">${onlyServer.map(i => `<li>${syRow(i)}</li>`).join('')}</ul><button type="button" class="btn small" id="syReload">Reload now</button></div>` : ''}</div>`;
     }
     syncReport(out);
   } catch (x){
@@ -4770,6 +4800,8 @@ async function syncCheck(){
 }
 document.addEventListener('click', async e => {
   if (e.target.id === 'syCheck') return syncCheck();
+  if (e.target.id === 'syReload'){ location.reload(); return; }
+  if (e.target.id === 'syNormal'){ try { localStorage.removeItem('fsSafe'); } catch {} location.reload(); return; }
   if (e.target.id === 'syUpload'){
     const b = e.target; b.disabled = true; b.textContent = 'Uploading…';
     try {

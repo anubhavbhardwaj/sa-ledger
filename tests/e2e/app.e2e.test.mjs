@@ -331,3 +331,13 @@ test('bookings: a large camera photo is scaled down and read', async () => {
   assert.match(sent[0].image || '', /^data:image\/jpeg;base64,/, 'the photo goes to the reader as a JPEG');
   await clean(app);
 });
+
+test('sync watchdog: data that stays "not live" gets two reconnects, then safe mode', async () => {
+  const app = await openApp({ init: 'window.__staleMs = 300; window.__offline = true;' }), { page } = app;
+  await app.seed({ expenses: { e1: { amount: 1, date: d(0), store: 'X', category: 'Groceries', account: 'DKB', spender: 'Anubhav', createdAt: 'x' } } });
+  await page.waitForFunction(() => { try { return localStorage.getItem('fsSafe') === '1'; } catch { return false; } }, null, { timeout: 10000 });
+  await page.waitForLoadState('load'); await page.waitForTimeout(300);
+  assert.equal(await page.evaluate(() => localStorage.getItem('fsSafe')), '1');
+  assert.deepEqual(app.errors, []);
+  await app.close();
+});

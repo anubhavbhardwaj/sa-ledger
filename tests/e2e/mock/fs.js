@@ -6,7 +6,7 @@ function check(c, d){ const bad = Object.keys(d).filter(k => !(ALLOWED[c] || [])
 const st = c => (stores[c] ||= new Map());
 const emit = c => { const docs=[...st(c)].map(([id,d])=>({id,data:()=>d,metadata:{hasPendingWrites:!!window.__pending?.[c+'/'+id]}})); (subs[c]||[]).forEach(f=>f({docs,metadata:{fromCache:!!window.__offline},docChanges:()=>docs})); };
 export function initializeFirestore(){ return {}; }
-export function persistentLocalCache(){ return {}; } export function persistentMultipleTabManager(){ return {}; }
+export function persistentLocalCache(){ return {}; } export function memoryLocalCache(){ return {}; } export function persistentMultipleTabManager(){ return {}; }
 export function collection(fs, p){ return {col:p}; }
 export function doc(a, p, id){ if (a.col) return {col:a.col, id:'a'+(n++)}; return {col:p, id}; }
 export function __seed(c, id, d){ st(c).set(id, d); emit(c); }
