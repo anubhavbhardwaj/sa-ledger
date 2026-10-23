@@ -559,6 +559,8 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .catchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;margin-top:-4px}
 .chip-btn{border:1px solid var(--line);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:4px 11px;font:500 12.5px var(--f-body);cursor:pointer}
 .chip-btn[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.rclist{display:grid}.rcrow{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.rcrow:last-child{border-bottom:0}.rcrow .pill{margin-top:4px;justify-self:start}.rcamt{text-align:right;font-family:var(--f-mono);white-space:nowrap}.rcamt small{display:block;font:400 12px var(--f-body);color:var(--muted)}
 .fire-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px}
 .fire-grid label{display:grid;gap:4px;align-content:start;font-size:12.5px;color:var(--ink-2)}
 .fire-grid input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:8px 10px;width:100%;min-width:0;font-family:var(--f-mono)}
@@ -822,6 +824,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <section class="kpis" id="kpis" aria-label="Summary"></section>
       <section class="panel" id="budgetPanel" hidden></section>
       <section class="panel" id="goalsP"></section>
+      <section class="panel" id="recurP" hidden></section>
       <div class="grid">
         <section class="panel span-7">
           <header><h2>Income vs spending</h2><span class="legend"><span><i style="background:var(--c-inc)"></i>Income</span><span><i style="background:var(--c-exp)"></i>Spending</span></span></header>
@@ -1372,6 +1375,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 
 <script type="module">
 import { decodeBCBP } from "./bcbp.js";
+import { detectRecurring, backtest as recurBacktest } from "./recur.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -1753,7 +1757,7 @@ function renderMonths(ms){
 // Overview ignores bar filters: it is the unfiltered picture of the chosen period.
 function renderOverview(ms){
   $('#ovTitle').textContent = 'Overview · ' + periodName();
-  loadRates(); renderTodo(); fillMonthRates(); renderGoals();
+  loadRates(); renderTodo(); fillMonthRates(); renderGoals(); renderRecurring();
   const rows = state.items.filter(inPeriod);
   const total = sum(rows);
   let deltaHtml = '<span class="sub">No earlier month to compare</span>';
@@ -2453,6 +2457,29 @@ F('store').addEventListener('change', smartCategory);
 F('store').addEventListener('input', () => { clearTimeout(state.smartT); state.smartT = setTimeout(smartCategory, 250); });
 F('amount').addEventListener('change', smartCategory);
 F('account').addEventListener('change', smartCategory);
+
+// ---------- recurring charges (Overview) ----------
+let recurCache = null;
+function recurring(){
+  const key = state.items.length + '|' + (state.items[0]?.id || '') + '|' + today();
+  if (recurCache?.key === key) return recurCache;
+  return recurCache = { key, list: detectRecurring(state.items, today()), bt: recurBacktest(state.items, today()) };
+}
+function renderRecurring(){
+  const el = $('#recurP'); if (!el) return;
+  const { list, bt } = recurring();
+  el.hidden = !list.length; if (!list.length) return;
+  const td = today(), monthly = list.reduce((a, r) => a + r.monthly, 0);
+  const when = d => { const n = Math.round((Date.parse(d) - Date.parse(td)) / 864e5); return n === 0 ? 'today' : n === 1 ? 'tomorrow' : n > 1 && n < 7 ? 'in ' + n + ' days' : shortDate(d); };
+  const row = r => `<div class="rcrow"><span><strong>${esc(r.store)}</strong> <span class="muted">${esc(r.label)} · ${esc(r.category)}</span>
+      ${r.status === 'missed' ? `<br><span class="pill risk">expected ${shortDate(r.next)}, not seen yet</span>` : ''}${r.change ? `<br><span class="pill ${r.change.to > r.change.from ? 'over' : 'ontrack'}">${r.change.to > r.change.from ? 'price up' : 'price down'} from ${eur.format(r.change.from)} (${shortDate(r.change.on)})</span>` : ''}</span>
+      <span class="rcamt">${eur.format(r.amount)}<small>${r.status === 'missed' ? 'overdue' : 'next ' + when(r.next)}</small></span></div>`;
+  const alerts = list.filter(r => r.status === 'missed' || r.change), rest = list.filter(r => !alerts.includes(r));
+  el.innerHTML = `<header><h2>Recurring charges</h2><span class="hint">${eur0.format(monthly)} a month · ${list.length} found</span></header>
+    <div class="rclist">${[...alerts, ...rest].slice(0, 6).map(row).join('')}</div>
+    ${list.length > 6 ? `<details class="psmore"><summary>All ${list.length}</summary><div class="rclist">${[...alerts, ...rest].slice(6).map(row).join('')}</div></details>` : ''}
+    <p class="hint">Found from the rhythm of your entries: same store, a regular gap and a steady amount.${bt.n ? ` Checked on your history: hiding each series’ last charge, its date was predicted within 3 days for ${bt.dateOk} of ${bt.n} and its amount for ${bt.amtOk} of ${bt.n}.` : ''}</p>`;
+}
 
 // ---------- currencies ----------
 const fxCache = {};

@@ -376,3 +376,17 @@ test('add form: category filled from the store or offered as 3 choices', async (
   assert.equal(await page.inputValue('#f-category'), 'Groceries');
   await clean(app);
 });
+
+test('overview: recurring charges with next date, price change and a missed one', async () => {
+  const app = await openApp(), { page } = app, exp = {};
+  for (let k = 6; k >= 1; k--){
+    exp['n' + k] = { amount: k <= 2 ? 15.99 : 13.99, date: month(-k + 1) + '-01', store: 'Netflix', category: 'Subscriptions', account: 'Wise', spender: 'Anubhav', createdAt: 'x' };
+    exp['v' + k] = { amount: 39.99, date: month(-k) + '-02', store: 'Vodafone', category: 'Phone/Internet', account: 'DKB', spender: 'Anubhav', createdAt: 'x' };
+  }
+  await app.seed({ expenses: exp });
+  await app.go('overview'); await page.waitForSelector('#recurP:not([hidden])');
+  const t = await app.text('#recurP');
+  assert.match(t, /Recurring charges/); assert.match(t, /Netflix every month/); assert.match(t, new RegExp('price up from €13\\.99 \\(1 ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+month(-1).slice(5, 7) - 1] + '\\)'));
+  assert.match(t, /Vodafone/);
+  await clean(app);
+});
