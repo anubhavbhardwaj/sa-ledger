@@ -1358,6 +1358,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 </dialog>
 
 <script type="module">
+import { decodeBCBP } from "./bcbp.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, writeBatch, disableNetwork, enableNetwork, getDocsFromServer, query, where, waitForPendingWrites } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
@@ -5836,8 +5837,20 @@ async function bkProcess(sources, { text: extra = '', subject, date } = {}){
   if (!live()) return;
   bkBusy(codes.length ? `Found ${codes.length} ticket code${codes.length === 1 ? '' : 's'}. Reading the details…` : 'Reading the details…');
   let items = [];
-  S.aiErr = '';
-  try {
+  S.aiErr = ''; S.fromCode = false;
+  // Boarding passes: the barcode itself says name, flight, route, date and seat, so read it directly, no AI.
+  // The same flight on several passes (one per traveller) becomes one booking with all of them.
+  const ref = String(date || today()).slice(0, 10), passes = [];
+  codes.forEach((c, i) => { const d = decodeBCBP(c.text, ref); if (d) d.legs.forEach(l => passes.push({ ...l, codes: [i] })); });
+  for (const l of passes){
+    const same = items.find(x => x.number === l.number && x.start === l.start);
+    if (!same){ items.push(l); continue; }
+    same.travellers = [...new Set([...(same.travellers || []), ...(l.travellers || [])])];
+    same.codes = [...new Set([...same.codes, ...l.codes])];
+    if (l.seat && same.seat !== l.seat) same.seat = [same.seat, l.seat].filter(Boolean).join(', ');
+  }
+  if (items.length){ S.readChars = { files: texts.join('').length, email: extra.length }; S.fromCode = true; }
+  else try {
     // Attachments first (the e-ticket PDF has the facts), then the email text, shortened when files had text:
     // long airline emails are mostly marketing and would otherwise push the ticket out of the AI's reading limit.
     const email = extra.trim(), fileChars = texts.join('').length;
@@ -6007,6 +6020,7 @@ function bkReviewRender(){
   }).join('');
   const nNew = on.filter(b => !bkMatched(b)).length, nUpd = on.length - nNew;
   $('#bkReview').innerHTML = `
+    ${S.fromCode ? `<p class="muted" style="margin:0;font-size:12.5px">Read straight from the boarding pass code. Departure and arrival times come from the flight status nearer the day.</p>` : ''}
     ${S.aiErr ? `<div class="banner" style="background:var(--warn-soft);border-color:transparent"><span>Couldn’t read the details automatically (${esc(S.aiErr)}). Fill them in below${S.codes.length ? '; the ticket code was found' : ''}.${S.readChars ? ` <span class="muted" style="font-size:12px">Read ${S.readChars.files} characters from ${S.sources.length} file${S.sources.length === 1 ? '' : 's'} and ${S.readChars.email} from the email.</span>` : ''}</span>${S.retry ? '<button class="btn small" type="button" data-bkretry>Try again</button>' : ''}</div>` : ''}
     ${!S.editId && S.sources.length && !S.codes.length && !('BarcodeDetector' in window) ? `<p class="hint muted" style="margin:0;font-size:12.5px">This browser can’t scan QR codes; open the app on your phone to pick them up, or use “Open PDF” at the gate.</p>` : ''}
     ${cards}

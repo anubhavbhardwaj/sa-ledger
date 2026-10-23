@@ -47,6 +47,8 @@ screenshot to the installed app (Android share sheet), or by forwarding the conf
 - The browser reads the PDF (pdf.js from jsdelivr) and scans QR/Aztec/PDF417 codes with the built-in
   BarcodeDetector (Chrome on Android and macOS; not Firefox, Safari or Chrome on Windows). Each code is kept as a
   small image on the booking, ready to show full screen.
+- Boarding passes: `public/bcbp.js` decodes the barcode (IATA Bar Coded Boarding Pass) in the browser: name, booking
+  reference, route, flight, date and seat, without any AI. Only documents without a boarding pass code go to Groq.
 - `netlify/functions/extract.mjs` (`/api/extract`) asks Groq to sort the text into bookings (one per flight leg,
   train, stay…). Screenshots, photos and scanned PDFs go to a vision model (`GROQ_VISION_MODEL`, default
   `qwen/qwen3.8-27b`; if a model has been retired, the next one is tried). Uses the same `GROQ_API_KEY`.
