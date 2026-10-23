@@ -160,3 +160,24 @@ export function evaluate(items, { from, threshold = 0.6 } = {}){
   r.mistakes = Object.entries(r.mistakes).sort((a, b) => b[1] - a[1]).slice(0, 6);
   return r;
 }
+
+// Picks the confidence needed before the model fills a category in, from your own history: the lowest threshold whose
+// fills (beyond today's rule) were right at least `target` of the time in the replay. Falls back to 0.9.
+export function tuneThreshold(items, { from, target = 0.95, grid = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9] } = {}){
+  const list = items.filter(i => i.category && i.date && i.store).slice().sort((a, b) => a.date.localeCompare(b.date) || String(a.createdAt).localeCompare(String(b.createdAt)));
+  const m = new CategoryModel(), hist = new Map(), recs = [];
+  let ruleOk = 0, ruleN = 0, n = 0;
+  for (const i of list){
+    const k = keyOf(i.category), s = normStore(i.store);
+    if (i.date >= from){
+      n++;
+      const rule = ruleSuggest(hist, i);
+      if (rule){ ruleN++; if (rule === k) ruleOk++; }
+      else { const sg = m.suggest(i); if (sg.evidence && sg.list[0]) recs.push({ p: sg.list[0].p, ok: sg.list[0].key === k }); }
+    }
+    m.add(i); if (!hist.has(s)) hist.set(s, []); hist.get(s).push(k);
+  }
+  const at = t => { const f = recs.filter(r => r.p >= t), ok = f.filter(r => r.ok).length; return { t, fills: f.length, ok, precision: (ruleOk + ok) / Math.max(1, ruleN + f.length), overall: (ruleOk + ok) / Math.max(1, n) }; };
+  const sweep = grid.map(at), best = sweep.find(x => x.precision >= target && x.fills > 0);
+  return { threshold: best ? best.t : 0.9, sweep, n };
+}

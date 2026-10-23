@@ -60,3 +60,11 @@ test('smart: combined suggestion fills from the rule, the model or the starter v
   const none = suggestCategory(m, hist, { store: 'Xyzzy Qwerty', amount: 40, account: 'Wise', date: day(300) });
   assert.equal(none.fill, null); assert.equal(none.chips.length, 3);
 });
+
+import { tuneThreshold } from '../../public/smart.js';
+test('smart: the fill-in threshold is tuned to the target precision on the replay', () => {
+  const r = tuneThreshold(history(), { from: day(150), target: 0.95 });
+  assert.ok(r.threshold >= 0.5 && r.threshold <= 0.9);
+  const at = r.sweep.find(x => x.t === r.threshold);
+  assert.ok(at.precision >= 0.95 || r.threshold === 0.9);
+});

@@ -355,3 +355,24 @@ test('smart suggestions: the replay on your data shows rule vs model', async () 
   assert.match(t, /Today’s rule\s*\d+%/); assert.match(t, /Combined: rule, then model/); assert.match(t, /would take no typing at all/); assert.match(t, /Stores never entered before/);
   await clean(app);
 });
+
+test('add form: category filled from the store or offered as 3 choices', async () => {
+  const app = await openApp(), { page } = app, exp = {};
+  for (let k = 0; k < 60; k++){
+    const g = k % 2 === 0, mm = month(-Math.floor((60 - k) / 10));
+    exp['y' + k] = { amount: g ? 30 : 4, date: mm + '-' + String(1 + k % 27).padStart(2, '0'), store: g ? 'Rewe City' : 'Bar Centrale', category: g ? 'Groceries' : 'Eating Out', account: g ? 'DKB' : 'Wise', spender: 'Anubhav', createdAt: 'x' };
+  }
+  await app.seed({ expenses: exp });
+  await page.click('#addBtn'); await page.waitForSelector('#dlg[open]');
+  await page.fill('#f-amount', '12'); await page.fill('#f-store', 'Rewe To Go'); await page.dispatchEvent('#f-store', 'change'); await page.waitForTimeout(400);
+  assert.equal(await page.inputValue('#f-category'), 'Groceries');
+  assert.match(await app.text('#catChips'), /Filled in/);
+  await page.fill('#f-store', 'Trattoria da Enzo'); await page.dispatchEvent('#f-store', 'change'); await page.waitForTimeout(400);
+  assert.equal(await page.inputValue('#f-category'), 'Eating Out', 'starter list for a new restaurant');
+  await page.fill('#f-store', 'Xyzzy Qwerty'); await page.dispatchEvent('#f-store', 'change'); await page.waitForTimeout(400);
+  assert.match(await app.text('#catChips'), /Pick one/);
+  assert.equal(await page.inputValue('#f-category'), '', 'an unsure guess is not left filled in');
+  await page.click('#catChips [data-catchip="Groceries"]');
+  assert.equal(await page.inputValue('#f-category'), 'Groceries');
+  await clean(app);
+});
