@@ -4831,14 +4831,14 @@ function renderSmartEval(){
   const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
   if (!r.n){ $('#smBody').innerHTML = '<p>Not enough expenses in the last 6 months to test.</p>'; return; }
   $('#smBody').innerHTML = `
-    <div class="mwrap"><table class="mini"><thead><tr><th></th><th class="num">Suggests for</th><th class="num">Right when it suggests</th><th class="num">Right overall</th></tr></thead><tbody>
-      <tr><td>Today’s rule</td><td class="num">${pct(r.rule.cover, r.n)}</td><td class="num">${pct(r.rule.ok, r.rule.cover)}</td><td class="num"><strong>${pct(r.rule.ok, r.n)}</strong></td></tr>
-      <tr><td>Model, when at least 60% sure</td><td class="num">${pct(r.model.cover, r.n)}</td><td class="num">${pct(r.model.ok, r.model.cover)}</td><td class="num"><strong>${pct(r.model.ok, r.n)}</strong></td></tr>
-      <tr><td>Model, best guess every time</td><td class="num">100%</td><td class="num">${pct(r.model.top1, r.n)}</td><td class="num">${pct(r.model.top1, r.n)}</td></tr>
-      <tr><td>Right category among its top 3</td><td class="num">100%</td><td class="num">${pct(r.model.top3, r.n)}</td><td class="num">${pct(r.model.top3, r.n)}</td></tr>
+    <div class="mwrap"><table class="mini"><thead><tr><th></th><th class="num">Fills in for</th><th class="num">Right when it fills in</th><th class="num">Right overall</th></tr></thead><tbody>
+      <tr><td>Today’s rule</td><td class="num">${pct(r.rule.cover, r.n)}</td><td class="num">${pct(r.rule.ok, r.rule.cover)}</td><td class="num">${pct(r.rule.ok, r.n)}</td></tr>
+      <tr><td>Model alone, when at least 60% sure</td><td class="num">${pct(r.model.cover, r.n)}</td><td class="num">${pct(r.model.ok, r.model.cover)}</td><td class="num">${pct(r.model.ok, r.n)}</td></tr>
+      <tr class="witot"><td>Combined: rule, then model or starter list when sure</td><td class="num">${pct(r.hybrid.cover, r.n)}</td><td class="num">${pct(r.hybrid.ok, r.hybrid.cover)}</td><td class="num"><strong>${pct(r.hybrid.ok, r.n)}</strong></td></tr>
     </tbody></table></div>
-    <p style="margin:0">Stores never entered before: <strong>${r.unseen.n}</strong> of ${r.n}. Today’s rule can’t suggest anything for them; the model got <strong>${r.unseen.ok}</strong> right while at least 60% sure.</p>
-    ${r.mistakes.length ? `<div><strong>Most common mistakes</strong> (model said → you chose):<ul style="margin:4px 0 0;padding-left:18px">${r.mistakes.map(([k, n]) => `<li>${esc(k)} <span class="muted">(${n}×)</span></li>`).join('')}</ul></div>` : ''}
+    <p style="margin:0">When the combined version isn’t sure (${pct(r.hybrid.open, r.n)} of entries) it fills in nothing and offers 3 choices; the right one was among them <strong>${pct(r.hybrid.chipsHit, r.hybrid.open)}</strong> of the time. So <strong>${pct(r.hybrid.ok + r.hybrid.chipsHit, r.n)}</strong> of entries would take no typing at all (filled in correctly, or one tap).</p>
+    <p style="margin:0">Stores never entered before: <strong>${r.unseen.n}</strong> of ${r.n}. Model alone got ${r.unseen.ok} right while sure; combined with the starter list: <strong>${r.unseen.hybrid}</strong>.</p>
+    ${r.mistakes.length ? `<div><strong>Most common wrong fills</strong> (filled in → you chose):<ul style="margin:4px 0 0;padding-left:18px">${r.mistakes.map(([k, n]) => `<li>${esc(k)} <span class="muted">(${n}×)</span></li>`).join('')}</ul></div>` : '<p style="margin:0" class="pos">No wrong fills.</p>'}
     <p class="muted" style="margin:0;font-size:12.5px">${r.n} expenses since ${shortDate(from, true)} · computed in ${ms} ms on this device. “Right overall” is the share you wouldn’t have had to change.</p>`;
 }
 

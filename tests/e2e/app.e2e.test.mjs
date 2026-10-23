@@ -352,6 +352,6 @@ test('smart suggestions: the replay on your data shows rule vs model', async () 
   await page.click('#profBtn'); await page.click('[data-pm="smart"]'); await page.waitForSelector('#smDlg[open]');
   await page.waitForFunction(() => /Today’s rule/.test(document.getElementById('smBody').textContent));
   const t = await app.text('#smBody');
-  assert.match(t, /Today’s rule\s*\d+%/); assert.match(t, /Model, when at least 60% sure/); assert.match(t, /Stores never entered before/);
+  assert.match(t, /Today’s rule\s*\d+%/); assert.match(t, /Combined: rule, then model/); assert.match(t, /would take no typing at all/); assert.match(t, /Stores never entered before/);
   await clean(app);
 });

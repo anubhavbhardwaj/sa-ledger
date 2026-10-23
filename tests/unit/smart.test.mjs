@@ -40,3 +40,23 @@ test('smart: the replay compares the model with the current rule', () => {
   assert.ok(r.model.top1 / r.n >= r.rule.ok / r.n, 'model at least as good as the rule overall');
   assert.ok(r.unseen.n >= 0);
 });
+
+import { lexiconGuess, suggestCategory } from '../../public/smart.js';
+test('smart: the starter vocabulary maps unknown stores to your own categories only', () => {
+  const mine = ['groceries', 'eating out', 'transportation', 'phone/internet'];
+  assert.equal(lexiconGuess('Esselunga Milano', mine), 'groceries');
+  assert.equal(lexiconGuess('Trattoria da Enzo', mine), 'eating out');
+  assert.equal(lexiconGuess('Trenitalia', mine), 'transportation');
+  assert.equal(lexiconGuess('Iliad Italia', mine), 'phone/internet');
+  assert.equal(lexiconGuess('Allianz', mine), null, 'no insurance category: nothing invented');
+  assert.equal(lexiconGuess('Something Unknown', mine), null);
+});
+test('smart: combined suggestion fills from the rule, the model or the starter vocabulary, otherwise offers choices', () => {
+  const m = new CategoryModel(), hist = new Map(), add = i => { m.add(i); const s = i.store.toLowerCase(); (hist.get(s) || hist.set(s, []).get(s)).push(i.category.toLowerCase()); };
+  history().forEach(add);
+  assert.equal(suggestCategory(m, hist, { store: 'Lieferando', amount: 25, date: day(300) }).source, 'rule');
+  const lex = suggestCategory(m, hist, { store: 'Trattoria da Enzo', amount: 40, account: 'Wise', date: day(300) });
+  assert.equal(lex.fill, 'eating out'); assert.equal(lex.source, 'starter');
+  const none = suggestCategory(m, hist, { store: 'Xyzzy Qwerty', amount: 40, account: 'Wise', date: day(300) });
+  assert.equal(none.fill, null); assert.equal(none.chips.length, 3);
+});
