@@ -341,3 +341,17 @@ test('sync watchdog: data that stays "not live" gets two reconnects, then safe m
   assert.deepEqual(app.errors, []);
   await app.close();
 });
+
+test('smart suggestions: the replay on your data shows rule vs model', async () => {
+  const app = await openApp(), { page } = app, exp = {};
+  for (let k = 0; k < 120; k++){
+    const g = k % 3 === 0, mm = month(-Math.floor((120 - k) / 12));
+    exp['x' + k] = { amount: g ? 30 : 4, date: mm + '-' + String(1 + k % 27).padStart(2, '0'), store: g ? ['Rewe City', 'REWE Markt', 'Rewe To Go'][k % 3 === 0 ? (k / 3) % 3 : 0] : ['Bar Roma', 'Bar Centrale', 'Bar Sport'][k % 3], category: g ? 'Groceries' : 'Eating Out', account: g ? 'DKB' : 'Wise', spender: 'Anubhav', createdAt: 'x' };
+  }
+  await app.seed({ expenses: exp });
+  await page.click('#profBtn'); await page.click('[data-pm="smart"]'); await page.waitForSelector('#smDlg[open]');
+  await page.waitForFunction(() => /Today’s rule/.test(document.getElementById('smBody').textContent));
+  const t = await app.text('#smBody');
+  assert.match(t, /Today’s rule\s*\d+%/); assert.match(t, /Model, when at least 60% sure/); assert.match(t, /Stores never entered before/);
+  await clean(app);
+});

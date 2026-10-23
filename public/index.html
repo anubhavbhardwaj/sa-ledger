@@ -789,6 +789,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="health"><span>System health</span><small id="pmHealth"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="sync"><span>Sync check</span><small>is this device up to date?</small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="smart"><span>Smart suggestions</span><small>how well categories are guessed</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="alerts"><span>Notifications</span><small id="pmAlerts">off on this phone</small></button>
         <hr>
         <button class="pm-item" role="menuitem" type="button" data-pm="import"><span>Import CSV</span><small>into expenses</small></button>
@@ -1290,6 +1291,14 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 
 <dialog id="codeView" aria-label="Ticket code"><img alt="Ticket code"><p></p></dialog>
 
+<dialog id="smDlg">
+  <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:620px">
+    <h3>Smart suggestions: test on your data</h3>
+    <p class="muted" style="margin:0;font-size:13px">Replays the last 6 months: each expense is guessed from everything entered before it, exactly as if you were typing it then. Compares today’s rule (copy the store’s usual category) with a small model that learns from store words, amount, account, spender, country and weekend. Runs on this device; nothing is sent anywhere.</p>
+    <div id="smBody" style="display:grid;gap:12px;font-size:13.5px"></div>
+    <div class="dlg-actions"><div class="right"><button class="btn" type="submit">Close</button></div></div>
+  </form>
+</dialog>
 <dialog id="syDlg">
   <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:520px">
     <h3>Sync check</h3>
@@ -1359,6 +1368,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 
 <script type="module">
 import { decodeBCBP } from "./bcbp.js";
+import { evaluate as evalCategories } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, writeBatch, disableNetwork, enableNetwork, getDocsFromServer, query, where, waitForPendingWrites } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
@@ -4814,6 +4824,24 @@ document.addEventListener('click', async e => {
   }
 });
 
+// ---------- Smart suggestions: offline evaluation of the category model against today's rule ----------
+function renderSmartEval(){
+  const from = addMonth(thisMonth(), -6) + '-01', t0 = performance.now();
+  const r = evalCategories(state.items, { from, threshold: 0.6 }), ms = Math.round(performance.now() - t0);
+  const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
+  if (!r.n){ $('#smBody').innerHTML = '<p>Not enough expenses in the last 6 months to test.</p>'; return; }
+  $('#smBody').innerHTML = `
+    <div class="mwrap"><table class="mini"><thead><tr><th></th><th class="num">Suggests for</th><th class="num">Right when it suggests</th><th class="num">Right overall</th></tr></thead><tbody>
+      <tr><td>Today’s rule</td><td class="num">${pct(r.rule.cover, r.n)}</td><td class="num">${pct(r.rule.ok, r.rule.cover)}</td><td class="num"><strong>${pct(r.rule.ok, r.n)}</strong></td></tr>
+      <tr><td>Model, when at least 60% sure</td><td class="num">${pct(r.model.cover, r.n)}</td><td class="num">${pct(r.model.ok, r.model.cover)}</td><td class="num"><strong>${pct(r.model.ok, r.n)}</strong></td></tr>
+      <tr><td>Model, best guess every time</td><td class="num">100%</td><td class="num">${pct(r.model.top1, r.n)}</td><td class="num">${pct(r.model.top1, r.n)}</td></tr>
+      <tr><td>Right category among its top 3</td><td class="num">100%</td><td class="num">${pct(r.model.top3, r.n)}</td><td class="num">${pct(r.model.top3, r.n)}</td></tr>
+    </tbody></table></div>
+    <p style="margin:0">Stores never entered before: <strong>${r.unseen.n}</strong> of ${r.n}. Today’s rule can’t suggest anything for them; the model got <strong>${r.unseen.ok}</strong> right while at least 60% sure.</p>
+    ${r.mistakes.length ? `<div><strong>Most common mistakes</strong> (model said → you chose):<ul style="margin:4px 0 0;padding-left:18px">${r.mistakes.map(([k, n]) => `<li>${esc(k)} <span class="muted">(${n}×)</span></li>`).join('')}</ul></div>` : ''}
+    <p class="muted" style="margin:0;font-size:12.5px">${r.n} expenses since ${shortDate(from, true)} · computed in ${ms} ms on this device. “Right overall” is the share you wouldn’t have had to change.</p>`;
+}
+
 // ---------- German state pension (gesetzliche Rentenversicherung), Anubhav's ----------
 // Pension points: each year's pension-insurance gross (capped at the contribution ceiling) divided by the average
 // German salary that year; one point pays the current pension value a month. Figures for 2026.
@@ -7203,6 +7231,7 @@ pm.addEventListener('click', async e => {
   if (a === 'alerts') openAlerts();
   if (a === 'health'){ renderHealth(); $('#hlDlg').showModal(); }
   if (a === 'sync'){ syncReport(); $('#syDlg').showModal(); }
+  if (a === 'smart'){ $('#smBody').innerHTML = '<p class="muted">Replaying your history…</p>'; $('#smDlg').showModal(); setTimeout(renderSmartEval, 30); }
   if (a === 'backup') downloadBackup();
   if (a === 'restore') $('#rsFile').click();
   if (a === 'import'){ if (state.page !== 'transactions') location.hash = 'transactions'; state.txKind = 'expense'; $('#importFile').click(); }
