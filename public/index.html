@@ -2524,7 +2524,7 @@ function renderPeople(){
     const ps = state.people || [], sel = (state.ppSel || []).filter(id => ps.some(p => p.id === id));
     b.innerHTML = `<p class="muted" style="margin:0;font-size:13px">Tick who’s travelling, in passenger order, then copy.</p>
       <div class="ppsel">${ps.map(p => { const i = sel.indexOf(p.id); return `<label class="ppchk"><input type="checkbox" data-ppsel="${esc(p.id)}" ${i >= 0 ? 'checked' : ''}>${i >= 0 ? `<span class="pill ontrack">${i + 1}</span>` : ''}<span><strong>${esc(ppName(p))}</strong> <span class="muted">${esc(p.relation || '')}</span></span></label>`; }).join('')}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ppCopyForm" ${sel.length ? '' : 'disabled'}>Copy for the form filler</button><button class="btn" type="button" id="ppCopyText" ${sel.length ? '' : 'disabled'}>Copy as text</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ppCopyForm" ${sel.length ? '' : 'disabled'}>Copy for the form filler${sel.length ? ` (${sel.length === 1 ? '1 person' : sel.length + ' people'})` : ''}</button><button class="btn" type="button" id="ppCopyText" ${sel.length ? '' : 'disabled'}>Copy as text</button></div>
       <div class="ppbm"><span><strong>On a laptop, set up once:</strong> drag this button to your browser’s bookmarks bar.</span>
         <a class="btn" id="ppBm" href="${bookmarklet()}" draggable="true" title="Drag me to the bookmarks bar">Fill from S&amp;A</a>
         <ol><li>Here: tick the people and press <em>Copy for the form filler</em>.</li>
@@ -5047,7 +5047,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-25c';
+const APP_VERSION = '2026-10-25d';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

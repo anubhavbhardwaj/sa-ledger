@@ -7,7 +7,7 @@
 
 export const MARK = 'saLedger';
 // Raised whenever the filler changes: the bookmark has its own copy of the code, so it has to be dragged again.
-export const FILLER_VERSION = 2;
+export const FILLER_VERSION = 3;
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const GENDER = { male: 'Male', female: 'Female', x: 'Diverse / X' };
 
@@ -29,7 +29,7 @@ export function peopleText(people){
 
 export function fillForm(doc, data){
   const people = (data && data.people) || [], win = doc.defaultView || window;
-  const out = { filled: 0, per: people.map(() => 0), skipped: 0, notes: [], fields: [] };
+  const out = { filled: 0, per: people.map(() => 0), skipped: 0, notes: [], fields: [], log: [] };
   if (!people.length) return out;
   const low = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const pad = n => String(n).padStart(2, '0');
@@ -105,6 +105,14 @@ export function fillForm(doc, data){
     const digits = d.replace(/\D/g, ''); return ['1', '7'].includes(digits[0]) ? digits[0] : ['971', '972', '353', '351', '358', '420'].find(c => digits.startsWith(c)) || digits.slice(0, 2); };
 
   const fields = [...doc.querySelectorAll('input, select, textarea')];
+  /* The text a person sees for a field (label, placeholder), as opposed to its internal name and id. */
+  const shown = el => {
+    const p = [el.getAttribute('aria-label'), el.placeholder];
+    if (el.labels) for (const l of el.labels) p.push(l.textContent);
+    const lb = el.getAttribute('aria-labelledby');
+    if (lb) lb.split(/\s+/).forEach(id => { const x = doc.getElementById(id); if (x) p.push(x.textContent); });
+    return low(p.filter(Boolean).join(' | '));
+  };
   /* Headings in page order: a field belongs to the last heading before it ("General 2", "Passenger 2", "Contact details"). */
   const heads = [...doc.querySelectorAll('h1, h2, h3, h4, h5, h6, legend, [role=heading]')];
   const headOf = el => { let h = null; for (const x of heads){ if (x.compareDocumentPosition(el) & 4) h = x; else break; } return h; };
@@ -138,25 +146,30 @@ export function fillForm(doc, data){
       block = x.hEl;
       if ([...blockKinds.get(block)].some(b => NAMES.includes(b) && seen.has(b))){ idx++; seen = new Set(); }
     }
+    /* Names go to the first person as contact only when the label itself says so ("Contact first name"): internal
+       ids like "contactForm-name" are common on forms for every visitor. */
+    const label = (shown(el) || d).replace(/\s*\*\s*/g, ' ').trim().slice(0, 50), blockName = x.h.slice(0, 40);
+    const log = to => out.log.push({ label, block: blockName, kind: k, to });
     let who;
-    if (has(CONTACT_RE, d) || (CONTACTS.includes(k) && (has(CONTACT_RE, x.h) || (count[k] || 0) <= 1))) who = 0;
+    if (has(CONTACT_RE, shown(el)) || (CONTACTS.includes(k) && (has(CONTACT_RE, d) || has(CONTACT_RE, x.h) || (count[k] || 0) <= 1))) who = 0;
     else {
       if (k !== 'email2'){ if (seen.has(k)){ idx++; seen = new Set(); } seen.add(k); }
       who = idx;
     }
-    if (who >= people.length){ if (CONTACTS.includes(k)) who = 0; else continue; }
-    const p = people[who] || {};
+    if (who >= people.length){ if (CONTACTS.includes(k)) who = 0; else { log('nobody (only ' + people.length + ' chosen)'); continue; } }
+    const p = people[who] || {}, name = p.first || 'person ' + (who + 1);
 
     if (el.type === 'radio'){
       const group = fields.filter(r => r.type === 'radio' && r.name === el.name);
-      if (group.some(r => r.checked)){ out.skipped++; continue; }
+      if (group.some(r => r.checked)){ out.skipped++; log('left alone (already chosen)'); continue; }
       const lab = r => low((r.labels && r.labels[0] && r.labels[0].textContent) || r.value).replace(/[.:]/g, '');
       let hit = null; for (const test of titleTests(p.gender)){ hit = group.find(r => test(lab(r)) || test(low(r.value))); if (hit) break; }
-      if (hit){ hit.click(); hit.style.outline = '2px solid #E6AE4A'; out.filled++; out.per[who]++; out.fields.push({ kind: k, who, value: hit.value }); }
+      if (hit){ hit.click(); hit.style.outline = '2px solid #E6AE4A'; out.filled++; out.per[who]++; out.fields.push({ kind: k, who, value: hit.value }); log(name); }
+      else log(name + ': no matching choice');
       continue;
     }
     const empty = el.tagName === 'SELECT' ? (el.selectedIndex <= 0 || !el.value) : !String(el.value || '').trim();
-    if (!empty){ out.skipped++; continue; }
+    if (!empty){ out.skipped++; log('left alone (already filled)'); continue; }
 
     const [y, m, dd] = String(p.passportExp || '').split('-');
     let ok = false, val = null;
@@ -191,7 +204,8 @@ export function fillForm(doc, data){
     else val = { full: [p.first, p.last].filter(Boolean).join(' '), first: p.first, last: p.last, passport: p.passport, email: p.email, email2: p.email }[k] || null;
 
     if (val){ setVal(el, val); ok = true; }
-    if (ok){ el.style.outline = '2px solid #E6AE4A'; el.style.outlineOffset = '1px'; out.filled++; out.per[who]++; out.fields.push({ kind: k, who, value: el.value }); }
+    if (ok){ el.style.outline = '2px solid #E6AE4A'; el.style.outlineOffset = '1px'; out.filled++; out.per[who]++; out.fields.push({ kind: k, who, value: el.value }); log(name); }
+    else log(name + ': nothing saved for this');
   }
   return out;
 }
@@ -206,6 +220,17 @@ export function showFillResult(doc, r, people, version){
   else { add('S&A Ledger found nothing to fill here', true); add('If the form is in a pop-up or a frame, open it in its own tab, or copy the details one by one in the app.'); }
   if (r.skipped) add(r.skipped === 1 ? '1 field that already had something was left alone.' : `${r.skipped} fields that already had something were left alone.`);
   r.notes.forEach(n => add('⚠ ' + n));
+  if (r.log && r.log.length){
+    const det = doc.createElement('details'); det.setAttribute('style', 'margin-top:6px;font-size:12.5px');
+    const sum = doc.createElement('summary'); sum.textContent = 'What went where'; sum.style.cursor = 'pointer'; det.appendChild(sum);
+    r.log.forEach(e => { const li = doc.createElement('div'); li.textContent = `${e.label}${e.block ? ' (' + e.block + ')' : ''} → ${e.to}`; li.style.margin = '2px 0'; det.appendChild(li); });
+    const c = doc.createElement('button'); c.type = 'button'; c.textContent = 'Copy report (no personal details)';
+    c.setAttribute('style', 'margin-top:6px;padding:3px 10px;border:1px solid #ccc;border-radius:8px;background:#f4f4f4;color:#14201b;cursor:pointer;font:inherit');
+    const anon = t => people.reduce((s, p, i) => p.first ? s.split(p.first).join('person ' + (i + 1)) : s, String(t || ''));
+    const rep = { filler: version || 1, site: doc.location ? doc.location.hostname : '', fields: r.log.map(e => ({ label: anon(e.label), block: anon(e.block), kind: e.kind, to: anon(e.to) })) };
+    c.onclick = async () => { try { await navigator.clipboard.writeText(JSON.stringify(rep, null, 1)); c.textContent = 'Copied'; } catch (e) { prompt('Copy this report:', JSON.stringify(rep)); } };
+    det.appendChild(c); box.appendChild(det);
+  }
   const v = doc.createElement('div'); v.textContent = 'Form filler v' + (version || 1); v.setAttribute('style', 'margin-top:6px;font-size:11.5px;color:#6b776f'); box.appendChild(v);
   const x = doc.createElement('button'); x.type = 'button'; x.textContent = 'Close';
   x.setAttribute('style', 'margin-top:8px;padding:4px 12px;border:1px solid #ccc;border-radius:8px;background:#f4f4f4;color:#14201b;cursor:pointer;font:inherit');

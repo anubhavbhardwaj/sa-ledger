@@ -495,7 +495,7 @@ test('fill a form: an Italian hotel form without headings, date format from the 
   await clean(app);
 });
 
-test('fill a form: a ticket form with "Name" and "Surname", two visitors without headings, a Contacts link in the site menu', async () => {
+test('fill a form: a ticket form with "Name" and "Surname", "contact" in the field ids, a Contacts link in the site menu', async () => {
   const app = await openApp();
   const payload = JSON.stringify({ saLedger: 1, people: [
     { first: 'Anubhav', last: 'Bhardwaj', gender: 'male', passport: 'Z1234567', passportExp: '2031-03-11' },
@@ -503,6 +503,13 @@ test('fill a form: a ticket form with "Name" and "Surname", two visitors without
   const site = await bookingPage(app, 'ticket-form.html', payload);
   assert.equal(await val(site, '#mat-input-0'), 'Anubhav'); assert.equal(await val(site, '#mat-input-1'), 'Bhardwaj'); assert.equal(await val(site, '#mat-input-3'), 'Z1234567');
   assert.equal(await val(site, '#mat-input-4'), 'Sulekha'); assert.equal(await val(site, '#mat-input-5'), 'Sharma'); assert.equal(await val(site, '#mat-input-7'), 'X7654321');
-  assert.match((await site.textContent('#sa-fill-result')).replace(/\s+/g, ' '), /Anubhav \(3\), Sulekha \(3\).*Form filler v2/);
+  const box = (await site.textContent('#sa-fill-result')).replace(/\s+/g, ' ');
+  assert.match(box, /Anubhav \(3\), Sulekha \(3\).*Form filler v3/);
+  assert.match(box, /What went where\s*name → Anubhav\s*surname → Anubhav.*name → Sulekha\s*surname → Sulekha/);
+  await site.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async t => { window.__copied = t; } } }); });
+  await site.click('#sa-fill-result details summary'); await site.click('text=Copy report');
+  const report = await site.evaluate(() => window.__copied);
+  assert.ok(report && !/Anubhav|Sulekha|Bhardwaj|Sharma|Z1234567|X7654321/.test(report), 'the report has no personal details');
+  assert.deepEqual(JSON.parse(report).fields.filter(f => f.kind === 'first').map(f => f.to), ['person 1', 'person 2']);
   await clean(app);
 });
