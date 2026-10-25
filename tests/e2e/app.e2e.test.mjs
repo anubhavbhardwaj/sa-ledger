@@ -24,7 +24,7 @@ for (const mobile of [false, true]) test(`every page opens without errors (${mob
 
 test('planner, compare both with the evening before: all 10 days are searched and a pick becomes a trip', async () => {
   const app = await openApp(), { page } = app, s = d(60), e = d(65);
-  await app.go('trips'); await page.click('[data-plan=""]');
+  await app.go('trips'); await page.click('#tripMore'); await page.click('#tripMoreMenu [data-plan=""]');
   await page.click('[data-planwho="both"]');
   await page.fill('#planStart', s); await page.dispatchEvent('#planStart', 'change');
   assert.equal(await page.inputValue('#planEnd'), s, 'the end date follows the start date');
@@ -44,7 +44,7 @@ test('planner, compare both with the evening before: all 10 days are searched an
 
 test('planner, meet somewhere new: places for both, a Rome group with no answer is asked per airport, trip with 5 things to book', async () => {
   const app = await openApp({ serp: { emptyGroups: /^FCO,CIA$/ } }), { page } = app;
-  await app.go('trips'); await page.click('[data-plan=""]');
+  await app.go('trips'); await page.click('#tripMore'); await page.click('#tripMoreMenu [data-plan=""]');
   await page.click('[data-planwho="meet"]');
   await page.fill('#planStart', d(60)); await page.dispatchEvent('#planStart', 'change');
   await page.fill('#planEnd', d(65)); await page.dispatchEvent('#planEnd', 'change');
@@ -180,7 +180,8 @@ test('goals: monthly investing and an emergency fund, set up from the Overview',
     invSnapshots: { ['tr_' + m]: { accountId: 'tr', month: m, investment: 800, value: 20000 }, ['tr_' + month(-1)]: { accountId: 'tr', month: month(-1), investment: 2100, value: 19000 } },
     expenses: exp,
   });
-  await page.waitForSelector('#goalsP [data-goalnew]');
+  await page.waitForSelector('#setupLine [data-goalnew]');
+  assert.equal(await page.isHidden('#goalsP'), true, 'no empty Goals card, just a button on the set-up line');
   await page.click('[data-goalnew]'); await page.fill('#g-amount', '2000'); await page.click('#goalForm [type=submit]'); await page.waitForTimeout(150);
   await page.click('[data-goalnew]'); assert.match(await app.text('#goalHint'), /averages €2,000 a month/, 'trips left out of the average');
   await page.check('#g-accounts input[value="dkb"]'); await page.click('#goalForm [type=submit]'); await page.waitForTimeout(150);
@@ -395,7 +396,7 @@ test('overview: recurring charges with next date, price change and a missed one'
 
 test('people & details: save a person, check a photo, typos flagged', async () => {
   const app = await openApp({ init: `window.__ocrStub = async () => ({ text: 'Passenger 1\\nMr ANUBAV BHARDWAJ\\nEmail anubhav.iiitb@gmail.com', confidence: 91 });` }), { page } = app;
-  await app.go('trips'); await page.click('#page-trips [data-openpeople]'); await page.waitForSelector('#ppDlg[open]');
+  await app.go('trips'); await page.click('#tripMore'); await page.click('#tripMoreMenu [data-openpeople]'); await page.waitForSelector('#ppDlg[open]');
   await page.click('#ppAdd');
   await page.fill('#pp-first', 'Anubhav'); await page.fill('#pp-last', 'Bhardwaj'); await page.selectOption('#pp-gender', 'male'); await page.fill('#pp-email', 'anubhav.iiitb@gmail.com');
   await page.click('#ppSave'); await page.waitForTimeout(200);
@@ -414,7 +415,7 @@ test('people & details: save a person, check a photo, typos flagged', async () =
 test('people & details: passport number and expiry, shortened in the list, checked on a photo, warning on the Overview', async () => {
   const exp = new Date(Date.now() + 120 * 864e5).toISOString().slice(0, 10), [y, m, d] = exp.split('-');
   const app = await openApp({ init: `window.__ocrStub = async () => ({ text: 'Mr ANUBHAV BHARDWAJ\\nPassport number Z1234576\\nExpiry ${d}.${m}.${y}', confidence: 90 });` }), { page } = app;
-  await app.go('trips'); await page.click('#page-trips [data-openpeople]'); await page.waitForSelector('#ppDlg[open]');
+  await app.go('trips'); await page.click('#tripMore'); await page.click('#tripMoreMenu [data-openpeople]'); await page.waitForSelector('#ppDlg[open]');
   await page.click('#ppAdd');
   await page.fill('#pp-first', 'Anubhav'); await page.fill('#pp-last', 'Bhardwaj'); await page.fill('#pp-passport', 'z123 4567'); await page.fill('#pp-passportExp', exp);
   await page.click('#ppSave'); await page.waitForTimeout(200);
@@ -453,7 +454,7 @@ test('fill a form: copy two people in the app, the bookmark fills an airline for
   await app.seed({ settings: { people: { items: [
     { id: 'a', relation: 'Me', first: 'Anubhav', last: 'Bhardwaj', gender: 'male', passport: 'Z1234567', passportExp: '2031-03-11', email: 'anubhav@example.com', phone: '+49 151 23425746' },
     { id: 's', relation: 'Fiancée', first: 'Sulekha', last: 'Sharma', gender: 'female', passport: 'X7654321', passportExp: '2030-08-05', email: 'sulekha@example.com', phone: '+39 333 1234567' }] } } });
-  await app.go('trips'); await page.click('#page-trips [data-openpeople]'); await page.waitForSelector('#ppDlg[open]');
+  await app.go('trips'); await page.click('#tripMore'); await page.click('#tripMoreMenu [data-openpeople]'); await page.waitForSelector('#ppDlg[open]');
   await page.click('#ppFill');
   assert.match(await app.text('#ppBody'), /1\s*Anubhav Bhardwaj Me/);
   await page.click('[data-ppsel="s"]');
@@ -530,7 +531,10 @@ test('menu: four items; Data & backup and App status open their own screens; Tra
     await page.click('#hlDlg button[type=submit]');
     await page.click(mobile ? '.bottomnav a[href="#trips"]' : '.tabs a[href="#trips"]');
     await page.waitForSelector('#page-trips:not([hidden])');
-    assert.match(await app.text('#page-trips .pagehead'), /Travel.*People & details.*\+ Booking/);
+    assert.match(await app.text('#page-trips .pagehead'), /Travel.*More.*\+ Booking.*\+ New trip/);
+    assert.equal(await page.isHidden('#tripMoreMenu'), true);
+    await page.click('#tripMore'); assert.match(await app.text('#tripMoreMenu'), /Plan a trip.*Repeat last visit.*People & details/);
+    await page.click('#page-trips h1'); assert.equal(await page.isHidden('#tripMoreMenu'), true, 'closes on a click elsewhere');
     assert.equal(await page.$$eval('#page-trips [data-back]', els => els.filter(e => e.closest('#tripListView')).length), 0, 'no Back button on a tab');
     await app.seed({ bookingInbox: { m1: { subject: 'Your flight', receivedAt: new Date().toISOString(), from: 'x@y.z' } } });
     await page.waitForTimeout(200);
@@ -550,5 +554,20 @@ test('phone: no page or dialog is wider than the screen', async () => {
     wide.push(await page.evaluate(h => document.documentElement.scrollWidth > innerWidth ? 'page ' + h : null, h));
   }
   assert.deepEqual(wide.filter(Boolean), []);
+  await clean(app);
+});
+
+test('phone layout: Ask AI in the top bar, the + button steps aside while scrolling down, set-up items on one line', async () => {
+  const app = await openApp({ mobile: true }), { page } = app;
+  const ex = {}; for (let i = 0; i < 40; i++) ex['e' + i] = { amount: 10 + i, date: d(-i % 20), store: 'Store ' + (i % 7), category: 'Groceries', account: 'DKB', spender: 'Anubhav', createdAt: 'x' };
+  await app.seed({ expenses: ex }); await page.waitForTimeout(300);
+  assert.ok(await page.$('.appbar #aiBtn'), 'Ask AI sits in the top bar');
+  assert.match(await app.text('#setupLine'), /Not set up yet:\s*Budgets\s*Goals/);
+  assert.equal(await page.isHidden('#budgetPanel'), true); assert.equal(await page.isHidden('#goalsP'), true);
+  assert.equal(await page.$$eval('#recent .r', r => r.length), 5);
+  await page.evaluate(() => scrollTo(0, 600)); await page.waitForTimeout(150);
+  assert.match(await page.getAttribute('#fab', 'class'), /away/);
+  await page.evaluate(() => scrollTo(0, 300)); await page.waitForTimeout(150);
+  assert.doesNotMatch(await page.getAttribute('#fab', 'class'), /away/);
   await clean(app);
 });

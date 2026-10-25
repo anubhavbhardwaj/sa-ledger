@@ -170,6 +170,8 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .avatar[aria-expanded="true"]{box-shadow:0 0 0 3px var(--accent-soft)}
 .pmenu{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:250px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:grid}
 .pmenu[hidden]{display:none!important}
+.setupline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}.setupline[hidden]{display:none}
+.morewrap{position:relative}.morewrap .pmenu{left:0;right:auto;width:240px}
 .pm-head{font-size:12.5px;color:var(--muted);padding:8px 10px 6px}
 .pm-head strong{color:var(--ink)}
 .pm-item{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:var(--ink);font-size:14px;font-weight:500}
@@ -418,9 +420,9 @@ table.mini th.num{font-family:var(--f-body)}
 .neg{color:var(--danger)}
 .mmeta{display:none;font-size:12px;color:var(--muted);margin-top:1px}
 /* ask AI */
-.aibtn{position:fixed;right:24px;bottom:24px;z-index:16;display:inline-flex;align-items:center;gap:7px;border:0;border-radius:999px;padding:11px 16px;background:var(--ink);color:var(--ground);font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(21,32,28,.25)}
+.aibtn{display:inline-flex;align-items:center;gap:6px}.aibtn svg{color:var(--accent)}
 .aibtn:hover{filter:brightness(1.1)}
-#app[hidden] ~ .aibtn{display:none}
+
 .aidlg{padding:0;border:0;max-width:none;max-height:none;margin:0 0 0 auto;height:100dvh;width:min(460px,100vw);border-radius:0;background:var(--surface);color:var(--ink);box-shadow:-8px 0 30px rgba(0,0,0,.18)}
 .aidlg::backdrop{background:rgba(10,15,13,.35)}
 .aiwrap{display:grid;grid-template-rows:auto 1fr auto auto;height:100%}
@@ -449,7 +451,7 @@ table.mini th.num{font-family:var(--f-body)}
 .aiform textarea{flex:1;resize:none;border:1px solid var(--line);background:var(--ground);border-radius:10px;padding:10px 12px;font:inherit;max-height:140px;color:var(--ink)}
 .ainote{margin:0;padding:0 16px 12px;font-size:11.5px;color:var(--muted)}
 @media (max-width:640px){
-  .aibtn{left:16px;right:auto;bottom:calc(76px + env(safe-area-inset-bottom,0px));padding:10px 14px}
+  .aibtn{padding:7px 10px}
   .aidlg{width:100vw;height:100dvh}
   .aiwrap{padding-bottom:env(safe-area-inset-bottom,0px)}
 }
@@ -603,7 +605,9 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
   .btab svg{width:22px;height:22px}
   .btab[aria-current="page"]{color:var(--accent);font-weight:600}
   .btab .bdot{position:absolute;top:6px;left:calc(50% + 8px);min-width:16px;height:16px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-size:10px;line-height:16px;text-align:center;padding:0 4px}
-  .fab{display:grid;place-items:center;position:fixed;right:16px;bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:16;width:56px;height:56px;border-radius:18px;border:0;background:var(--accent);color:var(--accent-ink);font-size:28px;line-height:1;box-shadow:0 6px 18px rgba(21,32,28,.28);cursor:pointer}
+  .fab.away{transform:translateY(140px);opacity:0;pointer-events:none}
+  main.wrap{padding-bottom:72px}
+  .fab{transition:transform .2s ease,opacity .2s ease;display:grid;place-items:center;position:fixed;right:16px;bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:16;width:56px;height:56px;border-radius:18px;border:0;background:var(--accent);color:var(--accent-ink);font-size:28px;line-height:1;box-shadow:0 6px 18px rgba(21,32,28,.28);cursor:pointer}
   input,select,textarea{font-size:16px!important}
   .kpi{padding:12px 14px}.kpi .val{font-size:21px}
   .tscroll{margin:0;padding:0;overflow:visible}
@@ -790,6 +794,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
       <a class="tab" href="#wealth" data-page="wealth">Wealth</a>
       <a class="tab" href="#trips" data-page="trips">Travel<span class="badge" id="tbadge" hidden></span></a>
     </nav>
+    <button class="btn small aibtn" id="aiBtn" type="button" aria-haspopup="dialog" aria-label="Ask AI"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z"/></svg><span>Ask AI</span></button>
     <button class="btn primary" id="addBtn" type="button">+ <span class="long">Add expense</span></button>
     <button class="btn small syncbtn" id="syncBtn" type="button" hidden></button>
     <button class="btn small inboxbtn" id="inboxBtn" type="button" hidden>To review <span class="badge" id="inboxCount">0</span></button>
@@ -822,6 +827,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
       <section class="panel" id="todoCard" hidden></section>
       <div class="pagehead"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
       <section class="kpis" id="kpis" aria-label="Summary"></section>
+      <div class="setupline" id="setupLine" hidden></div>
       <section class="panel" id="budgetPanel" hidden></section>
       <section class="panel" id="goalsP"></section>
       <section class="panel" id="recurP" hidden></section>
@@ -882,7 +888,9 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
       <div id="tripListView" style="display:grid;gap:16px">
         <div class="pagehead">
           <div><h1>Travel</h1><p>Visits, holidays and office travel with their bookings. Link any expense to a trip, whenever it was paid.</p></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="repeatVisit" type="button">Repeat last visit</button><button class="btn" type="button" data-openpeople>People &amp; details</button><button class="btn" type="button" data-addbk="">+ Booking</button><button class="btn" type="button" data-plan="">✈ Plan a trip</button><button class="btn primary" id="newTrip" type="button">+ New trip</button></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><div class="morewrap"><button class="btn" id="tripMore" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="tripMoreMenu">More ▾</button>
+            <div class="pmenu" id="tripMoreMenu" role="menu" hidden><button class="pm-item" role="menuitem" type="button" data-plan=""><span>✈ Plan a trip</span><small>flights for both</small></button><button class="pm-item" role="menuitem" type="button" id="repeatVisit"><span>Repeat last visit</span><small>same trip, new dates</small></button><button class="pm-item" role="menuitem" type="button" data-openpeople><span>People &amp; details</span><small>passports, form filler</small></button></div></div>
+            <button class="btn" type="button" data-addbk="">+ Booking</button><button class="btn primary" id="newTrip" type="button">+ New trip</button></div>
         </div>
         <div class="banner" id="tripSetup" hidden></div>
         <div class="banner" data-ppbar hidden></div>
@@ -991,7 +999,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
   <a class="btab" href="#trips" data-page="trips"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 13.5L3 11l1.5-1.5 8 .5 4.5-4.5a2.1 2.1 0 013 3L15.5 13l.5 8L14.5 22.5 12 15l-3 3v2.5L7.5 22 6 18l-4-1.5L3.5 15H6z"/></svg><span>Travel</span><span class="bdot" id="tbadge2" hidden></span></a>
 </nav>
 <button class="fab" id="fab" type="button" aria-label="Add expense">+</button>
-<button class="aibtn" id="aiBtn" type="button" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z"/></svg><span>Ask AI</span></button>
+
 </div>
 
 <dialog id="tripDlg">
@@ -1828,11 +1836,11 @@ function renderOverview(ms){
     <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' + (invWho.length > 1 ? ' (' + invWho.map(([k, v]) => esc(k) + ' ' + eur0.format(v)).join(' · ') + ')' : invWho.length === 1 ? ' by ' + esc(invWho[0][0]) : '') : ''}</span></div>
     <div class="kpi"><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
     + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${hm0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : `<span class="${nw.delta >= 0 ? 'pos' : 'neg'}">${signed(nw.delta)}</span> since end of ${MON[+nw.prevM.slice(5,7)-1]}`} · Wealth →</span></a>` : ''; })();
-  renderBudgets();
+  renderBudgets(); renderSetupLine();
   renderIncomeVsSpend($('#ovTrend'));
   renderBars('category', $('#ovCats'), {max:6, filtered:false, goto:'transactions'});
   const recent = [...rows.map(r => ({...r, kind:'expense'})), ...inc, ...state.transfers.filter(inPeriod)]
-    .sort((a,b) => b.date.localeCompare(a.date) || String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0, 8);
+    .sort((a,b) => b.date.localeCompare(a.date) || String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0, 5);
   $('#recent').innerHTML = recent.length ? recent.map(r => r.kind === 'transfer' ? `
     <div class="r" data-edit="${esc(r.id)}" data-kind="transfer" tabindex="0" role="button">
       <span class="d">${r.date.slice(8,10)} ${MON[+r.date.slice(5,7)-1]}</span>
@@ -2502,9 +2510,11 @@ function renderRecurring(){
       ${r.status === 'missed' ? `<br><span class="pill risk">expected ${shortDate(r.next)}, not seen yet</span>` : ''}${r.change ? `<br><span class="pill ${r.change.to > r.change.from ? 'over' : 'ontrack'}">${r.change.to > r.change.from ? 'price up' : 'price down'} from ${eur.format(r.change.from)} (${shortDate(r.change.on)})</span>` : ''}</span>
       <span class="rcamt">${eur.format(r.amount)}<small>${r.status === 'missed' ? 'overdue' : 'next ' + when(r.next)}</small></span></div>`;
   const alerts = list.filter(r => r.status === 'missed' || r.change), rest = list.filter(r => !alerts.includes(r));
+  // Missed charges and price changes always show; otherwise only the next three, the rest folded away.
+  const shownN = Math.min(6, alerts.length + 3);
   el.innerHTML = `<header><h2>Recurring charges</h2><span class="hint">${eur0.format(monthly)} a month · ${list.length} found</span></header>
-    <div class="rclist">${[...alerts, ...rest].slice(0, 6).map(row).join('')}</div>
-    ${list.length > 6 ? `<details class="psmore"><summary>All ${list.length}</summary><div class="rclist">${[...alerts, ...rest].slice(6).map(row).join('')}</div></details>` : ''}
+    <div class="rclist">${[...alerts, ...rest].slice(0, shownN).map(row).join('')}</div>
+    ${list.length > shownN ? `<details class="psmore"><summary>All ${list.length}</summary><div class="rclist">${[...alerts, ...rest].slice(shownN).map(row).join('')}</div></details>` : ''}
     <p class="hint">Found from the rhythm of your entries: same store, a regular gap and a steady amount.${bt.n ? ` Checked on your history: hiding each series’ last charge, its date was predicted within 3 days for ${bt.dateOk} of ${bt.n} and its amount for ${bt.amtOk} of ${bt.n}.` : ''}</p>`;
 }
 
@@ -3443,11 +3453,19 @@ function goalEmergency(g){
   for (const a of accs){ const e = estimate(a); if (!e || (e.base.virtual && Math.abs(e.balance) < 0.5)) missing.push(a.name); else have += toEur(a, e.balance); }
   return { target, avg, accs, have, missing };
 }
+// What isn't set up yet takes one line on the Overview instead of a card each.
+function renderSetupLine(){
+  const el = $('#setupLine'); if (!el) return;
+  const noBud = state.period !== 'all' && !(state.budgets.items || []).some(b => b.a > 0), noGoals = !(state.goals || []).length;
+  el.hidden = !noBud && !noGoals; if (el.hidden) return;
+  el.innerHTML = `<span>Not set up yet:</span>${noBud ? '<button class="btn small" type="button" data-editbudgets="suggest">Budgets</button>' : ''}${noGoals ? '<button class="btn small" type="button" data-goalnew>Goals</button>' : ''}`;
+}
 function renderGoals(){
   const el = $('#goalsP'); if (!el) return;
   const G = state.goals || [];
   const head = `<header><h2>Goals</h2><span class="right"><button class="btn small" type="button" data-goalnew>+ Goal</button></span></header>`;
-  if (!G.length){ el.innerHTML = head + `<p class="muted" style="margin:0;font-size:13px">Set a monthly investing habit or an emergency fund, and see each month whether you’re on track.</p>`; return; }
+  el.hidden = !G.length; renderSetupLine();
+  if (!G.length) return;
   const bar = (v, t) => `<span class="lvbar"><i style="width:${Math.min(100, t ? v / t * 100 : 0)}%;background:${v >= t ? 'var(--good)' : 'var(--accent)'}"></i></span>`;
   el.innerHTML = head + G.map((g, i) => {
     const who = g.owner === 'Both' ? '' : ` · ${esc(g.owner)}`;
@@ -3537,6 +3555,9 @@ function openTripDlg(t, preset){
 $('#tripTypeSeg').addEventListener('click', e => { const b = e.target.closest('[data-ttype]'); if (b) setTripType(b.dataset.ttype); });
 $('#tripCancel').addEventListener('click', () => tdlg.close());
 $('#newTrip').addEventListener('click', () => openTripDlg(null));
+// Travel's More menu: opens and closes, and closes after a choice or a click elsewhere.
+$('#tripMore').addEventListener('click', e => { e.stopPropagation(); const m = $('#tripMoreMenu'); m.hidden = !m.hidden; $('#tripMore').setAttribute('aria-expanded', !m.hidden); });
+document.addEventListener('click', e => { const m = $('#tripMoreMenu'); if (m && !m.hidden && (!e.target.closest('#tripMoreMenu') || e.target.closest('.pm-item'))){ m.hidden = true; $('#tripMore').setAttribute('aria-expanded', 'false'); } });
 $('#repeatVisit').addEventListener('click', () => {
   const last = state.trips.filter(t => t.type === 'visit').sort((a,b) => (b.start||'').localeCompare(a.start||''))[0];
   openTripDlg(null, last ? { name:last.name, type:'visit', traveller:last.traveller, budget:last.budget, currency:last.currency } : { type:'visit', name:'Rome visit' });
@@ -3674,10 +3695,7 @@ function renderBudgets(){
   el.hidden = false;
   const has = (state.budgets.items || []).some(b => b.a > 0);
   if (!has){
-    el.innerHTML = `<header><h2>Budgets</h2></header>
-      <p class="muted" style="margin:0">Set a monthly budget per category to see what’s on track, at risk or over. Daily life only; trips have their own budgets.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-editbudgets="suggest">Suggest budgets from my spending</button><button class="btn" type="button" data-editbudgets>Set budgets myself</button></div>`;
-    return;
+    el.hidden = true; return;
   }
   const b = budgetStatus(state.period);
   const counts = ['over','risk'].map(k => b.rows.filter(r => r.status === k).length);
@@ -5049,7 +5067,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-25f';
+const APP_VERSION = '2026-10-25g';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
@@ -5949,6 +5967,11 @@ async function aiAsk(q){
   } finally { ans.typing = false; state.aiBusy = false; $('#aiSend').disabled = false; aiRender(); $('#aiInput').focus(); }
 }
 $('#aiBtn').addEventListener('click', () => { aiRender(); aidlg.showModal(); setTimeout(() => $('#aiInput').focus(), 50); });
+// The + button moves out of the way while you scroll down and comes back when you scroll up.
+{ let lastY = scrollY;
+  addEventListener('scroll', () => { const y = scrollY, f = $('#fab'); if (!f) return;
+    if (y > lastY + 8 && y > 120) f.classList.add('away'); else if (y < lastY - 8 || y < 120) f.classList.remove('away');
+    if (Math.abs(y - lastY) > 8) lastY = y; }, { passive: true }); }
 $('#aiClose').addEventListener('click', () => aidlg.close());
 $('#aiNew').addEventListener('click', () => { if (state.aiBusy) return; state.ai = []; aiRender(); $('#aiInput').focus(); });
 aidlg.addEventListener('click', e => { if (e.target === aidlg) aidlg.close(); });
