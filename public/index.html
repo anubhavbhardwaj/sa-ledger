@@ -563,6 +563,7 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .rcrow:last-child{border-bottom:0}.rcrow .pill{margin-top:4px;justify-self:start}.rcamt{text-align:right;font-family:var(--f-mono);white-space:nowrap}.rcamt small{display:block;font:400 12px var(--f-body);color:var(--muted)}
 .ppcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px}.pph{display:flex;gap:8px;align-items:baseline}.pph .linkbtn{margin-left:auto}
 .ppfields{display:flex;flex-wrap:wrap;gap:6px}.ppcopy{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:4px 9px;font-size:13px;display:grid}
+.ppwarn{margin:0;font-size:12.5px;line-height:1.4}.ppwarn.bad{color:var(--danger)}.ppwarn.warn{color:var(--warn)}.ppq{color:var(--warn);font-weight:700}
 .ppcopy small{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.ppcopy:active{background:var(--sunk)}
 .pprh{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}.ppres{border:1px solid var(--line);border-radius:10px;padding:10px 12px}.ppres.bad{border-color:var(--danger)}.ppres ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:4px;font-size:13.5px}
 .pptext{white-space:pre-wrap;font-size:12px;max-height:240px;overflow:auto;background:var(--sunk);padding:8px;border-radius:8px}
@@ -823,6 +824,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <div style="display:grid;gap:18px">
       <div class="install" id="installBar" hidden></div>
       <div class="banner" id="inboxBar" hidden></div>
+      <div class="banner" id="ppBar" hidden></div>
       <div class="banner" data-bkinboxbar hidden></div>
       <section class="panel" id="nextUp" hidden></section>
       <section class="panel" id="todoCard" hidden></section>
@@ -1391,7 +1393,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 <script type="module">
 import { decodeBCBP } from "./bcbp.js";
 import { detectRecurring, backtest as recurBacktest } from "./recur.js";
-import { checkPhoto } from "./verify.js";
+import { checkPhoto, passportAlerts, human as humanDate } from "./verify.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -1602,6 +1604,7 @@ onAuthStateChanged(auth, user => {
     const gl = snap.docs.find(x => x.id === 'goals'); state.goals = gl ? gl.data().items || [] : [];
     const pp = snap.docs.find(x => x.id === 'people'); state.people = pp ? pp.data().items || [] : [];
     if ($('#ppDlg')?.open && state.ppView === 'list') renderPeople();
+    renderPassportBar();
     const tx = snap.docs.find(x => x.id === 'tax'); state.tax = tx ? tx.data() : {};
     pfCache = null; render();
   }, onErr('budgets')));
@@ -1775,7 +1778,7 @@ function renderMonths(ms){
 // Overview ignores bar filters: it is the unfiltered picture of the chosen period.
 function renderOverview(ms){
   $('#ovTitle').textContent = 'Overview · ' + periodName();
-  loadRates(); renderTodo(); fillMonthRates(); renderGoals(); renderRecurring();
+  loadRates(); renderTodo(); fillMonthRates(); renderGoals(); renderRecurring(); renderPassportBar();
   const rows = state.items.filter(inPeriod);
   const total = sum(rows);
   let deltaHtml = '<span class="sub">No earlier month to compare</span>';
@@ -2501,8 +2504,12 @@ function renderRecurring(){
 
 // ---------- People & details: names as in the passport, contacts, and checking a form from a photo ----------
 const REL = ['Me', 'Partner', 'Fiancée', 'Spouse', 'Father', 'Mother', 'Sibling', 'Child', 'Friend', 'Other'];
-const PP_FIELDS = [['first', 'First name(s) as in passport'], ['last', 'Last name as in passport'], ['relation', 'Relationship'], ['gender', 'Gender'], ['email', 'Email'], ['phone', 'Phone']];
+const PP_FIELDS = [['first', 'First name(s) as in passport'], ['last', 'Last name as in passport'], ['relation', 'Relationship'], ['gender', 'Gender'],
+  ['passport', 'Passport number'], ['passportExp', 'Passport expiry'], ['email', 'Email'], ['phone', 'Phone']];
 const ppName = p => [p.first, p.last].filter(Boolean).join(' ') || 'Unnamed';
+// The passport number is shown shortened in the list (first character and last three); tapping copies it in full.
+const ppMask = s => s.length > 4 ? s[0] + '•'.repeat(s.length - 4) + s.slice(-3) : s;
+const ppAlerts = p => passportAlerts(p, state.trips || [], today()).map(a => `<p class="ppwarn ${a.level}">${a.level === 'bad' ? '⚠ ' : ''}${esc(a.text)}</p>`).join('');
 async function savePeople(items){
   try { await setDoc(doc(fs, 'settings', 'people'), { items, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) }); state.people = items; }
   catch (x){ toast(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); throw x; }
@@ -2517,25 +2524,28 @@ function renderPeople(){
       <label class="f">Last name as in passport<input id="pp-last" value="${esc(p.last || '')}" autocomplete="off"></label>
       <label class="f">Relationship<select id="pp-relation">${REL.map(r => `<option ${p.relation === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
       <label class="f">Gender<select id="pp-gender"><option value="">Not set</option><option value="female" ${p.gender === 'female' ? 'selected' : ''}>Female</option><option value="male" ${p.gender === 'male' ? 'selected' : ''}>Male</option><option value="x" ${p.gender === 'x' ? 'selected' : ''}>Diverse / X</option></select></label>
+      <label class="f">Passport number<input id="pp-passport" value="${esc(p.passport || '')}" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+      <label class="f">Passport expiry<input id="pp-passportExp" type="date" value="${esc(p.passportExp || '')}"></label>
       <label class="f full">Email<input id="pp-email" type="email" value="${esc(p.email || '')}" autocomplete="off"></label>
       <label class="f full">Phone (with country code)<input id="pp-phone" type="tel" value="${esc(p.phone || '')}" autocomplete="off" placeholder="+49 151 …"></label>
     </div>
-    <p class="muted" style="margin:0;font-size:12.5px">Type names exactly as printed in the passport, including middle names. Saved for both of you.</p>
+    <p class="muted" style="margin:0;font-size:12.5px">Type names exactly as printed in the passport, including middle names. Saved for both of you. The expiry date gives a warning a year ahead, and when a trip in the app ends less than 6 months before it.</p>
     <div class="dlg-actions" style="margin:0">${p.id ? '<button class="btn danger" type="button" id="ppDel">Delete</button>' : ''}<div class="right"><button class="btn" type="button" id="ppBack">Cancel</button><button class="btn primary" type="button" id="ppSave">Save</button></div></div>`;
     return;
   }
   if (v === 'result'){
     const R = state.ppResult || {};
-    const icon = { ok: '<span class="pos">✓</span>', near: '<span class="neg">⚠</span>', conflict: '<span class="neg">✗</span>', missing: '<span class="muted">–</span>' };
+    const icon = { ok: '<span class="pos">✓</span>', near: '<span class="neg">⚠</span>', conflict: '<span class="neg">✗</span>', check: '<span class="ppq">?</span>', missing: '<span class="muted">–</span>' };
     const line = r => r.status === 'ok' ? `${esc(r.expected)} <span class="muted">matches</span>`
       : r.status === 'near' ? `The form shows <strong>“${esc(r.seen)}”</strong>, should be <strong>${esc(r.expected)}</strong>`
+      : r.status === 'check' ? `The form shows <strong>“${esc(r.seen)}”</strong> (saved: ${esc(r.expected)}): ${esc(r.note)}`
       : r.status === 'conflict' ? `The form says <strong>${esc(r.seen)}</strong>, but ${esc(r.expected)} is saved`
       : `${esc(r.expected)} <span class="muted">not on the photo</span>`;
     b.innerHTML = (R.busy ? `<div class="bkprog"><span class="bkspin"></span><span>${esc(R.busy)}</span></div>` : '') +
       (R.error ? `<p class="err" style="margin:0">${esc(R.error)}</p>` : '') +
       (R.results ? (R.results.length ? R.results.map(x => `<div class="ppres ${x.problems ? 'bad' : 'good'}"><div class="pprh"><span><strong>${esc(ppName(x.person))}</strong> <span class="muted">${esc(x.person.relation || '')}</span></span>
-          <span class="pill ${x.problems ? 'over' : 'ontrack'}">${x.problems ? x.problems + ' to fix' : 'all found details match'}</span></div>
-          <ul>${x.rows.map(r => `<li>${icon[r.status]} <span class="muted">${esc(r.field)}:</span> ${line(r)}</li>`).join('')}</ul></div>`).join('')
+          <span class="pill ${x.problems ? 'over' : x.checks ? 'risk' : 'ontrack'}">${x.problems ? x.problems + ' to fix' : x.checks ? x.checks + ' to check by eye' : 'all found details match'}</span></div>
+          <ul>${x.rows.map(r => `<li>${icon[r.status]} <span class="muted">${esc(r.field)}:</span> ${line(r)}</li>`).join('')}</ul>${ppAlerts(x.person)}</div>`).join('')
         : `<p style="margin:0">None of your people’s names were found on the photo. Try again closer, straight on and without glare${R.byAI ? '' : '; or check the text recognised below'}.</p>`) : '') +
       (R.byAI ? `<p class="muted" style="margin:0;font-size:12.5px">The photo was unclear for the phone’s own reading, so it was read by AI (Groq).</p>` : '') +
       (R.text ? `<details class="psmore"><summary>Recognised text</summary><pre class="pptext">${esc(R.text)}</pre></details>` : '') +
@@ -2543,13 +2553,25 @@ function renderPeople(){
     return;
   }
   const ps = state.people || [];
-  b.innerHTML = `<p class="muted" style="margin:0;font-size:13px">Save names as in the passport and contact details, then take a photo of a booking form on a laptop or paper: the app finds each person on it and flags anything that doesn’t match.</p>
+  b.innerHTML = `<p class="muted" style="margin:0;font-size:13px">Save names and passport details exactly as in the passport, plus contact details, then take a photo of a booking form on a laptop or paper: the app finds each person on it and flags anything that doesn’t match.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-ppcheck="cam" ${ps.length ? '' : 'disabled'}>Check a photo</button><button class="btn" type="button" data-ppcheck="file" ${ps.length ? '' : 'disabled'}>Choose image</button><button class="btn" type="button" id="ppAdd">Add person</button></div>
     ${ps.length ? ps.map(p => `<div class="ppcard"><div class="pph"><strong>${esc(ppName(p))}</strong> <span class="muted">${esc(p.relation || '')}</span><button type="button" class="linkbtn" data-ppedit="${esc(p.id)}">Edit</button></div>
-      <div class="ppfields">${[['First name', p.first], ['Last name', p.last], ['Gender', p.gender === 'female' ? 'Female' : p.gender === 'male' ? 'Male' : p.gender === 'x' ? 'Diverse / X' : ''], ['Email', p.email], ['Phone', p.phone]].filter(x => x[1]).map(([k, v]) => `<button type="button" class="ppcopy" data-ppcopy="${esc(v)}" title="Copy"><small>${k}</small>${esc(v)}</button>`).join('')}</div></div>`).join('')
+      <div class="ppfields">${[['First name', p.first], ['Last name', p.last], ['Gender', p.gender === 'female' ? 'Female' : p.gender === 'male' ? 'Male' : p.gender === 'x' ? 'Diverse / X' : ''],
+        ['Passport', p.passport, p.passport && ppMask(p.passport)], ['Expires', p.passportExp && humanDate(p.passportExp)], ['Email', p.email], ['Phone', p.phone]]
+        .filter(x => x[1]).map(([k, v, show]) => `<button type="button" class="ppcopy" data-ppcopy="${esc(v)}" data-pplabel="${k}" title="Copy"><small>${k}</small>${esc(show || v)}</button>`).join('')}</div>${ppAlerts(p)}</div>`).join('')
       : '<p class="empty" style="margin:0">No one saved yet.</p>'}
-    <p class="hint" style="margin:0">Tap a detail to copy it into a form.</p>`;
+    <p class="hint" style="margin:0">Tap a detail to copy it into a form. Passport numbers are shown shortened; tapping copies the full number.</p>`;
 }
+// Overview banner: a passport that has expired, runs out within a year, or has too little left for a planned trip.
+function renderPassportBar(){
+  const bar = $('#ppBar'); if (!bar) return;
+  const hits = (state.people || []).map(p => ({ p, a: passportAlerts(p, state.trips || [], today()) })).filter(x => x.a.length);
+  bar.hidden = !hits.length; if (!hits.length) return;
+  bar.innerHTML = `<div class="left"><strong>${hits.some(x => x.a.some(a => a.level === 'bad')) ? '⚠ ' : ''}Passport${hits.length > 1 ? 's' : ''} to look at</strong>
+    ${hits.map(x => `<span class="note" style="font-size:12.5px;color:var(--muted)">${esc(ppName(x.p))}: ${esc(x.a.map(a => a.text).join(' '))}</span>`).join('')}</div>
+    <button class="btn" type="button" data-openpeople>Details</button>`;
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-openpeople]')){ state.ppView = 'list'; renderPeople(); $('#ppDlg').showModal(); } });
 // Text recognition on the phone (Tesseract, about 10 MB the first time), kept loaded between photos.
 let ocrWorkerP = null;
 function ocrWorker(){
@@ -2599,14 +2621,19 @@ document.addEventListener('click', async e => {
   if (t.id === 'ppAdd'){ state.ppEdit = { relation: (state.people || []).length ? 'Fiancée' : 'Me' }; state.ppView = 'edit'; return renderPeople(); }
   if (t.closest('[data-ppedit]')){ state.ppEdit = { ...(state.people || []).find(p => p.id === t.closest('[data-ppedit]').dataset.ppedit) }; state.ppView = 'edit'; return renderPeople(); }
   if (t.id === 'ppBack'){ state.ppView = 'list'; return renderPeople(); }
-  if (t.closest('[data-ppcopy]')){ const v = t.closest('[data-ppcopy]').dataset.ppcopy; try { await navigator.clipboard.writeText(v); toast('Copied: ' + v); } catch { toast(v); } return; }
+  if (t.closest('[data-ppcopy]')){
+    const el = t.closest('[data-ppcopy]'), v = el.dataset.ppcopy, secret = el.dataset.pplabel === 'Passport';
+    try { await navigator.clipboard.writeText(v); toast(secret ? 'Copied the passport number' : 'Copied: ' + v); } catch { toast(v); } return;
+  }
   if (t.closest('[data-ppcheck]')) return (t.closest('[data-ppcheck]').dataset.ppcheck === 'cam' ? $('#ppCam') : $('#ppFile')).click();
   if (t.id === 'ppSave'){
     const v = k => ($('#pp-' + k)?.value || '').trim(), p = { id: state.ppEdit?.id || Math.random().toString(36).slice(2, 10) };
     for (const [k] of PP_FIELDS) if (v(k)) p[k] = v(k).slice(0, 120);
+    if (p.passport) p.passport = p.passport.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+    if (p.passportExp && !/^\d{4}-\d{2}-\d{2}$/.test(p.passportExp)) delete p.passportExp;
     if (!p.first && !p.last) return toast('Enter at least a name.');
     const items = [...(state.people || []).filter(x => x.id !== p.id), p];
-    try { await savePeople(items); state.ppView = 'list'; renderPeople(); toast('Saved ' + ppName(p)); } catch {}
+    try { await savePeople(items); state.ppView = 'list'; renderPeople(); renderPassportBar(); toast('Saved ' + ppName(p)); } catch {}
   }
   if (t.id === 'ppDel'){
     if (!confirm('Delete ' + ppName(state.ppEdit) + '?')) return;
@@ -4992,7 +5019,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-23';
+const APP_VERSION = '2026-10-25';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

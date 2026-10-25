@@ -408,3 +408,25 @@ test('people & details: save a person, check a photo, typos flagged', async () =
   assert.match(t, /1 to fix/); assert.match(t, /The form shows “anubav”, should be Anubhav/); assert.match(t, /Bhardwaj matches/); assert.match(t, /anubhav\.iiitb@gmail\.com matches/);
   await clean(app);
 });
+
+test('people & details: passport number and expiry, shortened in the list, checked on a photo, warning on the Overview', async () => {
+  const exp = new Date(Date.now() + 120 * 864e5).toISOString().slice(0, 10), [y, m, d] = exp.split('-');
+  const app = await openApp({ init: `window.__ocrStub = async () => ({ text: 'Mr ANUBHAV BHARDWAJ\\nPassport number Z1234576\\nExpiry ${d}.${m}.${y}', confidence: 90 });` }), { page } = app;
+  await page.click('#profBtn'); await page.click('[data-pm="people"]'); await page.waitForSelector('#ppDlg[open]');
+  await page.click('#ppAdd');
+  await page.fill('#pp-first', 'Anubhav'); await page.fill('#pp-last', 'Bhardwaj'); await page.fill('#pp-passport', 'z123 4567'); await page.fill('#pp-passportExp', exp);
+  await page.click('#ppSave'); await page.waitForTimeout(200);
+  const list = await app.text('#ppBody');
+  assert.match(list, /Z••••567/); assert.doesNotMatch(list, /Z1234567/); assert.match(list, /under 6 months/);
+  await page.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 400; c.height = 200; c.getContext('2d').fillRect(0, 0, 10, 10);
+    const b = await new Promise(r => c.toBlob(r, 'image/png')), dt = new DataTransfer(); dt.items.add(new File([b], 'form.png', { type: 'image/png' }));
+    const i = document.getElementById('ppFile'); i.files = dt.files; i.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => /to fix|match/.test(document.getElementById('ppBody').textContent));
+  const t = await app.text('#ppBody');
+  assert.match(t, /1 to fix/); assert.match(t, /The form shows “Z1234576”, should be Z1234567/); assert.match(t, /Passport expiry: .* matches/);
+  await page.click('#ppClose');
+  assert.equal(await page.isHidden('#ppBar'), false); assert.match(await app.text('#ppBar'), /Passport to look at[\s\S]*Anubhav Bhardwaj: Passport expires/);
+  await clean(app);
+});
