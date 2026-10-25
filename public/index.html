@@ -1396,7 +1396,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 import { decodeBCBP } from "./bcbp.js";
 import { detectRecurring, backtest as recurBacktest } from "./recur.js";
 import { checkPhoto, passportAlerts, human as humanDate } from "./verify.js";
-import { formPayload, peopleText, bookmarklet } from "./fill.js";
+import { formPayload, peopleText, bookmarklet, FILLER_VERSION } from "./fill.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -2529,7 +2529,8 @@ function renderPeople(){
         <a class="btn" id="ppBm" href="${bookmarklet()}" draggable="true" title="Drag me to the bookmarks bar">Fill from S&amp;A</a>
         <ol><li>Here: tick the people and press <em>Copy for the form filler</em>.</li>
           <li>On the booking page: click <em>Fill from S&amp;A</em> in the bookmarks bar. The browser may ask to allow reading the clipboard, or show a box to paste into.</li>
-          <li>It fills title, names, passport number and expiry, email and phone, leaves fields that already have something alone and outlines what it filled in yellow. Check every value before you submit.</li></ol></div>
+          <li>It fills title, names, passport number and expiry, email and phone, leaves fields that already have something alone and outlines what it filled in yellow. Check every value before you submit.</li></ol>
+        <span class="muted" style="font-size:12.5px">Current filler: v${FILLER_VERSION}. The box on the booking page shows your bookmark’s version; if it’s older, delete the bookmark and drag this button again.</span></div>
       <p class="muted" style="margin:0;font-size:12.5px">On the phone: <em>Copy as text</em> for a message or an email, or tap single details in the list to paste them one at a time. What you copy stays in the clipboard until you copy something else.</p>
       <div><button class="btn" type="button" id="ppBack">Back to people</button></div>`;
     return;
@@ -5046,7 +5047,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-25b';
+const APP_VERSION = '2026-10-25c';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

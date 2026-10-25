@@ -494,3 +494,15 @@ test('fill a form: an Italian hotel form without headings, date format from the 
   assert.match(await site.textContent('#sa-fill-result'), /Passport expiry for Sulekha typed as 05\/08\/2030 \(day first\): check the site’s date format/);
   await clean(app);
 });
+
+test('fill a form: a ticket form with "Name" and "Surname", two visitors without headings, a Contacts link in the site menu', async () => {
+  const app = await openApp();
+  const payload = JSON.stringify({ saLedger: 1, people: [
+    { first: 'Anubhav', last: 'Bhardwaj', gender: 'male', passport: 'Z1234567', passportExp: '2031-03-11' },
+    { first: 'Sulekha', last: 'Sharma', gender: 'female', passport: 'X7654321', passportExp: '2030-08-05' }] });
+  const site = await bookingPage(app, 'ticket-form.html', payload);
+  assert.equal(await val(site, '#mat-input-0'), 'Anubhav'); assert.equal(await val(site, '#mat-input-1'), 'Bhardwaj'); assert.equal(await val(site, '#mat-input-3'), 'Z1234567');
+  assert.equal(await val(site, '#mat-input-4'), 'Sulekha'); assert.equal(await val(site, '#mat-input-5'), 'Sharma'); assert.equal(await val(site, '#mat-input-7'), 'X7654321');
+  assert.match((await site.textContent('#sa-fill-result')).replace(/\s+/g, ' '), /Anubhav \(3\), Sulekha \(3\).*Form filler v2/);
+  await clean(app);
+});
