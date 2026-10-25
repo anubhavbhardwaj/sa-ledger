@@ -561,6 +561,11 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .chip-btn[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:transparent}
 .rclist{display:grid}.rcrow{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);align-items:flex-start}
 .rcrow:last-child{border-bottom:0}.rcrow .pill{margin-top:4px;justify-self:start}.rcamt{text-align:right;font-family:var(--f-mono);white-space:nowrap}.rcamt small{display:block;font:400 12px var(--f-body);color:var(--muted)}
+.ppcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px}.pph{display:flex;gap:8px;align-items:baseline}.pph .linkbtn{margin-left:auto}
+.ppfields{display:flex;flex-wrap:wrap;gap:6px}.ppcopy{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:4px 9px;font-size:13px;display:grid}
+.ppcopy small{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.ppcopy:active{background:var(--sunk)}
+.pprh{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}.ppres{border:1px solid var(--line);border-radius:10px;padding:10px 12px}.ppres.bad{border-color:var(--danger)}.ppres ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:4px;font-size:13.5px}
+.pptext{white-space:pre-wrap;font-size:12px;max-height:240px;overflow:auto;background:var(--sunk);padding:8px;border-radius:8px}
 .fire-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px}
 .fire-grid label{display:grid;gap:4px;align-content:start;font-size:12.5px;color:var(--ink-2)}
 .fire-grid input{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:8px 10px;width:100%;min-width:0;font-family:var(--f-mono)}
@@ -791,6 +796,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
         <a class="pm-item" role="menuitem" href="#trips"><span>Trips</span><small id="pmTrips"></small></a>
         <button class="pm-item pm-alert" role="menuitem" type="button" data-addbk="" id="pmBkInbox" hidden><span>Forwarded bookings</span><small id="pmBkInboxN"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-addbk=""><span>Add booking</span><small>ticket, PDF, screenshot or photo</small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="people"><span>People &amp; details</span><small>check a form with a photo</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="health"><span>System health</span><small id="pmHealth"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="sync"><span>Sync check</span><small>is this device up to date?</small></button>
@@ -1297,6 +1303,15 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 
 <dialog id="codeView" aria-label="Ticket code"><img alt="Ticket code"><p></p></dialog>
 
+<dialog id="ppDlg">
+  <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:560px" novalidate onsubmit="return false">
+    <h3 id="ppTitle">People &amp; details</h3>
+    <div id="ppBody" style="display:grid;gap:12px"></div>
+    <input type="file" id="ppCam" accept="image/*" capture="environment" hidden>
+    <input type="file" id="ppFile" accept="image/*" hidden>
+    <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="ppClose">Close</button></div></div>
+  </form>
+</dialog>
 <dialog id="smDlg">
   <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:620px">
     <h3>Smart suggestions: test on your data</h3>
@@ -1376,6 +1391,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 <script type="module">
 import { decodeBCBP } from "./bcbp.js";
 import { detectRecurring, backtest as recurBacktest } from "./recur.js";
+import { checkPhoto } from "./verify.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -1516,7 +1532,7 @@ const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' +
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-const state = { workdays:{}, tax:{}, payslips:[], psDraft:[], psProject:true, taxYear:null, taxMonth:null, home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], toBook:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null, store:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
+const state = { people:[], ppView:'list', workdays:{}, tax:{}, payslips:[], psDraft:[], psProject:true, taxYear:null, taxMonth:null, home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], toBook:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null, store:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
 
 // ---------- auth ----------
@@ -1584,6 +1600,8 @@ onAuthStateChanged(auth, user => {
     const bs = snap.docs.find(x => x.id === 'bookings'); state.bkSettings = bs ? bs.data() : {};
     const lv = snap.docs.find(x => x.id === 'leave'); state.leave = lv ? lv.data() : {};
     const gl = snap.docs.find(x => x.id === 'goals'); state.goals = gl ? gl.data().items || [] : [];
+    const pp = snap.docs.find(x => x.id === 'people'); state.people = pp ? pp.data().items || [] : [];
+    if ($('#ppDlg')?.open && state.ppView === 'list') renderPeople();
     const tx = snap.docs.find(x => x.id === 'tax'); state.tax = tx ? tx.data() : {};
     pfCache = null; render();
   }, onErr('budgets')));
@@ -2480,6 +2498,122 @@ function renderRecurring(){
     ${list.length > 6 ? `<details class="psmore"><summary>All ${list.length}</summary><div class="rclist">${[...alerts, ...rest].slice(6).map(row).join('')}</div></details>` : ''}
     <p class="hint">Found from the rhythm of your entries: same store, a regular gap and a steady amount.${bt.n ? ` Checked on your history: hiding each series’ last charge, its date was predicted within 3 days for ${bt.dateOk} of ${bt.n} and its amount for ${bt.amtOk} of ${bt.n}.` : ''}</p>`;
 }
+
+// ---------- People & details: names as in the passport, contacts, and checking a form from a photo ----------
+const REL = ['Me', 'Partner', 'Fiancée', 'Spouse', 'Father', 'Mother', 'Sibling', 'Child', 'Friend', 'Other'];
+const PP_FIELDS = [['first', 'First name(s) as in passport'], ['last', 'Last name as in passport'], ['relation', 'Relationship'], ['gender', 'Gender'], ['email', 'Email'], ['phone', 'Phone']];
+const ppName = p => [p.first, p.last].filter(Boolean).join(' ') || 'Unnamed';
+async function savePeople(items){
+  try { await setDoc(doc(fs, 'settings', 'people'), { items, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) }); state.people = items; }
+  catch (x){ toast(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); throw x; }
+}
+function renderPeople(){
+  const b = $('#ppBody'), v = state.ppView;
+  $('#ppTitle').textContent = v === 'edit' ? (state.ppEdit?.id ? 'Edit person' : 'Add person') : v === 'result' ? 'Photo check' : 'People & details';
+  if (v === 'edit'){
+    const p = state.ppEdit || {};
+    b.innerHTML = `<div class="fields">
+      <label class="f">First name(s) as in passport<input id="pp-first" value="${esc(p.first || '')}" autocomplete="off"></label>
+      <label class="f">Last name as in passport<input id="pp-last" value="${esc(p.last || '')}" autocomplete="off"></label>
+      <label class="f">Relationship<select id="pp-relation">${REL.map(r => `<option ${p.relation === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
+      <label class="f">Gender<select id="pp-gender"><option value="">Not set</option><option value="female" ${p.gender === 'female' ? 'selected' : ''}>Female</option><option value="male" ${p.gender === 'male' ? 'selected' : ''}>Male</option><option value="x" ${p.gender === 'x' ? 'selected' : ''}>Diverse / X</option></select></label>
+      <label class="f full">Email<input id="pp-email" type="email" value="${esc(p.email || '')}" autocomplete="off"></label>
+      <label class="f full">Phone (with country code)<input id="pp-phone" type="tel" value="${esc(p.phone || '')}" autocomplete="off" placeholder="+49 151 …"></label>
+    </div>
+    <p class="muted" style="margin:0;font-size:12.5px">Type names exactly as printed in the passport, including middle names. Saved for both of you.</p>
+    <div class="dlg-actions" style="margin:0">${p.id ? '<button class="btn danger" type="button" id="ppDel">Delete</button>' : ''}<div class="right"><button class="btn" type="button" id="ppBack">Cancel</button><button class="btn primary" type="button" id="ppSave">Save</button></div></div>`;
+    return;
+  }
+  if (v === 'result'){
+    const R = state.ppResult || {};
+    const icon = { ok: '<span class="pos">✓</span>', near: '<span class="neg">⚠</span>', conflict: '<span class="neg">✗</span>', missing: '<span class="muted">–</span>' };
+    const line = r => r.status === 'ok' ? `${esc(r.expected)} <span class="muted">matches</span>`
+      : r.status === 'near' ? `The form shows <strong>“${esc(r.seen)}”</strong>, should be <strong>${esc(r.expected)}</strong>`
+      : r.status === 'conflict' ? `The form says <strong>${esc(r.seen)}</strong>, but ${esc(r.expected)} is saved`
+      : `${esc(r.expected)} <span class="muted">not on the photo</span>`;
+    b.innerHTML = (R.busy ? `<div class="bkprog"><span class="bkspin"></span><span>${esc(R.busy)}</span></div>` : '') +
+      (R.error ? `<p class="err" style="margin:0">${esc(R.error)}</p>` : '') +
+      (R.results ? (R.results.length ? R.results.map(x => `<div class="ppres ${x.problems ? 'bad' : 'good'}"><div class="pprh"><span><strong>${esc(ppName(x.person))}</strong> <span class="muted">${esc(x.person.relation || '')}</span></span>
+          <span class="pill ${x.problems ? 'over' : 'ontrack'}">${x.problems ? x.problems + ' to fix' : 'all found details match'}</span></div>
+          <ul>${x.rows.map(r => `<li>${icon[r.status]} <span class="muted">${esc(r.field)}:</span> ${line(r)}</li>`).join('')}</ul></div>`).join('')
+        : `<p style="margin:0">None of your people’s names were found on the photo. Try again closer, straight on and without glare${R.byAI ? '' : '; or check the text recognised below'}.</p>`) : '') +
+      (R.byAI ? `<p class="muted" style="margin:0;font-size:12.5px">The photo was unclear for the phone’s own reading, so it was read by AI (Groq).</p>` : '') +
+      (R.text ? `<details class="psmore"><summary>Recognised text</summary><pre class="pptext">${esc(R.text)}</pre></details>` : '') +
+      `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-ppcheck="cam">Take another photo</button><button class="btn" type="button" id="ppBack">Back to people</button></div>`;
+    return;
+  }
+  const ps = state.people || [];
+  b.innerHTML = `<p class="muted" style="margin:0;font-size:13px">Save names as in the passport and contact details, then take a photo of a booking form on a laptop or paper: the app finds each person on it and flags anything that doesn’t match.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-ppcheck="cam" ${ps.length ? '' : 'disabled'}>Check a photo</button><button class="btn" type="button" data-ppcheck="file" ${ps.length ? '' : 'disabled'}>Choose image</button><button class="btn" type="button" id="ppAdd">Add person</button></div>
+    ${ps.length ? ps.map(p => `<div class="ppcard"><div class="pph"><strong>${esc(ppName(p))}</strong> <span class="muted">${esc(p.relation || '')}</span><button type="button" class="linkbtn" data-ppedit="${esc(p.id)}">Edit</button></div>
+      <div class="ppfields">${[['First name', p.first], ['Last name', p.last], ['Gender', p.gender === 'female' ? 'Female' : p.gender === 'male' ? 'Male' : p.gender === 'x' ? 'Diverse / X' : ''], ['Email', p.email], ['Phone', p.phone]].filter(x => x[1]).map(([k, v]) => `<button type="button" class="ppcopy" data-ppcopy="${esc(v)}" title="Copy"><small>${k}</small>${esc(v)}</button>`).join('')}</div></div>`).join('')
+      : '<p class="empty" style="margin:0">No one saved yet.</p>'}
+    <p class="hint" style="margin:0">Tap a detail to copy it into a form.</p>`;
+}
+// Text recognition on the phone (Tesseract, about 10 MB the first time), kept loaded between photos.
+let ocrWorkerP = null;
+function ocrWorker(){
+  return ocrWorkerP ||= import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.esm.min.js')
+    .then(T => (T.createWorker || T.default?.createWorker)('eng'))
+    .catch(e => { ocrWorkerP = null; throw new Error('Couldn’t load the text reader. Check your connection.'); });
+}
+// Photo → canvas tuned for reading text: up to 2000 px wide, grey, stretched contrast (helps with screens and glare).
+async function ppCanvas(file){
+  const bmp = await createImageBitmap(file), k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  const g = c.getContext('2d'); g.drawImage(bmp, 0, 0, c.width, c.height);
+  const im = g.getImageData(0, 0, c.width, c.height), d = im.data; let lo = 255, hi = 0;
+  for (let i = 0; i < d.length; i += 4){ const y = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; d[i] = y; if (y < lo) lo = y; if (y > hi) hi = y; }
+  const span = Math.max(1, hi - lo);
+  for (let i = 0; i < d.length; i += 4){ const y = Math.max(0, Math.min(255, (d[i] - lo) * 255 / span)); d[i] = d[i + 1] = d[i + 2] = y; }
+  g.putImageData(im, 0, 0);
+  return c;
+}
+async function ppCheck(file){
+  state.ppView = 'result'; state.ppResult = { busy: 'Reading the photo on your phone… (the first time it downloads the text reader, about 10 MB)' }; renderPeople();
+  try {
+    const c = await ppCanvas(await shrinkPhoto(file));
+    let text = '', conf = 0;
+    try {
+      const r = window.__ocrStub ? await window.__ocrStub(c) : (await (await ocrWorker()).recognize(c)).data;
+      text = r.text || ''; conf = r.confidence || 0;
+    } catch (x){ text = ''; conf = 0; }
+    let results = checkPhoto(state.people || [], text), byAI = false;
+    // Unclear on the phone: low confidence or nobody found. Then the AI reads it (the photo is sent to Groq).
+    if ((conf < 60 || !results.length) && navigator.onLine){
+      state.ppResult = { busy: 'The photo is unclear for the phone; asking the AI to read it…' }; renderPeople();
+      try {
+        const r = await api('/api/ocr', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image: toJpeg(c, 1800) }) });
+        const t2 = (await r.json()).text || '', res2 = checkPhoto(state.people || [], t2);
+        if (res2.length >= results.length){ text = t2; results = res2; byAI = true; }
+      } catch (x){ if (!text) throw x; }
+    }
+    state.ppResult = { results, text, byAI };
+  } catch (x){ state.ppResult = { error: x.message || String(x) }; }
+  if (state.ppView === 'result') renderPeople();
+}
+document.addEventListener('click', async e => {
+  const t = e.target;
+  if (!t.closest('#ppDlg')) return;
+  if (t.id === 'ppClose') return $('#ppDlg').close();
+  if (t.id === 'ppAdd'){ state.ppEdit = { relation: (state.people || []).length ? 'Fiancée' : 'Me' }; state.ppView = 'edit'; return renderPeople(); }
+  if (t.closest('[data-ppedit]')){ state.ppEdit = { ...(state.people || []).find(p => p.id === t.closest('[data-ppedit]').dataset.ppedit) }; state.ppView = 'edit'; return renderPeople(); }
+  if (t.id === 'ppBack'){ state.ppView = 'list'; return renderPeople(); }
+  if (t.closest('[data-ppcopy]')){ const v = t.closest('[data-ppcopy]').dataset.ppcopy; try { await navigator.clipboard.writeText(v); toast('Copied: ' + v); } catch { toast(v); } return; }
+  if (t.closest('[data-ppcheck]')) return (t.closest('[data-ppcheck]').dataset.ppcheck === 'cam' ? $('#ppCam') : $('#ppFile')).click();
+  if (t.id === 'ppSave'){
+    const v = k => ($('#pp-' + k)?.value || '').trim(), p = { id: state.ppEdit?.id || Math.random().toString(36).slice(2, 10) };
+    for (const [k] of PP_FIELDS) if (v(k)) p[k] = v(k).slice(0, 120);
+    if (!p.first && !p.last) return toast('Enter at least a name.');
+    const items = [...(state.people || []).filter(x => x.id !== p.id), p];
+    try { await savePeople(items); state.ppView = 'list'; renderPeople(); toast('Saved ' + ppName(p)); } catch {}
+  }
+  if (t.id === 'ppDel'){
+    if (!confirm('Delete ' + ppName(state.ppEdit) + '?')) return;
+    try { await savePeople((state.people || []).filter(x => x.id !== state.ppEdit.id)); state.ppView = 'list'; renderPeople(); } catch {}
+  }
+});
+['ppCam', 'ppFile'].forEach(id => document.getElementById(id)?.addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) ppCheck(f); }));
 
 // ---------- currencies ----------
 const fxCache = {};
@@ -7309,6 +7443,7 @@ pm.addEventListener('click', async e => {
   if (a === 'alerts') openAlerts();
   if (a === 'health'){ renderHealth(); $('#hlDlg').showModal(); }
   if (a === 'sync'){ syncReport(); $('#syDlg').showModal(); }
+  if (a === 'people'){ state.ppView = 'list'; renderPeople(); $('#ppDlg').showModal(); }
   if (a === 'smart'){ $('#smBody').innerHTML = '<p class="muted">Replaying your history…</p>'; $('#smDlg').showModal(); setTimeout(renderSmartEval, 30); }
   if (a === 'backup') downloadBackup();
   if (a === 'restore') $('#rsFile').click();

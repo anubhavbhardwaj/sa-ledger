@@ -390,3 +390,21 @@ test('overview: recurring charges with next date, price change and a missed one'
   assert.match(t, /Vodafone/);
   await clean(app);
 });
+
+test('people & details: save a person, check a photo, typos flagged', async () => {
+  const app = await openApp({ init: `window.__ocrStub = async () => ({ text: 'Passenger 1\\nMr ANUBAV BHARDWAJ\\nEmail anubhav.iiitb@gmail.com', confidence: 91 });` }), { page } = app;
+  await page.click('#profBtn'); await page.click('[data-pm="people"]'); await page.waitForSelector('#ppDlg[open]');
+  await page.click('#ppAdd');
+  await page.fill('#pp-first', 'Anubhav'); await page.fill('#pp-last', 'Bhardwaj'); await page.selectOption('#pp-gender', 'male'); await page.fill('#pp-email', 'anubhav.iiitb@gmail.com');
+  await page.click('#ppSave'); await page.waitForTimeout(200);
+  assert.match(await app.text('#ppBody'), /Anubhav Bhardwaj\s*Me/);
+  await page.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 400; c.height = 200; c.getContext('2d').fillRect(0, 0, 10, 10);
+    const b = await new Promise(r => c.toBlob(r, 'image/png')), dt = new DataTransfer(); dt.items.add(new File([b], 'form.png', { type: 'image/png' }));
+    const i = document.getElementById('ppFile'); i.files = dt.files; i.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => /to fix|match/.test(document.getElementById('ppBody').textContent));
+  const t = await app.text('#ppBody');
+  assert.match(t, /1 to fix/); assert.match(t, /The form shows “anubav”, should be Anubhav/); assert.match(t, /Bhardwaj matches/); assert.match(t, /anubhav\.iiitb@gmail\.com matches/);
+  await clean(app);
+});
