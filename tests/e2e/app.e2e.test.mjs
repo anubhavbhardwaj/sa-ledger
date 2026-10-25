@@ -308,7 +308,7 @@ test('sync: an entry saved only on this device is marked, and reconnecting uploa
 test('sync check: compares this device with the server', async () => {
   const app = await openApp(), { page } = app;
   await app.seed({ expenses: { s1: { amount: 28.98, date: d(-1), store: 'Pewex', category: 'Groceries', account: 'Wise', spender: 'Sulekha', createdAt: 'x', createdBy: 'sulekha' } } });
-  await page.click('#profBtn'); await page.click('[data-pm="sync"]'); await page.waitForSelector('#syDlg[open]');
+  await page.click('#profBtn'); await page.click('[data-pm="health"]'); await page.click('[data-hl="sync"]'); await page.waitForSelector('#syDlg[open]');
   assert.match(await app.text('#syBody'), /Nothing waiting to upload/);
   await page.click('#syCheck'); await page.waitForTimeout(200);
   assert.match(await app.text('#syBody'), /expenses \(last 30 days\): 1 on the server, 1 on this device · match/);
@@ -319,7 +319,7 @@ test('bookings: a large camera photo is scaled down and read', async () => {
   const app = await openApp({ mobile: true }), { page } = app;
   const sent = [];
   await page.route('http://app.test/api/extract', async r => { sent.push(r.request().postDataJSON()); await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ bookings: [{ type: 'hotel', title: 'Hotel Test, Rome', start: '2027-03-25', end: '2027-03-28', price: 300, currency: 'EUR' }] }) }); });
-  await page.click('#profBtn'); await page.click('[data-addbk]:not([hidden])'); await page.waitForSelector('#bkDlg[open]');
+  await app.go('trips'); await page.click('#page-trips [data-addbk]'); await page.waitForSelector('#bkDlg[open]');
   assert.match(await app.text('#bkDrop'), /Take photo/);
   await page.evaluate(async () => {
     const c = document.createElement('canvas'); c.width = 4000; c.height = 3000; const g = c.getContext('2d'), img = g.createImageData(4000, 3000);
@@ -351,7 +351,7 @@ test('smart suggestions: the replay on your data shows rule vs model', async () 
     exp['x' + k] = { amount: g ? 30 : 4, date: mm + '-' + String(1 + k % 27).padStart(2, '0'), store: g ? ['Rewe City', 'REWE Markt', 'Rewe To Go'][k % 3 === 0 ? (k / 3) % 3 : 0] : ['Bar Roma', 'Bar Centrale', 'Bar Sport'][k % 3], category: g ? 'Groceries' : 'Eating Out', account: g ? 'DKB' : 'Wise', spender: 'Anubhav', createdAt: 'x' };
   }
   await app.seed({ expenses: exp });
-  await page.click('#profBtn'); await page.click('[data-pm="smart"]'); await page.waitForSelector('#smDlg[open]');
+  await page.click('#profBtn'); await page.click('[data-pm="health"]'); await page.click('[data-hl="smart"]'); await page.waitForSelector('#smDlg[open]');
   await page.waitForFunction(() => /Today’s rule/.test(document.getElementById('smBody').textContent));
   const t = await app.text('#smBody');
   assert.match(t, /Today’s rule\s*\d+%/); assert.match(t, /Combined: rule, then model/); assert.match(t, /would take no typing at all/); assert.match(t, /Stores never entered before/);
@@ -395,7 +395,7 @@ test('overview: recurring charges with next date, price change and a missed one'
 
 test('people & details: save a person, check a photo, typos flagged', async () => {
   const app = await openApp({ init: `window.__ocrStub = async () => ({ text: 'Passenger 1\\nMr ANUBAV BHARDWAJ\\nEmail anubhav.iiitb@gmail.com', confidence: 91 });` }), { page } = app;
-  await page.click('#profBtn'); await page.click('[data-pm="people"]'); await page.waitForSelector('#ppDlg[open]');
+  await app.go('trips'); await page.click('#page-trips [data-openpeople]'); await page.waitForSelector('#ppDlg[open]');
   await page.click('#ppAdd');
   await page.fill('#pp-first', 'Anubhav'); await page.fill('#pp-last', 'Bhardwaj'); await page.selectOption('#pp-gender', 'male'); await page.fill('#pp-email', 'anubhav.iiitb@gmail.com');
   await page.click('#ppSave'); await page.waitForTimeout(200);
@@ -414,7 +414,7 @@ test('people & details: save a person, check a photo, typos flagged', async () =
 test('people & details: passport number and expiry, shortened in the list, checked on a photo, warning on the Overview', async () => {
   const exp = new Date(Date.now() + 120 * 864e5).toISOString().slice(0, 10), [y, m, d] = exp.split('-');
   const app = await openApp({ init: `window.__ocrStub = async () => ({ text: 'Mr ANUBHAV BHARDWAJ\\nPassport number Z1234576\\nExpiry ${d}.${m}.${y}', confidence: 90 });` }), { page } = app;
-  await page.click('#profBtn'); await page.click('[data-pm="people"]'); await page.waitForSelector('#ppDlg[open]');
+  await app.go('trips'); await page.click('#page-trips [data-openpeople]'); await page.waitForSelector('#ppDlg[open]');
   await page.click('#ppAdd');
   await page.fill('#pp-first', 'Anubhav'); await page.fill('#pp-last', 'Bhardwaj'); await page.fill('#pp-passport', 'z123 4567'); await page.fill('#pp-passportExp', exp);
   await page.click('#ppSave'); await page.waitForTimeout(200);
@@ -429,6 +429,8 @@ test('people & details: passport number and expiry, shortened in the list, check
   const t = await app.text('#ppBody');
   assert.match(t, /1 to fix/); assert.match(t, /The form shows “Z1234576”, should be Z1234567/); assert.match(t, /Passport expiry: .* matches/);
   await page.click('#ppClose');
+  assert.match(await app.text('#page-trips [data-ppbar]'), /Passport to look at/, 'also on the Travel tab');
+  await app.go('overview'); await page.waitForTimeout(100);
   assert.equal(await page.isHidden('#ppBar'), false); assert.match(await app.text('#ppBar'), /Passport to look at[\s\S]*Anubhav Bhardwaj: Passport expires/);
   await clean(app);
 });
@@ -451,7 +453,7 @@ test('fill a form: copy two people in the app, the bookmark fills an airline for
   await app.seed({ settings: { people: { items: [
     { id: 'a', relation: 'Me', first: 'Anubhav', last: 'Bhardwaj', gender: 'male', passport: 'Z1234567', passportExp: '2031-03-11', email: 'anubhav@example.com', phone: '+49 151 23425746' },
     { id: 's', relation: 'Fiancée', first: 'Sulekha', last: 'Sharma', gender: 'female', passport: 'X7654321', passportExp: '2030-08-05', email: 'sulekha@example.com', phone: '+39 333 1234567' }] } } });
-  await page.click('#profBtn'); await page.click('[data-pm="people"]'); await page.waitForSelector('#ppDlg[open]');
+  await app.go('trips'); await page.click('#page-trips [data-openpeople]'); await page.waitForSelector('#ppDlg[open]');
   await page.click('#ppFill');
   assert.match(await app.text('#ppBody'), /1\s*Anubhav Bhardwaj Me/);
   await page.click('[data-ppsel="s"]');
@@ -512,4 +514,28 @@ test('fill a form: a ticket form with "Name" and "Surname", "contact" in the fie
   assert.ok(report && !/Anubhav|Sulekha|Bhardwaj|Sharma|Z1234567|X7654321/.test(report), 'the report has no personal details');
   assert.deepEqual(JSON.parse(report).fields.filter(f => f.kind === 'first').map(f => f.to), ['person 1', 'person 2']);
   await clean(app);
+});
+
+test('menu: four items; Data & backup and App status open their own screens; Travel is a tab with forwarded bookings on it', async () => {
+  for (const mobile of [false, true]){
+    const app = await openApp({ mobile }), { page } = app;
+    await page.click('#profBtn');
+    const items = await page.$$eval('#profMenu .pm-item:not([hidden])', els => els.map(e => e.querySelector('span').textContent));
+    assert.deepEqual(items, ['Notifications', 'Data & backup', 'App status', 'Sign out']);
+    await page.click('[data-pm="data"]'); await page.waitForSelector('#dataDlg[open]');
+    assert.match(await app.text('#dataDlg'), /Import CSV.*Export CSV.*Download backup.*Restore from backup/);
+    await page.click('#dataDlg button[type=submit]');
+    await page.click('#profBtn'); await page.click('[data-pm="health"]'); await page.waitForSelector('#hlDlg[open]');
+    assert.match(await app.text('#hlDlg'), /App status.*Sync check.*Smart suggestions/);
+    await page.click('#hlDlg button[type=submit]');
+    await page.click(mobile ? '.bottomnav a[href="#trips"]' : '.tabs a[href="#trips"]');
+    await page.waitForSelector('#page-trips:not([hidden])');
+    assert.match(await app.text('#page-trips .pagehead'), /Travel.*People & details.*\+ Booking/);
+    assert.equal(await page.$$eval('#page-trips [data-back]', els => els.filter(e => e.closest('#tripListView')).length), 0, 'no Back button on a tab');
+    await app.seed({ bookingInbox: { m1: { subject: 'Your flight', receivedAt: new Date().toISOString(), from: 'x@y.z' } } });
+    await page.waitForTimeout(200);
+    assert.equal(await page.isHidden(mobile ? '#tbadge2' : '#tbadge'), false); assert.equal(await page.textContent(mobile ? '#tbadge2' : '#tbadge'), '1');
+    assert.equal(await page.isHidden('#profBadge'), true, 'the avatar badge is only for app problems');
+    await clean(app);
+  }
 });

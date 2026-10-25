@@ -598,7 +598,7 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
   .appbar-in{min-height:52px}
   .appbar .tabs,.appbar #addBtn{display:none}
   .appbar .logo{margin-right:auto}
-  .bottomnav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .bottomnav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
   .btab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px 7px;text-decoration:none;color:var(--muted);font-size:11px;font-weight:500;position:relative}
   .btab svg{width:22px;height:22px}
   .btab[aria-current="page"]{color:var(--accent);font-weight:600}
@@ -788,28 +788,18 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
       <a class="tab" href="#transactions" data-page="transactions">Transactions<span class="badge" id="fbadge" hidden></span></a>
       <a class="tab" href="#visualizations" data-page="visualizations">Visualizations</a>
       <a class="tab" href="#wealth" data-page="wealth">Wealth</a>
+      <a class="tab" href="#trips" data-page="trips">Travel<span class="badge" id="tbadge" hidden></span></a>
     </nav>
     <button class="btn primary" id="addBtn" type="button">+ <span class="long">Add expense</span></button>
     <button class="btn small syncbtn" id="syncBtn" type="button" hidden></button>
     <button class="btn small inboxbtn" id="inboxBtn" type="button" hidden>To review <span class="badge" id="inboxCount">0</span></button>
     <div class="prof">
-      <button class="avatar" id="profBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="profMenu" aria-label="Menu: trips, budgets, settings"><span id="profInitial">A</span><span class="pbadge" id="profBadge" hidden>0</span></button>
+      <button class="avatar" id="profBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="profMenu" aria-label="Menu: notifications, data and backup, app status"><span id="profInitial">A</span><span class="pbadge" id="profBadge" hidden>0</span></button>
       <div class="pmenu" id="profMenu" role="menu" hidden>
         <div class="pm-head">Signed in as <strong id="whoName"></strong></div>
-        <a class="pm-item" role="menuitem" href="#trips"><span>Trips</span><small id="pmTrips"></small></a>
-        <button class="pm-item pm-alert" role="menuitem" type="button" data-addbk="" id="pmBkInbox" hidden><span>Forwarded bookings</span><small id="pmBkInboxN"></small></button>
-        <button class="pm-item" role="menuitem" type="button" data-addbk=""><span>Add booking</span><small>ticket, PDF, screenshot or photo</small></button>
-        <button class="pm-item" role="menuitem" type="button" data-pm="people"><span>People &amp; details</span><small>check a form with a photo</small></button>
-        <button class="pm-item" role="menuitem" type="button" data-pm="budgets"><span>Budgets</span><small id="pmBudgets"></small></button>
-        <button class="pm-item" role="menuitem" type="button" data-pm="health"><span>System health</span><small id="pmHealth"></small></button>
-        <button class="pm-item" role="menuitem" type="button" data-pm="sync"><span>Sync check</span><small>is this device up to date?</small></button>
-        <button class="pm-item" role="menuitem" type="button" data-pm="smart"><span>Smart suggestions</span><small>how well categories are guessed</small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="alerts"><span>Notifications</span><small id="pmAlerts">off on this phone</small></button>
-        <hr>
-        <button class="pm-item" role="menuitem" type="button" data-pm="import"><span>Import CSV</span><small>into expenses</small></button>
-        <button class="pm-item" role="menuitem" type="button" data-pm="export"><span>Export CSV</span><small>current transactions view</small></button>
-        <button class="pm-item" role="menuitem" type="button" data-pm="backup"><span>Download backup</span><small id="pmBackup">everything, one file</small></button>
-        <button class="pm-item" role="menuitem" type="button" data-pm="restore"><span>Restore from backup</span><small>adds back what’s missing</small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="data"><span>Data &amp; backup</span><small id="pmBackup">import, export, backup</small></button>
+        <button class="pm-item" role="menuitem" type="button" data-pm="health"><span>App status</span><small id="pmHealth"></small></button>
         <button class="pm-item" role="menuitem" type="button" data-pm="install" id="pmInstall" hidden><span>Install app</span><small>on this device</small></button>
         <hr>
         <button class="pm-item" role="menuitem" type="button" id="logoutBtn"><span>Sign out</span></button>
@@ -826,7 +816,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <div style="display:grid;gap:18px">
       <div class="install" id="installBar" hidden></div>
       <div class="banner" id="inboxBar" hidden></div>
-      <div class="banner" id="ppBar" hidden></div>
+      <div class="banner" id="ppBar" data-ppbar hidden></div>
       <div class="banner" data-bkinboxbar hidden></div>
       <section class="panel" id="nextUp" hidden></section>
       <section class="panel" id="todoCard" hidden></section>
@@ -890,12 +880,12 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
   <section class="page" id="page-trips" data-page="trips" hidden>
     <div style="display:grid;gap:16px">
       <div id="tripListView" style="display:grid;gap:16px">
-        <div><button class="btn ghost" type="button" data-back>← Back</button></div>
         <div class="pagehead">
-          <div><h1>Trips</h1><p>Visits, holidays and office travel. Link any expense to a trip, whenever it was paid.</p></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="repeatVisit" type="button">Repeat last visit</button><button class="btn" type="button" data-addbk="">+ Booking</button><button class="btn" type="button" data-plan="">✈ Plan a trip</button><button class="btn primary" id="newTrip" type="button">+ New trip</button></div>
+          <div><h1>Travel</h1><p>Visits, holidays and office travel with their bookings. Link any expense to a trip, whenever it was paid.</p></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="repeatVisit" type="button">Repeat last visit</button><button class="btn" type="button" data-openpeople>People &amp; details</button><button class="btn" type="button" data-addbk="">+ Booking</button><button class="btn" type="button" data-plan="">✈ Plan a trip</button><button class="btn primary" id="newTrip" type="button">+ New trip</button></div>
         </div>
         <div class="banner" id="tripSetup" hidden></div>
+        <div class="banner" data-ppbar hidden></div>
         <div class="banner" data-bkinboxbar hidden></div>
         <section class="kpis" id="tripKpis" aria-label="Trip summary"></section>
         <div id="tripList" style="display:grid;gap:18px"></div>
@@ -996,8 +986,9 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 <nav class="bottomnav" aria-label="Pages">
   <a class="btab" href="#overview" data-page="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
   <a class="btab" href="#transactions" data-page="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Transactions</span><span class="bdot" id="fbadge2" hidden></span></a>
-  <a class="btab" href="#visualizations" data-page="visualizations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg><span>Visualizations</span></a>
+  <a class="btab" href="#visualizations" data-page="visualizations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg><span>Charts</span></a>
   <a class="btab" href="#wealth" data-page="wealth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg><span>Wealth</span></a>
+  <a class="btab" href="#trips" data-page="trips"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 13.5L3 11l1.5-1.5 8 .5 4.5-4.5a2.1 2.1 0 013 3L15.5 13l.5 8L14.5 22.5 12 15l-3 3v2.5L7.5 22 6 18l-4-1.5L3.5 15H6z"/></svg><span>Travel</span><span class="bdot" id="tbadge2" hidden></span></a>
 </nav>
 <button class="fab" id="fab" type="button" aria-label="Add expense">+</button>
 <button class="aibtn" id="aiBtn" type="button" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z"/></svg><span>Ask AI</span></button>
@@ -1332,12 +1323,24 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
     <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="syUpload">Upload now</button><button class="btn primary" type="button" id="syCheck">Check with server</button><button class="btn" type="submit">Close</button></div></div>
   </form>
 </dialog>
+<dialog id="dataDlg">
+  <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:440px">
+    <h3>Data &amp; backup</h3>
+    <div style="display:grid;gap:2px">
+      <button class="pm-item" type="button" data-dx="import"><span>Import CSV</span><small>into expenses</small></button>
+      <button class="pm-item" type="button" data-dx="export"><span>Export CSV</span><small>current transactions view</small></button>
+      <button class="pm-item" type="button" data-dx="backup"><span>Download backup</span><small id="dxBackup">everything, one file</small></button>
+      <button class="pm-item" type="button" data-dx="restore"><span>Restore from backup</span><small>adds back what’s missing</small></button>
+    </div>
+    <div class="dlg-actions"><div class="right"><button class="btn" type="submit">Close</button></div></div>
+  </form>
+</dialog>
 <dialog id="hlDlg">
   <form method="dialog" style="display:grid;gap:12px;padding:20px;max-width:520px">
-    <h3>System health</h3>
+    <h3>App status</h3>
     <p class="muted" style="margin:0;font-size:13px">What runs in the background, and when it last worked.</p>
     <div class="hlist" id="hlBody"></div>
-    <div class="dlg-actions"><div class="right"><button class="btn" type="submit">Close</button></div></div>
+    <div class="dlg-actions"><button class="btn" type="button" data-hl="sync">Sync check</button><button class="btn" type="button" data-hl="smart">Smart suggestions</button><div class="right"><button class="btn" type="submit">Close</button></div></div>
   </form>
 </dialog>
 <dialog id="alDlg">
@@ -1766,7 +1769,7 @@ function render(){
   if (state.page === 'overview'){ renderOverview(ms); renderNextUp(); }
   if (state.page === 'transactions') renderTransactions();
   if (state.page === 'visualizations') renderVisualizations();
-  if (state.page === 'trips') renderTrips();
+  if (state.page === 'trips'){ renderTrips(); renderPassportBar(); }
   if (state.page === 'wealth') renderWealth();
   fillDatalists();
 }
@@ -2582,12 +2585,11 @@ function renderPeople(){
 }
 // Overview banner: a passport that has expired, runs out within a year, or has too little left for a planned trip.
 function renderPassportBar(){
-  const bar = $('#ppBar'); if (!bar) return;
   const hits = (state.people || []).map(p => ({ p, a: passportAlerts(p, state.trips || [], today()) })).filter(x => x.a.length);
-  bar.hidden = !hits.length; if (!hits.length) return;
-  bar.innerHTML = `<div class="left"><strong>${hits.some(x => x.a.some(a => a.level === 'bad')) ? '⚠ ' : ''}Passport${hits.length > 1 ? 's' : ''} to look at</strong>
+  const html = hits.length ? `<div class="left"><strong>${hits.some(x => x.a.some(a => a.level === 'bad')) ? '⚠ ' : ''}Passport${hits.length > 1 ? 's' : ''} to look at</strong>
     ${hits.map(x => `<span class="note" style="font-size:12.5px;color:var(--muted)">${esc(ppName(x.p))}: ${esc(x.a.map(a => a.text).join(' '))}</span>`).join('')}</div>
-    <button class="btn" type="button" data-openpeople>Details</button>`;
+    <button class="btn" type="button" data-openpeople>Details</button>` : '';
+  $$('[data-ppbar]').forEach(bar => { bar.hidden = !hits.length; bar.innerHTML = html; });
 }
 document.addEventListener('click', e => { if (e.target.closest('[data-openpeople]')){ state.ppView = 'list'; renderPeople(); $('#ppDlg').showModal(); } });
 // Text recognition on the phone (Tesseract, about 10 MB the first time), kept loaded between photos.
@@ -3682,7 +3684,7 @@ function renderBudgets(){
   if (!state.budAll){
     const attention = b.rows.filter(r => r.status === 'over' || r.status === 'risk');
     const okN = b.rows.length - attention.length;
-    el.innerHTML = `<header><h2>Budgets · ${monthLabel(state.period)}</h2><span class="right"><button class="btn ghost small" type="button" data-budall>All ${b.rows.length} budgets</button></span></header>
+    el.innerHTML = `<header><h2>Budgets · ${monthLabel(state.period)}</h2><span class="right"><button class="btn ghost small" type="button" data-budall>All ${b.rows.length} budgets</button><button class="btn ghost small" type="button" data-editbudgets>Edit</button></span></header>
       <div class="brows">${bRow(b.total, true)}${attention.map(r => bRow(r)).join('')}</div>
       <p class="bfoot" style="margin:0">${attention.length ? okN + ' other budget' + (okN===1?' is':'s are') + ' on track.' : 'Every category is on track' + (b.isCur ? ' so far.' : '.')}</p>`;
     return;
@@ -5047,7 +5049,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-25d';
+const APP_VERSION = '2026-10-25e';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
@@ -6477,8 +6479,7 @@ function renderBkInbox(){
     bar.innerHTML = n ? `<div class="left"><strong>${n} forwarded booking${n === 1 ? '' : 's'} to add</strong><span class="note" style="font-size:12.5px;color:var(--muted)">${esc(it.subject || 'Email')}, ${ago(it.receivedAt)}</span></div><button class="btn primary" type="button" data-bkinbox="${esc(it.id)}">Review</button>` : ''; });
   // A badge on the profile button and the menu entry; a toast when one arrives while the app is open.
   renderBadge();
-  $('#profBtn').setAttribute('aria-label', 'Menu: trips, budgets, settings' + (n ? `. ${n} forwarded booking${n === 1 ? '' : 's'} to add` : ''));
-  $('#pmBkInbox').hidden = !n; $('#pmBkInboxN').textContent = n + ' to add';
+  ['#tbadge', '#tbadge2'].forEach(id => { const b = $(id); if (b){ b.hidden = !n; b.textContent = n > 9 ? '9+' : n; } });
   try { if (navigator.setAppBadge) n ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } catch {}
   const seen = state.bkSeen;
   state.bkSeen = new Set(state.bkInbox.map(x => x.id));
@@ -6706,10 +6707,10 @@ const healthIssues = () => healthRows().filter(r => r.cls === 'bad' || r.cls ===
 function renderHealth(){
   $('#hlBody').innerHTML = healthRows().map(r => `<div class="hrow ${r.cls}"><i aria-hidden="true"></i><span><strong>${esc(r.j.name)}</strong>${r.j.note ? ` <span class="muted" style="font-size:12px">(${r.j.note})</span>` : ''}<small>${esc(r.text)}</small>${r.err ? `<small class="e">${esc(r.err)}</small>` : ''}</span></div>`).join('');
 }
-// One badge on the profile button: forwarded bookings to add, else "!" when something needs attention.
+// A "!" on the profile button when something in App status needs attention (forwarded bookings show on the Travel tab).
 function renderBadge(){
-  const n = state.bkInbox.length, issues = healthIssues().length, badge = $('#profBadge');
-  badge.hidden = !n && !issues; badge.textContent = n ? (n > 9 ? '9+' : n) : '!';
+  const issues = healthIssues().length, badge = $('#profBadge');
+  badge.hidden = !issues; badge.textContent = '!';
   $('#pmHealth').textContent = issues ? `${issues} need${issues === 1 ? 's' : ''} attention` : Object.keys(state.health).length ? 'all good' : '';
   $('#pmHealth').style.color = issues ? 'var(--warn)' : '';
 }
@@ -7478,23 +7479,24 @@ $('#rsForm').addEventListener('submit', async e => {
 // ---------- profile menu ----------
 const pm = $('#profMenu'), pb = $('#profBtn');
 function pmNotes(){
-  const g = state.trips.filter(t => ['ongoing','upcoming'].includes(tripStatus(t))).sort((a,b) => (a.start||'').localeCompare(b.start||''));
-  $('#pmTrips').textContent = g[0] ? (tripStatus(g[0]) === 'ongoing' ? 'On: ' : 'Next: ') + g[0].name : state.trips.length ? state.trips.length + ' trips' : '';
-  const nb = (state.budgets.items || []).filter(b => b.a > 0).length;
-  $('#pmBudgets').textContent = nb ? nb + ' set' : 'not set';
   const bk = state.backup;
-  $('#pmBackup').textContent = bk?.errorAt && (!bk.lastAt || bk.errorAt > bk.lastAt) ? 'Drive backup failed ' + shortDate(bk.errorAt.slice(0,10)) + ', see Netlify logs'
+  $('#pmBackup').style.color = bk?.errorAt && (!bk.lastAt || bk.errorAt > bk.lastAt) ? 'var(--warn)' : '';
+  $('#dxBackup').textContent = $('#pmBackup').textContent = bk?.errorAt && (!bk.lastAt || bk.errorAt > bk.lastAt) ? 'Drive backup failed ' + shortDate(bk.errorAt.slice(0,10)) + ', see Netlify logs'
     : bk?.lastAt ? 'Drive copy: ' + shortDate(bk.lastAt.slice(0,10)) + ' ' + bk.lastAt.slice(11,16) + ' UTC' : 'Drive backup not set up yet';
 }
 function toggleMenu(open){ pm.hidden = !open; pb.setAttribute('aria-expanded', open); if (open){ pmNotes(); pm.querySelector('.pm-item')?.focus(); } }
 pb.addEventListener('click', e => { e.stopPropagation(); toggleMenu(pm.hidden); });
 document.addEventListener('click', e => { if (!pm.hidden && !e.target.closest('.prof')) toggleMenu(false); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pm.hidden){ toggleMenu(false); pb.focus(); } });
-pm.addEventListener('click', async e => {
-  const it = e.target.closest('.pm-item'); if (!it) return;
-  toggleMenu(false);
-  const a = it.dataset.pm;
-  if (a === 'budgets') openBudgets(false);
+pm.addEventListener('click', e => {
+  const it = e.target.closest('.pm-item'); if (!it || !it.dataset.pm) return;
+  toggleMenu(false); runPm(it.dataset.pm);
+});
+// Data & backup and App status are small screens of their own, so the menu stays short.
+$('#dataDlg').addEventListener('click', e => { const it = e.target.closest('[data-dx]'); if (!it) return; $('#dataDlg').close(); runPm(it.dataset.dx); });
+$('#hlDlg').addEventListener('click', e => { const it = e.target.closest('[data-hl]'); if (!it) return; $('#hlDlg').close(); runPm(it.dataset.hl); });
+async function runPm(a){
+  if (a === 'data'){ pmNotes(); $('#dataDlg').showModal(); }
   if (a === 'alerts') openAlerts();
   if (a === 'health'){ renderHealth(); $('#hlDlg').showModal(); }
   if (a === 'sync'){ syncReport(); $('#syDlg').showModal(); }
@@ -7508,7 +7510,7 @@ pm.addEventListener('click', async e => {
     if (installEvt){ installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; showInstall(); }
     else if (isIOS) toast('In Safari: tap Share, then “Add to Home Screen”.');
   }
-});
+}
 document.addEventListener('click', e => { if (e.target.closest('[data-back]')){ if (history.length > 1) history.back(); else location.hash = 'overview'; } });
 
 // ---------- install as an app ----------
