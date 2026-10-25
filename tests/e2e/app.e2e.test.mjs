@@ -539,3 +539,16 @@ test('menu: four items; Data & backup and App status open their own screens; Tra
     await clean(app);
   }
 });
+
+test('phone: no page or dialog is wider than the screen', async () => {
+  const app = await openApp({ mobile: true }), { page } = app;
+  const ids = await page.$$eval('dialog', ds => ds.map(d => d.id));
+  const wide = [];
+  for (const id of ids) wide.push(await page.evaluate(id => { const d = document.getElementById(id); try { d.showModal(); } catch { return null; } const r = d.scrollWidth > d.clientWidth + 1 ? id : null; d.close(); return r; }, id));
+  for (const h of ['overview', 'transactions', 'visualizations', 'wealth', 'trips']){
+    await app.go(h); await page.waitForTimeout(200);
+    wide.push(await page.evaluate(h => document.documentElement.scrollWidth > innerWidth ? 'page ' + h : null, h));
+  }
+  assert.deepEqual(wide.filter(Boolean), []);
+  await clean(app);
+});
