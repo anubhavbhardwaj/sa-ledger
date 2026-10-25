@@ -564,6 +564,8 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .ppcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px}.pph{display:flex;gap:8px;align-items:baseline}.pph .linkbtn{margin-left:auto}
 .ppfields{display:flex;flex-wrap:wrap;gap:6px}.ppcopy{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:4px 9px;font-size:13px;display:grid}
 .ppwarn{margin:0;font-size:12.5px;line-height:1.4}.ppwarn.bad{color:var(--danger)}.ppwarn.warn{color:var(--warn)}.ppq{color:var(--warn);font-weight:700}
+.ppsel{display:grid;gap:6px}.ppchk{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer}.ppchk .pill{min-width:22px;text-align:center}
+.ppbm{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;display:grid;gap:8px}.ppbm ol{margin:0;padding-left:20px;display:grid;gap:4px}.ppbm a.btn{justify-self:start;cursor:grab}
 .ppcopy small{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.ppcopy:active{background:var(--sunk)}
 .pprh{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}.ppres{border:1px solid var(--line);border-radius:10px;padding:10px 12px}.ppres.bad{border-color:var(--danger)}.ppres ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:4px;font-size:13.5px}
 .pptext{white-space:pre-wrap;font-size:12px;max-height:240px;overflow:auto;background:var(--sunk);padding:8px;border-radius:8px}
@@ -1394,6 +1396,7 @@ label.f input,label.f select{border:1px solid var(--line);background:var(--groun
 import { decodeBCBP } from "./bcbp.js";
 import { detectRecurring, backtest as recurBacktest } from "./recur.js";
 import { checkPhoto, passportAlerts, human as humanDate } from "./verify.js";
+import { formPayload, peopleText, bookmarklet } from "./fill.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -2516,7 +2519,21 @@ async function savePeople(items){
 }
 function renderPeople(){
   const b = $('#ppBody'), v = state.ppView;
-  $('#ppTitle').textContent = v === 'edit' ? (state.ppEdit?.id ? 'Edit person' : 'Add person') : v === 'result' ? 'Photo check' : 'People & details';
+  $('#ppTitle').textContent = v === 'edit' ? (state.ppEdit?.id ? 'Edit person' : 'Add person') : v === 'result' ? 'Photo check' : v === 'fill' ? 'Fill a form' : 'People & details';
+  if (v === 'fill'){
+    const ps = state.people || [], sel = (state.ppSel || []).filter(id => ps.some(p => p.id === id));
+    b.innerHTML = `<p class="muted" style="margin:0;font-size:13px">Tick who’s travelling, in passenger order, then copy.</p>
+      <div class="ppsel">${ps.map(p => { const i = sel.indexOf(p.id); return `<label class="ppchk"><input type="checkbox" data-ppsel="${esc(p.id)}" ${i >= 0 ? 'checked' : ''}>${i >= 0 ? `<span class="pill ontrack">${i + 1}</span>` : ''}<span><strong>${esc(ppName(p))}</strong> <span class="muted">${esc(p.relation || '')}</span></span></label>`; }).join('')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ppCopyForm" ${sel.length ? '' : 'disabled'}>Copy for the form filler</button><button class="btn" type="button" id="ppCopyText" ${sel.length ? '' : 'disabled'}>Copy as text</button></div>
+      <div class="ppbm"><span><strong>On a laptop, set up once:</strong> drag this button to your browser’s bookmarks bar.</span>
+        <a class="btn" id="ppBm" href="${bookmarklet()}" draggable="true" title="Drag me to the bookmarks bar">Fill from S&amp;A</a>
+        <ol><li>Here: tick the people and press <em>Copy for the form filler</em>.</li>
+          <li>On the booking page: click <em>Fill from S&amp;A</em> in the bookmarks bar. The browser may ask to allow reading the clipboard, or show a box to paste into.</li>
+          <li>It fills title, names, passport number and expiry, email and phone, leaves fields that already have something alone and outlines what it filled in yellow. Check every value before you submit.</li></ol></div>
+      <p class="muted" style="margin:0;font-size:12.5px">On the phone: <em>Copy as text</em> for a message or an email, or tap single details in the list to paste them one at a time. What you copy stays in the clipboard until you copy something else.</p>
+      <div><button class="btn" type="button" id="ppBack">Back to people</button></div>`;
+    return;
+  }
   if (v === 'edit'){
     const p = state.ppEdit || {};
     b.innerHTML = `<div class="fields">
@@ -2554,13 +2571,13 @@ function renderPeople(){
   }
   const ps = state.people || [];
   b.innerHTML = `<p class="muted" style="margin:0;font-size:13px">Save names and passport details exactly as in the passport, plus contact details, then take a photo of a booking form on a laptop or paper: the app finds each person on it and flags anything that doesn’t match.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-ppcheck="cam" ${ps.length ? '' : 'disabled'}>Check a photo</button><button class="btn" type="button" data-ppcheck="file" ${ps.length ? '' : 'disabled'}>Choose image</button><button class="btn" type="button" id="ppAdd">Add person</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-ppcheck="cam" ${ps.length ? '' : 'disabled'}>Check a photo</button><button class="btn" type="button" data-ppcheck="file" ${ps.length ? '' : 'disabled'}>Choose image</button><button class="btn" type="button" id="ppFill" ${ps.length ? '' : 'disabled'}>Fill a form</button><button class="btn" type="button" id="ppAdd">Add person</button></div>
     ${ps.length ? ps.map(p => `<div class="ppcard"><div class="pph"><strong>${esc(ppName(p))}</strong> <span class="muted">${esc(p.relation || '')}</span><button type="button" class="linkbtn" data-ppedit="${esc(p.id)}">Edit</button></div>
       <div class="ppfields">${[['First name', p.first], ['Last name', p.last], ['Gender', p.gender === 'female' ? 'Female' : p.gender === 'male' ? 'Male' : p.gender === 'x' ? 'Diverse / X' : ''],
         ['Passport', p.passport, p.passport && ppMask(p.passport)], ['Expires', p.passportExp && humanDate(p.passportExp)], ['Email', p.email], ['Phone', p.phone]]
         .filter(x => x[1]).map(([k, v, show]) => `<button type="button" class="ppcopy" data-ppcopy="${esc(v)}" data-pplabel="${k}" title="Copy"><small>${k}</small>${esc(show || v)}</button>`).join('')}</div>${ppAlerts(p)}</div>`).join('')
       : '<p class="empty" style="margin:0">No one saved yet.</p>'}
-    <p class="hint" style="margin:0">Tap a detail to copy it into a form. Passport numbers are shown shortened; tapping copies the full number.</p>`;
+    <p class="hint" style="margin:0">Tap a detail to copy it, or use Fill a form to fill a whole booking form on a laptop. Passport numbers are shown shortened; tapping copies the full number.</p>`;
 }
 // Overview banner: a passport that has expired, runs out within a year, or has too little left for a planned trip.
 function renderPassportBar(){
@@ -2621,6 +2638,16 @@ document.addEventListener('click', async e => {
   if (t.id === 'ppAdd'){ state.ppEdit = { relation: (state.people || []).length ? 'Fiancée' : 'Me' }; state.ppView = 'edit'; return renderPeople(); }
   if (t.closest('[data-ppedit]')){ state.ppEdit = { ...(state.people || []).find(p => p.id === t.closest('[data-ppedit]').dataset.ppedit) }; state.ppView = 'edit'; return renderPeople(); }
   if (t.id === 'ppBack'){ state.ppView = 'list'; return renderPeople(); }
+  if (t.id === 'ppFill'){ const me = (state.people || []).find(p => p.relation === 'Me'); state.ppSel = me ? [me.id] : []; state.ppView = 'fill'; return renderPeople(); }
+  if (t.matches('[data-ppsel]')){ const id = t.dataset.ppsel, sel = (state.ppSel || []).filter(x => x !== id); state.ppSel = t.checked ? [...sel, id] : sel; return renderPeople(); }
+  if (t.closest('#ppBm')){ e.preventDefault(); return toast('Drag this button to the bookmarks bar, then click it on the booking page.'); }
+  if (t.id === 'ppCopyForm' || t.id === 'ppCopyText'){
+    const ps = (state.ppSel || []).map(id => (state.people || []).find(p => p.id === id)).filter(Boolean);
+    const form = t.id === 'ppCopyForm', text = form ? JSON.stringify(formPayload(ps)) : peopleText(ps);
+    try { await navigator.clipboard.writeText(text); toast(form ? `Copied ${ps.length === 1 ? ppName(ps[0]) : ps.length + ' people'} for the form filler. Now click Fill from S&A on the booking page.` : 'Copied as text.'); }
+    catch { toast('Couldn’t copy: the browser blocked the clipboard.'); }
+    return;
+  }
   if (t.closest('[data-ppcopy]')){
     const el = t.closest('[data-ppcopy]'), v = el.dataset.ppcopy, secret = el.dataset.pplabel === 'Passport';
     try { await navigator.clipboard.writeText(v); toast(secret ? 'Copied the passport number' : 'Copied: ' + v); } catch { toast(v); } return;
@@ -5019,7 +5046,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-25';
+const APP_VERSION = '2026-10-25b';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

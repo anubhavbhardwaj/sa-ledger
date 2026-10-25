@@ -2,6 +2,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { start, stop, openApp, d, month } from './helpers.mjs';
+import { readFileSync } from 'node:fs';
+import { bookmarkletSource } from '../../public/fill.js';
 
 before(start);
 after(stop);
@@ -428,5 +430,67 @@ test('people & details: passport number and expiry, shortened in the list, check
   assert.match(t, /1 to fix/); assert.match(t, /The form shows “Z1234576”, should be Z1234567/); assert.match(t, /Passport expiry: .* matches/);
   await page.click('#ppClose');
   assert.equal(await page.isHidden('#ppBar'), false); assert.match(await app.text('#ppBar'), /Passport to look at[\s\S]*Anubhav Bhardwaj: Passport expires/);
+  await clean(app);
+});
+
+// A booking site in its own tab: serves a fixture form, runs the bookmark there (clipboard blocked, so it asks to paste).
+async function bookingPage(app, file, payload){
+  const page = await app.ctx.newPage();
+  await page.route('http://booking.test/**', r => r.fulfill({ contentType: 'text/html', body: readFileSync(new URL('./fixtures/' + file, import.meta.url)) }));
+  await page.goto('http://booking.test/');
+  page.on('dialog', dlg => dlg.type() === 'prompt' ? dlg.accept(payload) : dlg.dismiss());
+  await page.evaluate(src => (0, eval)(src), bookmarkletSource());
+  await page.waitForSelector('#sa-fill-result');
+  return page;
+}
+const val = (page, sel) => page.$eval(sel, el => el.type === 'radio' ? String(el.checked) : el.value);
+
+test('fill a form: copy two people in the app, the bookmark fills an airline form by passenger, contact and leaves payment alone', async () => {
+  // The test server is plain http, where browsers have no clipboard: a stand-in keeps what the app copies.
+  const app = await openApp({ init: `Object.defineProperty(navigator, 'clipboard', { value: { writeText: async t => { window.__clip = t; }, readText: async () => window.__clip || '' } });` }), { page } = app;
+  await app.seed({ settings: { people: { items: [
+    { id: 'a', relation: 'Me', first: 'Anubhav', last: 'Bhardwaj', gender: 'male', passport: 'Z1234567', passportExp: '2031-03-11', email: 'anubhav@example.com', phone: '+49 151 23425746' },
+    { id: 's', relation: 'Fiancée', first: 'Sulekha', last: 'Sharma', gender: 'female', passport: 'X7654321', passportExp: '2030-08-05', email: 'sulekha@example.com', phone: '+39 333 1234567' }] } } });
+  await page.click('#profBtn'); await page.click('[data-pm="people"]'); await page.waitForSelector('#ppDlg[open]');
+  await page.click('#ppFill');
+  assert.match(await app.text('#ppBody'), /1\s*Anubhav Bhardwaj Me/);
+  await page.click('[data-ppsel="s"]');
+  assert.match(await app.text('#ppBody'), /2\s*Sulekha Sharma/);
+  await page.click('#ppCopyForm');
+  const copied = await page.evaluate(() => window.__clip);
+  assert.deepEqual(JSON.parse(copied).people.map(p => p.first), ['Anubhav', 'Sulekha']);
+  assert.match(await page.$eval('#ppBm', a => a.getAttribute('href')), /^javascript:/);
+
+  const site = await bookingPage(app, 'booking-form.html', copied);
+  assert.equal(await val(site, '#t1'), 'MR'); assert.equal(await val(site, '#f1'), 'Anubhav'); assert.equal(await val(site, '#l1'), 'Bhardwaj');
+  assert.equal(await val(site, '#pn1'), 'Z1234567'); assert.equal(await val(site, '#pe1'), '2031-03-11');
+  assert.equal(await val(site, '[name="pax[0].dob"]'), '', 'date of birth is not saved, so left empty');
+  assert.equal(await val(site, 'input[value=frau]'), 'true'); assert.equal(await val(site, 'input[value=herr]'), 'false');
+  assert.equal(await val(site, '[name=p2vn]'), 'Sulekha'); assert.equal(await val(site, '[name=p2nn]'), 'Already', 'a filled field is left alone');
+  assert.equal(await val(site, '[name=p2pass]'), 'X7654321');
+  assert.equal(await val(site, '[name=p2expDay]'), '5'); assert.equal(await val(site, '[name=p2expMonth]'), 'm8'); assert.equal(await val(site, '[name=p2expYear]'), '2030');
+  assert.equal(await val(site, '[name=p3f]'), '', 'no third person chosen');
+  assert.equal(await val(site, '[name=email]'), 'anubhav@example.com'); assert.equal(await val(site, '[name=email2]'), 'anubhav@example.com');
+  assert.equal(await val(site, '[name=cc]'), 'DE'); assert.equal(await val(site, '[name=mobile]'), '15123425746');
+  for (const n of ['ccname', 'ccnum', 'ccexp', 'emf']) assert.equal(await val(site, `[name=${n}]`), '', n + ' stays empty');
+  assert.ok((await site.evaluate(() => window.events)).includes('pax[0].firstName'), 'input events fire for sites built with React or similar');
+  const box = (await site.textContent('#sa-fill-result')).replace(/\s+/g, ' ');
+  assert.match(box, /filled 15 fields/); assert.match(box, /Anubhav \(9\), Sulekha \(6\)/); assert.match(box, /1 field that already had something was left alone/);
+  await clean(app);
+});
+
+test('fill a form: an Italian hotel form without headings, date format from the placeholder, a note when the format is unknown', async () => {
+  const app = await openApp();
+  const payload = JSON.stringify({ saLedger: 1, people: [
+    { first: 'Anubhav', last: 'Bhardwaj', gender: 'male', passport: 'Z1234567', passportExp: '2031-03-11', email: 'anubhav@example.com', phone: '+49 151 23425746' },
+    { first: 'Sulekha', last: 'Sharma', gender: 'female', passport: 'X7654321', passportExp: '2030-08-05', email: 'sulekha@example.com', phone: '+39 333 1234567' }] });
+  const site = await bookingPage(app, 'hotel-form.html', payload);
+  assert.equal(await val(site, '[name=sal1]'), 'Sig.'); assert.equal(await val(site, '[name=sal2]'), 'Sig.ra');
+  assert.equal(await val(site, '[name=nome1]'), 'Anubhav'); assert.equal(await val(site, '[name=cognome1]'), 'Bhardwaj');
+  assert.equal(await val(site, '[name=nome2]'), 'Sulekha'); assert.equal(await val(site, '[name=cognome2]'), 'Sharma');
+  assert.equal(await val(site, '[name=doc1]'), 'Z1234567'); assert.equal(await val(site, '[name=doc2]'), 'X7654321');
+  assert.equal(await val(site, '[name=scad1]'), '11/03/2031'); assert.equal(await val(site, '[name=scad2]'), '05/08/2030');
+  assert.equal(await val(site, '[name=contactEmail]'), 'anubhav@example.com'); assert.equal(await val(site, '[name=tel]'), '+4915123425746');
+  assert.match(await site.textContent('#sa-fill-result'), /Passport expiry for Sulekha typed as 05\/08\/2030 \(day first\): check the site’s date format/);
   await clean(app);
 });

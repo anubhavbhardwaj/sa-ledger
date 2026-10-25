@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Test airline</title></head><body>
+<h1>Who's flying?</h1>
+<section><h2>Passenger 1 (adult)</h2>
+  <label for="t1">Title</label><select id="t1" name="pax[0].title"><option value="">Select</option><option value="MR">Mr.</option><option value="MRS">Mrs</option><option value="MS">Ms</option></select>
+  <label for="f1">First name(s)</label><input id="f1" name="pax[0].firstName">
+  <label for="l1">Last name</label><input id="l1" name="pax[0].lastName">
+  <label>Date of birth <input name="pax[0].dob" placeholder="DD/MM/YYYY"></label>
+  <label for="pn1">Passport number</label><input id="pn1" name="pax[0].docNumber">
+  <label for="pe1">Passport expiry date</label><input id="pe1" type="date" name="pax[0].docExpiry">
+</section>
+<section><h2>Passenger 2 (adult)</h2>
+  <div><span>Anrede</span> <label><input type="radio" name="p2sal" value="herr">Herr</label> <label><input type="radio" name="p2sal" value="frau">Frau</label></div>
+  <div class="row"><div><span>Vorname</span><input name="p2vn"></div><div><span>Nachname</span><input name="p2nn" value="Already"></div></div>
+  <label>Reisepassnummer <input name="p2pass"></label>
+  <div>Gültig bis
+    <select name="p2expDay" aria-label="Ablaufdatum Tag"><option value="">TT</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
+    <select name="p2expMonth" aria-label="Ablaufdatum Monat"><option value="">MM</option><option value="m1">Januar</option><option value="m7">Juli</option><option value="m8">August</option><option value="m9">September</option></select>
+    <select name="p2expYear" aria-label="Ablaufdatum Jahr"><option value="">JJJJ</option><option>2029</option><option>2030</option><option>2031</option></select>
+  </div>
+</section>
+<section><h2>Passenger 3</h2><label>First name <input name="p3f"></label></section>
+<fieldset><legend>Contact details</legend>
+  <label>Email <input type="email" name="email"></label>
+  <label>Confirm email <input type="email" name="email2"></label>
+  <label>Country code <select name="cc"><option value="">--</option><option value="IT">Italy (+39)</option><option value="DE">Germany (+49)</option><option value="IN">India (+91)</option></select></label>
+  <label>Mobile number <input type="tel" name="mobile"></label>
+</fieldset>
+<fieldset><legend>Payment</legend>
+  <label>Cardholder name <input name="ccname"></label>
+  <label>Card number <input name="ccnum"></label>
+  <label>Expiry date <input name="ccexp" placeholder="MM/YY"></label>
+</fieldset>
+<fieldset><legend>Emergency contact</legend><label>First name <input name="emf"></label></fieldset>
+<script>window.events = []; document.addEventListener('input', e => events.push(e.target.name));</script>
+</body></html>
