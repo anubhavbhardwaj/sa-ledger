@@ -87,7 +87,7 @@ service cloud.firestore {
     // 'bookings' (the address booking emails are forwarded to), 'leave' (vacation, work-from-abroad days and travel budget per year),
     // 'goals' (monthly investing and emergency fund goals), 'tax' (workplaces, job ticket and tax rate for the Taxes view)
     // 'people' (names as in the passport, gender, email and phone, for checking forms from a photo)
-    // and 'envelopes' (envelope budgeting: the envelopes and what was put in each one per month).
+    // and 'envelopes' (envelope budgeting: budget accounts, starting money, money assigned per month and targets).
     function validBudgets() {
       let d = request.resource.data;
       return d.keys().hasOnly(['items','total','updatedAt','updatedBy'])
@@ -129,10 +129,14 @@ service cloud.firestore {
     }
     function validEnvelopes() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['start','envs','months','updatedAt','updatedBy'])
-        && d.start is string && d.start.matches('^[0-9]{4}-[0-9]{2}$')
-        && d.envs is list && d.envs.size() <= 40
-        && (!('months' in d) || (d.months is map && d.months.size() <= 240));
+      return d.keys().hasOnly(['start','accounts','opening','openingBy','assigned','targets','trips','updatedAt','updatedBy'])
+        && isDate(d.start)
+        && d.accounts is list && d.accounts.size() <= 20
+        && d.opening is number
+        && (!('openingBy' in d) || d.openingBy is map)
+        && (!('assigned' in d) || (d.assigned is map && d.assigned.size() <= 240))
+        && (!('targets' in d) || d.targets is map)
+        && (!('trips' in d) || d.trips is bool);
     }
     function validFxMonths() {
       let d = request.resource.data;
