@@ -19,7 +19,7 @@ async function clean(app){
 for (const mobile of [false, true]) test(`every page opens without errors (${mobile ? 'phone' : 'desktop'})`, async () => {
   const app = await openApp({ mobile });
   await app.seed({ expenses: { e1: { amount: 12.5, date: d(0), store: 'Rewe', category: 'Groceries', account: 'DKB', spender: 'Anubhav', createdAt: 'x' } } });
-  for (const h of ['overview', 'transactions', 'visualizations', 'wealth', 'trips']){ await app.go(h); await app.page.waitForTimeout(150); }
+  for (const h of ['overview', 'transactions', 'budget', 'charts', 'wealth', 'trips']){ await app.go(h); await app.page.waitForTimeout(150); }
   await clean(app);
 });
 
@@ -110,12 +110,11 @@ test('overview: invested counts both of you, split by owner', async () => {
   await clean(app);
 });
 
-test('what if: lower a category for the month and the invested amount goes up', async () => {
+test('what if: hidden while envelopes are on (envelopes plan categories ahead)', async () => {
   const app = await openApp(), { page } = app, m = month(-1);
-  await app.seed({ expenses: { e1: { amount: 900, date: m + '-10', store: 'Venue', category: 'Wedding', account: 'DKB', spender: 'Anubhav', createdAt: 'x' }, e2: { amount: 300, date: m + '-11', store: 'Pizza', category: 'Restaurants', account: 'DKB', spender: 'Anubhav', createdAt: 'x' } } });
-  await app.go('visualizations'); await page.click(`.chip[data-p="${m}"]`);
-  await page.fill('[aria-label="What if for Wedding"]', '0'); await page.waitForTimeout(100);
-  assert.match(await app.text('.wisum'), /€900 more invested that month/);
+  await app.seed({ expenses: { e1: { amount: 900, date: m + '-10', store: 'Venue', category: 'Wedding', account: 'DKB', spender: 'Anubhav', createdAt: 'x' } } });
+  await app.go('charts'); await page.click(`.chip[data-p="${m}"]`); await page.waitForTimeout(150);
+  assert.equal(await page.isHidden('#wiPanel'), true); assert.equal(await page.isVisible('#byCategory'), true);
   await clean(app);
 });
 
@@ -550,7 +549,7 @@ test('phone: no page or dialog is wider than the screen', async () => {
   const ids = await page.$$eval('dialog', ds => ds.map(d => d.id));
   const wide = [];
   for (const id of ids) wide.push(await page.evaluate(id => { const d = document.getElementById(id); try { d.showModal(); } catch { return null; } const r = d.scrollWidth > d.clientWidth + 1 ? id : null; d.close(); return r; }, id));
-  for (const h of ['overview', 'transactions', 'visualizations', 'wealth', 'trips']){
+  for (const h of ['overview', 'transactions', 'budget', 'charts', 'wealth', 'trips']){
     await app.go(h); await page.waitForTimeout(200);
     wide.push(await page.evaluate(h => document.documentElement.scrollWidth > innerWidth ? 'page ' + h : null, h));
   }
@@ -564,7 +563,7 @@ test('phone layout: Ask AI in the top bar, the + button steps aside while scroll
   await app.seed({ expenses: ex }); await page.waitForTimeout(300);
   assert.ok(await page.$('.appbar #aiBtn'), 'Ask AI sits in the top bar');
   assert.match(await app.text('#setupLine'), /Not set up yet:\s*Goals/);
-  assert.match(await app.text('#budgetPanel'), /Envelopes.*Set up envelopes/, 'envelopes in place of budgets'); assert.equal(await page.isHidden('#goalsP'), true);
+  assert.match(await app.text('#kpis'), /Ready to assign.*Set up envelopes/, 'envelopes in place of budgets'); assert.equal(await page.isHidden('#goalsP'), true);
   assert.equal(await page.$$eval('#recent .r', r => r.length), 5);
   await page.evaluate(() => scrollTo(0, 600)); await page.waitForTimeout(150);
   assert.match(await page.getAttribute('#fab', 'class'), /away/);
@@ -608,7 +607,7 @@ test('envelopes: your own categories (Fixed, Flexible) and envelopes fed by chos
       e4: { amount: 800, date: td, store: 'Landlord', category: 'Housing', subcategory: 'Rent', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now },
       e5: { amount: 30, date: td, store: 'Kiosk', category: 'Shopping', subcategory: 'Magazines', account: 'Wise Common', spender: 'Anubhav', createdAt: now } },
     transfers: { t1: { amount: 200, date: td, from: 'Deutsche Bank', to: 'Scalable', createdAt: now } } });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(150);
   await page.click('#budgetPanel [data-envsetup]'); await page.waitForSelector('#envSetupDlg[open]');
   assert.deepEqual((await page.$$eval('#esAccs [data-esacc]:checked', els => els.map(e => e.value))).sort(), ['DB Card', 'Deutsche Bank', 'Wise Common', 'Wise Sulekha']);
   await page.click('#esSave'); await page.waitForSelector('#envCatDlg[open]');
@@ -641,7 +640,10 @@ test('envelopes: your own categories (Fixed, Flexible) and envelopes fed by chos
   await page.click('#eaCover [data-cover="ready"]'); await page.waitForTimeout(200);
   t = await app.text('#budgetPanel');
   assert.match(t, /Ready to Assign\s*€3,300\.00/); assert.match(t, /Food\s*€200\s*−€200\.00\s*€0\.00/);
-  assert.match(await app.text('#kpis'), /Ready to assign\s*€3,300\.00/);
+  await app.go('overview'); await page.waitForTimeout(150);
+  assert.match(await app.text('#kpis'), /Ready to assign\s*€3,300\.00.*Budget →/, 'the Overview keeps one line: Ready to Assign, links to Budget');
+  assert.equal(await page.$('#page-overview #budgetPanel'), null, 'the envelopes are on their own page');
+  await page.click('#kpis a[href="#budget"]'); await page.waitForTimeout(200);
   await page.click('[data-envmove]'); await page.waitForSelector('#envMoveDlg[open]');
   await page.selectOption('#em-to', food); await page.fill('#em-amt', '50'); await page.click('#envMoveForm [type=submit]'); await page.waitForTimeout(200);
   assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€3,250\.00.*Food\s*€250\s*−€200\.00\s*€50\.00/);
@@ -656,7 +658,7 @@ test('envelopes: a start day mid-month leaves earlier spending out, says so, and
     expenses: { e1: { amount: 100, date: m + '-01', store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now } },
     settings: { envelopes: { start: m + '-02', accounts: ['Deutsche Bank'], opening: 900, openingBy: { 'Deutsche Bank': 900 }, trips: true,
       groups: [{ id: 'g', name: 'Daily', envs: [{ id: 'food', name: 'Groceries', src: ['Groceries'] }] }], assigned: {}, targets: {} } } });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(150);
   let t = await app.text('#budgetPanel');
   assert.match(t, /Groceries\s*€0\s*€0\s*€0\.00/, 'the 1st is before the start day'); assert.match(t, /Counting from 2 \w+, your start day/);
   await page.click('[data-envwhole]'); await page.waitForSelector('#envSetupDlg[open]');
@@ -677,7 +679,7 @@ test('envelopes: trip spending can go to your own Trips category instead of one 
       e2: { amount: 300, date: m + '-03', store: 'Taj', category: 'Travel', subcategory: 'Hotels', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now, tripId: 'w' } },
     settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 2000, trips: true, assigned: {}, targets: {},
       groups: [{ id: 'g', name: 'Trips & Travel', envs: [{ id: 'tr', name: 'Transportation', src: ['Travel›Flights'] }, { id: 'ac', name: 'Accommodation', src: ['Travel›Hotels'] }] }] } } });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(150);
   let t = await app.text('#budgetPanel');
   assert.match(t, /Transportation\s*€0\s*€0/); assert.match(t, /Travel \(one per trip\).*Wedding in India\s*€0\s*−€900\.00/);
   await page.click('[data-envnotrips]'); await page.waitForTimeout(250);
@@ -697,7 +699,7 @@ test('envelopes: cover overspending from another envelope, YNAB-style; Savings l
     settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 0, trips: false, targets: {},
       groups: [{ id: 'g', name: 'Travel', envs: [{ id: 'tr', name: 'Transportation', src: ['Transportation'] }] }, { id: 'h', name: 'Daily', envs: [{ id: 'food', name: 'Groceries', src: ['Groceries'] }, { id: 'fun', name: 'Fun', src: ['Fun'] }] }],
       assigned: { [m]: { tr: 150, food: 300, fun: 50 } } } } });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(150);
   await page.click('[data-envkey="tr"]'); await page.waitForSelector('#envAsgDlg[open]');
   const c = await app.text('#eaCover');
   assert.match(c, /Cover €90\.00 from\s*Daily › Groceries\s*€300\.00\s*Daily › Fun\s*€50\.00/, 'envelopes with money, fullest first; no Ready to Assign when it is negative');
@@ -723,7 +725,7 @@ test('envelopes QA: spending from accounts outside the budget is shown per accou
       ex('i2', '12', 60, 'Amazon.in', 'Indian Expenses', 'HDFC NRE'), ex('k1', '10', 400, 'DB Kreditkarte', 'Credit Card', 'Deutsche Bank')]),
     settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank', 'DB Credit Card'], opening: 3000, openingBy: { 'Deutsche Bank': 3000, 'DB Credit Card': 0 }, trips: false, targets: {}, assigned: {},
       groups: [{ id: 'f', name: 'Fixed', envs: [{ id: 'rent', name: 'Rent - Both', src: ['Rent'] }] }, { id: 'd', name: 'Daily', envs: [{ id: 'ind', name: 'Indian Expenses', src: ['Indian Expenses'] }] }] } } });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(150);
   let t = await app.text('#budgetPanel');
   assert.match(t, /€960 not counted.*Raiffeisen Bank €900.*HDFC NRE €60/); assert.match(t, /Rent - Both \+ €900 outside\s*€0\s*−€880\.00/);
   assert.equal(await page.isHidden('#kpis .kpi:has-text("Budget left")'), true, 'the budgets summary tile is really hidden');
@@ -736,7 +738,7 @@ test('envelopes QA: spending from accounts outside the budget is shown per accou
   t = await app.text('#budgetPanel'); assert.match(t, /Rent - Both\s*€0\s*−€1,780\.00/); assert.doesNotMatch(t, /not counted/);
   // The card bill
   assert.match(t, /€400 in \w+ are credit card payments logged as spending/); assert.match(t, /Credit Card Payments.*DB Credit Card owes €0\s*€0\s*−€400\.00/);
-  await page.click('[data-ccfix]'); await page.waitForSelector('#ccDlg[open]');
+  await page.click('#budgetPanel [data-ccfix]'); await page.waitForSelector('#ccDlg[open]');
   assert.equal(await page.inputValue('[data-cccard="k1"]'), 'DB Credit Card', 'the card named in the entry');
   await page.click('#ccForm [type=submit]'); await page.waitForTimeout(300);
   t = await app.text('#budgetPanel'); assert.doesNotMatch(t, /payments logged as spending/); assert.match(t, /DB Credit Card owes €0\s*€0\s*−€400\.00/, 'still a payment, now as a transfer'); assert.doesNotMatch(t, /Not assigned/, 'no longer spending');
@@ -757,7 +759,7 @@ test('envelopes: starting money worked out from your balances and entries (back 
       e4: { amount: 50, date: m + '-04', store: 'Lidl', category: 'Groceries', account: 'Wise - Common', spender: 'Anubhav', createdAt: now } },
     income: { i1: { amount: 1000, date: m + '-01', source: 'Salary', category: 'Salary', account: 'Deutsche Bank', earner: 'Anubhav', createdAt: now },
       i2: { amount: 800, date: pm + '-10', source: 'Gift', category: 'Gift', account: 'Wise - Common', earner: 'Anubhav', createdAt: now } } });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(150);
   await page.click('#budgetPanel [data-envsetup]'); await page.waitForSelector('#envSetupDlg[open]');
   // Deutsche Bank: 2500 today − 1000 salary + 120 groceries = 1620 at the end of the day before the start.
   assert.equal(await page.inputValue('[data-esamt="Deutsche Bank"]'), '1620.00'); assert.match(await app.text('#esAccs'), /Deutsche Bank EUR · worked back from the balance of/);
@@ -771,5 +773,143 @@ test('envelopes: starting money worked out from your balances and entries (back 
   const t = await app.text('#budgetPanel');
   assert.match(t, /Ready to Assign\s*€3,320\.00/, '2320 + 1000 salary');
   assert.match(t, /Credit Card Payments.*Deutsche Bank CC owes €300\s*€0\s*€80\.00\s*€80\.00/);
+  await clean(app);
+});
+
+// ---------- review fixes: card bills, trip bookings, layout, transactions, country ----------
+const dbDocs = (app, col) => app.page.evaluate(async col => { const m = await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js'); return (await m.getDocsFromServer({ col })).docs.map(d => ({ id: d.id, ...d.data() })); }, col);
+const ACC4 = { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, ws: { name: 'Wise Sulekha', type: 'bank', currency: 'EUR', owner: 'Sulekha' },
+  amex: { name: 'AMEX', type: 'card', currency: 'EUR', owner: 'Anubhav' }, dcc: { name: 'Deutsche Bank CC', type: 'card', currency: 'EUR', owner: 'Anubhav' } };
+
+test('card bills: the Overview says they inflate Spent and turns them into card payments; the add form asks before saving one as spending', async () => {
+  const app = await openApp(), { page } = app, td = d(0);
+  await app.seed({ accounts: ACC4, expenses: {
+    e1: { amount: 1200, date: td, store: 'AMEX', category: 'Credit Card', account: 'Deutsche Bank', spender: 'Anubhav', comment: 'AMEX bill', createdAt: 'x' },
+    e2: { amount: 50, date: td, store: 'Rewe', category: 'Groceries', account: 'AMEX', spender: 'Anubhav', createdAt: 'x' } } });
+  await page.waitForTimeout(300);
+  assert.match(await app.text('#kpis'), /Spent\s*€1,250\.00/);
+  assert.match(await app.text('#page-overview [data-ccbar]'), /€1,200 of card bills are logged as spending \(1 entry in Credit Card\), so Spent and Saved count them/);
+  await page.click('#page-overview [data-ccfix]'); await page.waitForSelector('#ccDlg[open]');
+  assert.equal(await page.inputValue('[data-cccard="e1"]'), 'AMEX');
+  await page.click('#ccForm [type=submit]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#kpis'), /Spent\s*€50\.00/, 'the bill is no longer spending');
+  assert.equal(await page.isHidden('#page-overview [data-ccbar]'), true);
+  assert.deepEqual((await dbDocs(app, 'transfers')).map(t => [t.from, t.to, t.amount]), [['Deutsche Bank', 'AMEX', 1200]]);
+  // Typing a new one in: asked first; the card is guessed from the store.
+  await page.click('#addBtn'); await page.waitForSelector('#dlg[open]');
+  await page.fill('#f-amount', '300'); await page.fill('#f-store', 'Deutsche Bank CC bill'); await page.fill('#f-category', 'Credit Card'); await page.fill('#f-account', 'Deutsche Bank');
+  await page.click('#saveBtn'); await page.waitForTimeout(150);
+  assert.match(await app.text('#billAsk'), /This looks like a card bill/); assert.equal(await page.inputValue('#billCard'), 'Deutsche Bank CC');
+  assert.equal((await dbDocs(app, 'expenses')).length, 1, 'nothing saved yet');
+  await page.click('#billTr'); await page.waitForTimeout(300);
+  assert.equal(await page.isVisible('#dlg[open]'), false);
+  const trs = (await dbDocs(app, 'transfers')).map(t => [t.from, t.to, t.amount, t.comment]);
+  assert.deepEqual(trs.find(t => t[2] === 300), ['Deutsche Bank', 'Deutsche Bank CC', 300, 'Deutsche Bank CC bill'], 'a transfer to the card, the store kept as the comment');
+  // "Save as spending" keeps it an expense.
+  await page.click('#addBtn'); await page.waitForSelector('#dlg[open]');
+  await page.fill('#f-amount', '20'); await page.fill('#f-store', 'Card fee'); await page.fill('#f-category', 'Credit Card'); await page.fill('#f-account', 'Deutsche Bank');
+  await page.click('#saveBtn'); await page.waitForTimeout(150); await page.click('#billKeep'); await page.waitForTimeout(300);
+  assert.equal((await dbDocs(app, 'expenses')).filter(e => e.store === 'Card fee').length, 1);
+  await clean(app);
+});
+
+test('trip: a booking with the same amount as a payment on the trip counts as paid, not twice; Link makes it stick', async () => {
+  const app = await openApp(), { page } = app, s = d(20), e = d(30);
+  await app.seed({ trips: { tr: { name: 'India Diwali', type: 'holiday', traveller: 'Both', start: s, end: e, budget: 3000, createdAt: 'x' } },
+    expenses: { x1: { amount: 1380, date: d(-30), store: 'Lufthansa', category: 'Travel', account: 'DKB', spender: 'Anubhav', tripId: 'tr', createdAt: 'x' } },
+    bookings: { b1: { tripId: 'tr', type: 'flight', title: 'MUC to DEL', provider: 'Lufthansa', start: s + 'T13:05', price: 690, currency: 'EUR', createdAt: 'x' },
+      b2: { tripId: 'tr', type: 'flight', title: 'DEL to MUC', provider: 'Lufthansa', start: e + 'T02:10', price: 690, currency: 'EUR', createdAt: 'x' } } });
+  await page.waitForTimeout(300); await app.go('trips'); await page.waitForTimeout(150);
+  await page.click('[data-trip="tr"]'); await page.waitForTimeout(200);
+  const t = await app.text('#tripDetail');
+  assert.match(t, /Expected total\s*€1,380/, 'spent 1,380 and the two legs paid together in it');
+  assert.match(t, /Lufthansa €1,380 has the same amount, so it counts as paid/);
+  await page.click('[data-bkautolink="tr"]'); await page.waitForTimeout(300);
+  assert.deepEqual((await dbDocs(app, 'bookings')).map(b => b.expenseId), ['x1', 'x1']);
+  assert.match(await app.text('#tripDetail'), /all in expenses/);
+  await clean(app);
+});
+
+test('layout: numbers first and To do on one line; Budget tab; charts on Transactions; old chart links still work', async () => {
+  const app = await openApp({ mobile: true }), { page } = app, now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, etf: { name: 'ETF', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
+    invSnapshots: { s1: { accountId: 'etf', month: month(-1), investment: 500, value: 10000, createdAt: now } },
+    expenses: { e1: { amount: 30, date: d(0), store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now } } });
+  await page.waitForTimeout(300);
+  const order = await page.$$eval('#page-overview > div > *:not([hidden])', els => els.map(e => e.id || e.className));
+  assert.ok(order.indexOf('kpis') < order.indexOf('todoCard'), 'numbers above To do: ' + order.join(','));
+  assert.equal(await page.$eval('#todoDet', el => el.open), false, 'To do starts folded');
+  assert.match(await app.text('#todoCard summary'), /To do.*close: 1 of 2 done · next: Check in balances/);
+  assert.deepEqual(await page.$$eval('.bottomnav .btab span:first-of-type', s => s.map(x => x.textContent)), ['Overview', 'Transactions', 'Budget', 'Wealth', 'Travel']);
+  await page.click('.btab[data-page="budget"]'); await page.waitForTimeout(200);
+  assert.match(await app.text('#budgetPanel'), /Envelopes|Set up/);
+  await app.go('visualizations'); await page.waitForTimeout(200);
+  assert.equal(await page.evaluate(() => location.hash), '#transactions');
+  assert.equal(await page.isVisible('#txCharts'), true); assert.equal(await page.isVisible('#txListP'), false);
+  assert.match(await app.text('#byCategory'), /Groceries/);
+  await page.click('#vzBanner [data-txview="list"]'); await page.waitForTimeout(150);
+  assert.equal(await page.isVisible('#txListP'), true); assert.match(await app.text('#status'), /^Tap a row/, 'phones say tap');
+  assert.equal(await page.$eval('#txFilters', el => getComputedStyle(el).display), 'none', 'no empty gap above the list');
+  await clean(app);
+});
+
+test('wealth: net worth chart on Investments only; Cash & cards one row per account', async () => {
+  const app = await openApp(), { page } = app, now = new Date().toISOString();
+  await app.seed({ accounts: { ...ACC4, etf: { name: 'ETF', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
+    checkins: { c1: { accountId: 'db', date: d(-3), balance: 2000, createdAt: now }, c2: { accountId: 'amex', date: d(-50), balance: -300, createdAt: now } },
+    invSnapshots: { s1: { accountId: 'etf', month: month(-2), investment: 500, value: 10000, createdAt: now }, s2: { accountId: 'etf', month: month(-1), investment: 500, value: 10600, createdAt: now } } });
+  await page.waitForTimeout(300); await app.go('wealth'); await page.waitForTimeout(200);
+  await page.click('[data-wv="cash"]'); await page.waitForTimeout(150);
+  assert.equal(await page.isHidden('#nwAllP'), true);
+  assert.equal(await page.$$eval('#accList .ilist .r', r => r.length), 4);
+  const t = await app.text('#accList');
+  assert.match(t, /Deutsche Bank\s*Anubhav · checked in 3 days ago\s*€2,000\.00/); assert.match(t, /AMEX\s*Anubhav · checked in 50 days ago\s*€300\.00/); assert.match(t, /Wise Sulekha\s*Sulekha · no check-in yet/);
+  await page.click('#accList [data-acc="db"]'); await page.waitForTimeout(150);
+  assert.equal(await page.isVisible('#accDetail'), true, 'a row opens the account');
+  await clean(app);
+});
+
+test('transactions: Undo after delete; select several and change their category or trip at once, with Undo', async () => {
+  const app = await openApp(), { page } = app, td = d(0), now = new Date().toISOString();
+  await app.seed({ trips: { tr: { name: 'Rome visit', type: 'visit', traveller: 'Anubhav', start: d(-3), end: d(2), createdAt: now } }, expenses: {
+    e1: { amount: 10, date: td, store: 'Bar A', category: 'Food', account: 'DKB', spender: 'Anubhav', createdAt: now }, e2: { amount: 20, date: td, store: 'Bar B', category: 'Food', account: 'DKB', spender: 'Anubhav', createdAt: now },
+    e3: { amount: 30, date: td, store: 'Shop C', category: 'Shopping', account: 'DKB', spender: 'Anubhav', tripId: 'tr', createdAt: now } } });
+  await page.waitForTimeout(300); await app.go('transactions'); await page.waitForTimeout(150);
+  await page.click('#rows tr[data-edit="e3"]'); await page.waitForSelector('#dlg[open]');
+  await page.click('#delBtn'); await page.click('#delBtn'); await page.waitForTimeout(250);
+  assert.equal((await dbDocs(app, 'expenses')).length, 2);
+  assert.match(await app.text('#toast'), /Deleted\s*Undo/); await page.click('#toast .toastact'); await page.waitForTimeout(250);
+  const back = (await dbDocs(app, 'expenses')).find(x => x.id === 'e3');
+  assert.deepEqual([back.store, back.tripId, back.amount], ['Shop C', 'tr', 30], 'restored as it was');
+  await page.click('#selBtn'); await page.click('#rows tr[data-edit="e1"]'); await page.click('#rows tr[data-edit="e2"]');
+  assert.match(await app.text('#selBar'), /2 selected · €30\.00/);
+  await page.click('[data-selchange]'); await page.waitForSelector('#bulkDlg[open]');
+  assert.match(await app.text('#bulkTitle'), /Change 2 entries/);
+  await page.fill('#bk-category', 'Eating out'); await page.selectOption('#bk-trip', 'tr'); await page.click('#bulkSave'); await page.waitForTimeout(300);
+  let ex = await dbDocs(app, 'expenses');
+  assert.deepEqual(ex.filter(x => x.id !== 'e3').map(x => [x.id, x.category, x.tripId, x.spender]).sort(), [['e1', 'Eating out', 'tr', 'Anubhav'], ['e2', 'Eating out', 'tr', 'Anubhav']]);
+  assert.equal(await page.isHidden('#selBar'), true, 'select mode ends after a change');
+  await page.click('#toast .toastact'); await page.waitForTimeout(250);
+  ex = await dbDocs(app, 'expenses');
+  assert.deepEqual(ex.filter(x => x.id !== 'e3').map(x => [x.category, x.tripId || '']).sort(), [['Food', ''], ['Food', '']], 'Undo puts them back');
+  await clean(app);
+});
+
+test('country: entries without one count where their account is usually used (not on trips); the filter follows; the add form fills it', async () => {
+  const app = await openApp(), { page } = app, td = d(0), now = new Date().toISOString();
+  const E = (id, store, account, country, extra = {}) => [id, { amount: 10, date: td, store, category: 'Food', account, spender: 'Sulekha', ...(country ? { country } : {}), createdAt: now, ...extra }];
+  await app.seed({ trips: { tr: { name: 'Paris', type: 'holiday', traveller: 'Both', start: d(-5), end: d(-1), createdAt: now } },
+    expenses: Object.fromEntries([E('a', 'Conad', 'Wise Sulekha', 'Italy'), E('b', 'Coop', 'Wise Sulekha', 'Italy'), E('c', 'Esselunga', 'Wise Sulekha', ''),
+      E('d', 'Cafe', 'Wise Sulekha', '', { tripId: 'tr' }), E('e', 'Rewe', 'DKB', '')]) });
+  await page.waitForTimeout(300); await app.go('charts'); await page.waitForTimeout(200);
+  const t = await app.text('#byCountry');
+  assert.match(t, /Italy\s*€30\.00/); assert.match(t, /Not set\s*€20\.00/);
+  await page.click('#byCountry [data-k="Italy"], #byCountry [data-key="Italy"], #byCountry :text("Italy")'); await page.waitForTimeout(200);
+  await page.click('#vzBanner [data-txview="list"]'); await page.waitForTimeout(150);
+  assert.equal(await page.$$eval('#rows tr.row', r => r.length), 3, 'Italy includes the entry it was inferred for');
+  await page.click('#addBtn'); await page.waitForSelector('#dlg[open]');
+  await page.click('#moreBtn'); await page.evaluate(() => { document.getElementById('f-country').value = 'Germany'; });
+  await page.fill('#f-account', 'Wise Sulekha'); await page.dispatchEvent('#f-account', 'change');
+  assert.equal(await page.inputValue('#f-country'), 'Italy');
   await clean(app);
 });

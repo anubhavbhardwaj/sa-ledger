@@ -198,6 +198,16 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .pmenu hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
 /* transactions bar */
 .txbar{display:flex;gap:8px;align-items:center}
+.selbar{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:12;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--ink);color:var(--ground);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow);font-size:13.5px;order:9}
+.selbar strong{font-family:var(--f-mono);font-weight:600}
+.selbar .btn{background:var(--surface);color:var(--ink);border-color:transparent}
+.selbar .btn.primary{background:var(--accent);color:var(--accent-ink)}
+.selbar .sp{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+tr.row.picked td{background:var(--accent-soft)!important}
+tr.row.picked td.date::before{content:'✓ ';color:var(--accent);font-weight:700}
+#selBtn[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
+body.selecting .fab{display:none}
+@media (max-width:640px){.selbar{bottom:calc(80px + env(safe-area-inset-bottom,0px))}}
 .txbar input{flex:1 1 auto;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px}
 #filterBtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:11px;line-height:18px;text-align:center;font-weight:700}
 /* + form: more details */
@@ -490,6 +500,7 @@ table.mini th.num{font-family:var(--f-body)}
 .ilist .meta{font-size:12px;color:var(--muted)}
 .ilist .v{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:500;white-space:nowrap}
 .ilist .v small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+.ilist .v.neg{color:var(--danger)}
 .ilist .tot{cursor:default;font-weight:600}.ilist .tot:hover{background:none}
 .pos{color:var(--good)}
 .autohint{margin:0;font-size:12.5px;color:var(--muted);background:var(--sunk);border-radius:8px;padding:7px 10px}
@@ -508,6 +519,17 @@ table.mini th.num{font-family:var(--f-body)}
 .hint.cmp strong{color:var(--ink);font-weight:600}
 /* to do card */
 .todo{display:grid}
+.todo1>details{min-width:0}
+#wv-cash:not([hidden]){display:grid;gap:16px}
+.todo1>details>summary{display:flex;align-items:baseline;gap:10px;cursor:pointer;list-style:none;min-width:0}
+.todo1>details>summary::-webkit-details-marker{display:none}
+.todo1>details>summary h2{margin:0;flex:none}
+.todo1 .tsum{font-size:12.5px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.todo1 .tsum b{font-weight:600;color:var(--ink-2)}
+.todo1 .chev{color:var(--muted);transition:transform .15s}
+.todo1>details[open] .chev{transform:rotate(180deg)}
+.todo1>details[open] .tfirst{display:none}
+.todo1>details[open]>summary{margin-bottom:6px}
 .todo .t{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line)}
 .todo .t:last-child{border-bottom:0}
 .todo .ic{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--muted);display:grid;place-items:center;font-size:12px;line-height:1}
@@ -627,7 +649,7 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
   main.wrap{padding-bottom:72px}
   .fab{transition:transform .2s ease,opacity .2s ease;display:grid;place-items:center;position:fixed;right:16px;bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:16;width:56px;height:56px;border-radius:18px;border:0;background:var(--accent);color:var(--accent-ink);font-size:28px;line-height:1;box-shadow:0 6px 18px rgba(21,32,28,.28);cursor:pointer}
   input,select,textarea{font-size:16px!important}
-  .kpi{padding:12px 14px}.kpi .val{font-size:21px}
+  .kpis .kpi{padding:12px 14px;min-width:0}.kpis .kpi .val{font-size:21px}
   .tscroll{margin:0;padding:0;overflow:visible}
   .tscroll table{min-width:0;width:100%}
   .tscroll thead{display:none}
@@ -679,6 +701,8 @@ a.kpilink:hover{background:var(--sunk)}
 .delta.down{color:var(--down);background:var(--accent-soft)}
 
 .filterline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:30px}
+.filterline:empty{display:none}
+.txsegs{display:flex;gap:8px;flex-wrap:wrap}
 .filterline .note{font-size:12.5px;color:var(--muted)}
 .fchip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--ink);border:0;border-radius:999px;padding:4px 6px 4px 12px;font-size:13px;cursor:pointer}
 .fchip .x{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--surface);font-size:12px;line-height:1}
@@ -752,6 +776,7 @@ tfoot td{font-weight:600;border-bottom:0}
 .recent .a{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:500}
 
 .status{font-size:13px;color:var(--muted);margin:0}
+.toast .toastact{border:0;background:none;color:inherit;font:inherit;font-weight:700;margin-left:10px;cursor:pointer;padding:0;text-decoration:underline}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--ground);padding:9px 16px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);z-index:20}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--ground);font-size:12px;padding:6px 9px;border-radius:6px;z-index:30;white-space:nowrap}
 
@@ -768,6 +793,9 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
 .dlg-actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
 .dlg-actions .right{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
 .err{color:var(--danger);font-size:13px;margin:0}
+.billask{display:grid;gap:8px;background:var(--warn-soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
+.billask .billrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.billask select{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:5px 8px;font-size:13px;color:var(--ink);max-width:100%}
 @media (prefers-reduced-motion:no-preference){.hbar .fill{transition:width .25s ease}}
 
 /* login + session */
@@ -808,7 +836,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
     <nav class="tabs" aria-label="Pages">
       <a class="tab" href="#overview" data-page="overview">Overview</a>
       <a class="tab" href="#transactions" data-page="transactions">Transactions<span class="badge" id="fbadge" hidden></span></a>
-      <a class="tab" href="#visualizations" data-page="visualizations">Visualizations</a>
+      <a class="tab" href="#budget" data-page="budget">Budget</a>
       <a class="tab" href="#wealth" data-page="wealth">Wealth</a>
       <a class="tab" href="#trips" data-page="trips">Travel<span class="badge" id="tbadge" hidden></span></a>
     </nav>
@@ -838,15 +866,15 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
   <section class="page" id="page-overview" data-page="overview">
     <div style="display:grid;gap:18px">
       <div class="install" id="installBar" hidden></div>
+      <div class="pagehead"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
+      <section class="kpis" id="kpis" aria-label="Summary"></section>
       <div class="banner" id="inboxBar" hidden></div>
       <div class="banner" id="ppBar" data-ppbar hidden></div>
       <div class="banner" data-bkinboxbar hidden></div>
+      <div class="banner" data-ccbar hidden></div>
       <section class="panel" id="nextUp" hidden></section>
-      <section class="panel" id="todoCard" hidden></section>
-      <div class="pagehead"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
-      <section class="kpis" id="kpis" aria-label="Summary"></section>
+      <section class="panel todo1" id="todoCard" hidden></section>
       <div class="setupline" id="setupLine" hidden></div>
-      <section class="panel" id="budgetPanel" hidden></section>
       <section class="panel" id="goalsP"></section>
       <section class="panel" id="recurP" hidden></section>
       <div class="grid">
@@ -855,7 +883,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
           <div id="ovTrend"></div>
         </section>
         <section class="panel span-5">
-          <header><h2>Top categories</h2><a class="btn ghost" href="#visualizations">All charts →</a></header>
+          <header><h2>Top categories</h2><a class="btn ghost" href="#charts">All charts →</a></header>
           <div class="hbars" id="ovCats"></div>
         </section>
         <section class="panel span-12">
@@ -866,18 +894,27 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
     </div>
   </section>
 
+  <!-- BUDGET (envelopes) -->
+  <section class="page" id="page-budget" data-page="budget" hidden>
+    <div style="display:grid;gap:16px">
+      <section class="panel" id="budgetPanel" hidden></section>
+      <div class="panel" id="budgetEmpty" hidden><p class="empty" style="margin:0">Pick a month at the top to see its envelopes.</p></div>
+    </div>
+  </section>
+
   <!-- TRANSACTIONS -->
   <section class="page" id="page-transactions" data-page="transactions" hidden>
     <div style="display:grid;gap:14px">
       <div class="pagehead">
         <div style="display:grid;gap:8px"><h1 id="txTitle">Transactions</h1><p id="txSub" style="margin:0"></p>
-          <div class="seg" role="radiogroup" aria-label="Show" id="txKind"><button type="button" role="radio" data-txkind="expense" aria-checked="true">Expenses</button><button type="button" role="radio" data-txkind="income" aria-checked="false">Income</button><button type="button" role="radio" data-txkind="transfer" aria-checked="false">Transfers</button></div>
+          <div class="txsegs"><div class="seg" role="radiogroup" aria-label="View" id="txView"><button type="button" role="radio" data-txview="list" aria-checked="true">List</button><button type="button" role="radio" data-txview="charts" aria-checked="false">Charts</button></div><div class="seg" role="radiogroup" aria-label="Show" id="txKind"><button type="button" role="radio" data-txkind="expense" aria-checked="true">Expenses</button><button type="button" role="radio" data-txkind="income" aria-checked="false">Income</button><button type="button" role="radio" data-txkind="transfer" aria-checked="false">Transfers</button></div></div>
         </div>
         <input id="importFile" type="file" accept=".csv,text/csv" hidden>
         <button id="exportBtn" type="button" hidden>Export CSV</button>
       </div>
       <div class="banner" id="importBar" hidden></div>
-      <div class="txbar"><input id="search" type="search" placeholder="Search store, comment or category" aria-label="Search transactions"><button class="btn" id="filterBtn" type="button" aria-expanded="false" aria-controls="toolbar">Filters <span class="badge" id="filterCount" hidden></span></button></div>
+      <div class="banner" data-ccbar hidden></div>
+      <div class="txbar"><input id="search" type="search" placeholder="Search store, comment or category" aria-label="Search transactions"><button class="btn" id="filterBtn" type="button" aria-expanded="false" aria-controls="toolbar">Filters <span class="badge" id="filterCount" hidden></span></button><button class="btn" id="selBtn" type="button" aria-pressed="false">Select</button></div>
       <div class="toolbar" id="toolbar" role="group" aria-label="Filters" hidden>
         <label><span class="lbl">Category</span><select id="fl-category"></select></label>
         <label><span class="lbl">Spender</span><select id="fl-spender"></select></label>
@@ -887,7 +924,52 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
         <label><span class="lbl">Trip</span><select id="fl-tripName"></select></label>
       </div>
       <div class="filterline" id="txFilters"></div>
-      <section class="panel">
+      <div id="txCharts" hidden style="display:grid;gap:14px">
+        <div class="banner" id="vzBanner"></div>
+        <section class="kpis" id="vzKpis" aria-label="Highlights"></section>
+        <div class="grid">
+          <section class="panel span-7">
+            <header><h2>Monthly spend</h2><span class="right" data-vzslot="trend"></span></header>
+            <div id="vzTrend"></div>
+          </section>
+          <section class="panel span-5">
+            <header><h2 id="cumTitle">Running total</h2><span class="right" data-vzslot="cum"></span></header>
+            <div id="cum"></div>
+          </section>
+          <section class="panel span-6">
+            <header><h2>Daily life vs trips</h2><span class="right" data-vzslot="tripKind"></span></header>
+            <div class="hbars" id="byTripKind"></div>
+          </section>
+          <section class="panel span-6">
+            <header><h2>By category</h2><span class="right" data-vzslot="category"></span></header>
+            <div class="hbars" id="byCategory"></div>
+          </section>
+          <section class="panel span-4">
+            <header><h2>By spender</h2><span class="right" data-vzslot="spender"></span></header>
+            <div class="hbars" id="bySpender"></div>
+          </section>
+          <section class="panel span-4">
+            <header><h2>By account</h2><span class="right" data-vzslot="account"></span></header>
+            <div class="hbars" id="byAccount"></div>
+          </section>
+          <section class="panel span-4">
+            <header><h2>By country</h2><span class="right" data-vzslot="country"></span></header>
+            <p class="muted" style="margin:-4px 0 8px;font-size:12px">Entries without a country count where their account is usually used.</p>
+            <div class="hbars" id="byCountry"></div>
+          </section>
+          <section class="panel span-12">
+            <header><h2>By store</h2><span class="right" data-vzslot="store"></span></header>
+            <div class="hbars" id="byStore"></div>
+          </section>
+          <section class="panel span-12" id="wiPanel">
+            <header><h2 id="wiTitle">What if</h2></header>
+            <p class="muted" style="margin:0 0 10px;font-size:13px">What you spent per category in the month picked at the top. Type a lower amount where you could have spent less, and see how much more you could have invested that month.</p>
+            <div id="wiBody"></div>
+          </section>
+        </div>
+      </div>
+      <div class="selbar" id="selBar" hidden></div>
+      <section class="panel" id="txListP">
         <div class="tscroll">
           <table>
             <thead id="thead"></thead>
@@ -960,59 +1042,12 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
     </div>
   </section>
 
-  <!-- VISUALIZATIONS -->
-  <section class="page" id="page-visualizations" data-page="visualizations" hidden>
-    <div style="display:grid;gap:14px">
-      <div class="pagehead"><div><h1 id="vzTitle">Visualizations</h1><p>Tap any bar, slice or row to filter. Your selection carries over to Transactions. Switch each chart between types with the buttons on its right.</p></div></div>
-      <div class="banner" id="vzBanner"></div>
-      <section class="kpis" id="vzKpis" aria-label="Highlights"></section>
-      <div class="grid">
-        <section class="panel span-7">
-          <header><h2>Monthly spend</h2><span class="right" data-vzslot="trend"></span></header>
-          <div id="vzTrend"></div>
-        </section>
-        <section class="panel span-5">
-          <header><h2 id="cumTitle">Running total</h2><span class="right" data-vzslot="cum"></span></header>
-          <div id="cum"></div>
-        </section>
-        <section class="panel span-6">
-          <header><h2>Daily life vs trips</h2><span class="right" data-vzslot="tripKind"></span></header>
-          <div class="hbars" id="byTripKind"></div>
-        </section>
-        <section class="panel span-6">
-          <header><h2>By category</h2><span class="right" data-vzslot="category"></span></header>
-          <div class="hbars" id="byCategory"></div>
-        </section>
-        <section class="panel span-4">
-          <header><h2>By spender</h2><span class="right" data-vzslot="spender"></span></header>
-          <div class="hbars" id="bySpender"></div>
-        </section>
-        <section class="panel span-4">
-          <header><h2>By account</h2><span class="right" data-vzslot="account"></span></header>
-          <div class="hbars" id="byAccount"></div>
-        </section>
-        <section class="panel span-4">
-          <header><h2>By country</h2><span class="right" data-vzslot="country"></span></header>
-          <div class="hbars" id="byCountry"></div>
-        </section>
-        <section class="panel span-12">
-          <header><h2>By store</h2><span class="right" data-vzslot="store"></span></header>
-          <div class="hbars" id="byStore"></div>
-        </section>
-        <section class="panel span-12" id="wiPanel">
-          <header><h2 id="wiTitle">What if</h2></header>
-          <p class="muted" style="margin:0 0 10px;font-size:13px">What you spent per category in the month picked at the top. Type a lower amount where you could have spent less, and see how much more you could have invested that month.</p>
-          <div id="wiBody"></div>
-        </section>
-      </div>
-    </div>
-  </section>
 </main>
 
 <nav class="bottomnav" aria-label="Pages">
   <a class="btab" href="#overview" data-page="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
   <a class="btab" href="#transactions" data-page="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Transactions</span><span class="bdot" id="fbadge2" hidden></span></a>
-  <a class="btab" href="#visualizations" data-page="visualizations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg><span>Charts</span></a>
+  <a class="btab" href="#budget" data-page="budget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span>Budget</span></a>
   <a class="btab" href="#wealth" data-page="wealth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg><span>Wealth</span></a>
   <a class="btab" href="#trips" data-page="trips"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 13.5L3 11l1.5-1.5 8 .5 4.5-4.5a2.1 2.1 0 013 3L15.5 13l.5 8L14.5 22.5 12 15l-3 3v2.5L7.5 22 6 18l-4-1.5L3.5 15H6z"/></svg><span>Travel</span><span class="bdot" id="tbadge2" hidden></span></a>
 </nav>
@@ -1441,6 +1476,21 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
 </dialog>
 <div id="tip" hidden></div>
 <div class="toast" id="toast" hidden></div>
+<dialog id="bulkDlg">
+  <form id="bulkForm" novalidate style="display:grid;gap:12px;padding:20px;max-width:520px">
+    <h3 id="bulkTitle" tabindex="-1" autofocus style="outline:none">Change entries</h3>
+    <p class="muted" style="margin:0;font-size:13px">Only what you fill in changes; everything else stays as it is.</p>
+    <div class="fields">
+      <label class="f">Category<input id="bk-category" data-list="dl-category" autocomplete="off" placeholder="Keep"></label>
+      <label class="f">Sub category<input id="bk-subcategory" data-list="dl-subcategory" autocomplete="off" placeholder="Keep"></label>
+      <label class="f">Account / card<input id="bk-account" data-list="dl-account" autocomplete="off" placeholder="Keep"></label>
+      <label class="f">Spender<select id="bk-spender"><option value="">Keep</option><option>Anubhav</option><option>Sulekha</option></select></label>
+      <label class="f full">Trip<select id="bk-trip"></select></label>
+    </div>
+    <p class="err" id="bulkErr" hidden></p>
+    <div class="dlg-actions"><button class="btn danger" type="button" id="bulkDel">Delete</button><div class="right"><button class="btn" type="button" id="bulkCancel">Cancel</button><button class="btn primary" type="submit" id="bulkSave">Save</button></div></div>
+  </form>
+</dialog>
 
 <dialog id="dlg">
   <form id="form" method="dialog" novalidate>
@@ -1470,6 +1520,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
       </div>
     </div>
     <p class="autohint" id="autoHint" hidden></p>
+    <div class="billask" id="billAsk" hidden></div>
     <p class="err" id="formErr" hidden></p>
     <div class="dlg-actions">
       <button class="btn danger" id="delBtn" type="button" hidden>Delete</button>
@@ -1621,7 +1672,7 @@ const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','
 const CC = {Germany:'DE', Italy:'IT', India:'IN', France:'FR', Spain:'ES', Switzerland:'CH', Austria:'AT'};
 const DIMS = ['category','spender','account','country','tripKind','tripName','store'];
 const LABEL = {category:'Category', spender:'Spender', account:'Account', country:'Country', tripKind:'Trip type', tripName:'Trip', store:'Store'};
-const PAGES = ['overview','transactions','trips','wealth','visualizations'];
+const PAGES = ['overview','transactions','budget','trips','wealth'];
 const FIELDS = ['amount','date','store','category','subcategory','account','spender','country','comment','tax'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' + y; };
@@ -1785,10 +1836,17 @@ function tripStatus(t){
 }
 function derive(){
   state.tripMap = Object.fromEntries(state.trips.map(t => [t.id, t]));
+  // Each account's usual country (60% or more of its entries that have one): Wise Sulekha → Italy, Deutsche Bank → Germany.
+  const cnt = new Map();
+  for (const i of state.items) if (i.country && i.account){ const a = String(i.account).toLowerCase(), m = cnt.get(a) || {}; m[i.country] = (m[i.country] || 0) + 1; cnt.set(a, m); }
+  state.accCountry = new Map([...cnt].map(([a, m]) => { const e = Object.entries(m).sort((x, y) => y[1] - x[1]), n = e.reduce((x, y) => x + y[1], 0); return [a, e[0][1] / n >= 0.6 ? e[0][0] : '']; }));
   for (const i of state.items){
     const t = i.tripId && state.tripMap[i.tripId];
     i.tripKind = t ? TRIP_KIND[t.type] : 'Daily life';
     i.tripName = t ? tripLabel(t) : 'No trip';
+    // Where it was spent, for the charts and the Country filter: the entry's country, else (not on a trip, where the
+    // card says little about the place) its account's usual one, rupees mean India; else "Not set".
+    i.place = i.country || (t ? '' : state.accCountry.get(String(i.account || '').toLowerCase()) || (i.currency === 'INR' ? 'India' : '')) || 'Not set';
   }
 }
 function expenseDoc(it, over = {}){
@@ -1803,7 +1861,7 @@ const tripExpenses = id => state.items.filter(i => i.tripId === id);
 const monthsPresent = () => [...new Set([...state.items, ...state.income, ...state.transfers].map(i => i.date.slice(0,7)).concat(state.envCfg?.accounts?.length ? [today().slice(0, 7)] : []))].sort();
 const inPeriod = i => state.period === 'all' || i.date.startsWith(state.period);
 function passFilters(i, skip){
-  for (const k of DIMS){ if (k === skip) continue; const v = state.filters[k]; if (v !== null && (i[k] || '—') !== v) return false; }
+  for (const k of DIMS){ if (k === skip) continue; const v = state.filters[k]; if (v !== null && dimOf(i, k) !== v) return false; }
   return true;
 }
 function passSearch(i){
@@ -1813,9 +1871,10 @@ function passSearch(i){
 const filtered = () => state.items.filter(i => inPeriod(i) && passFilters(i) && passSearch(i));
 const activeFilters = () => DIMS.filter(k => state.filters[k] !== null);
 const sum = arr => arr.reduce((s,i) => s + (+i.amount||0), 0);
+const dimOf = (i, k) => k === 'country' ? i.place || i.country || 'Not set' : i[k] || '—';
 function group(rows, key){
   const m = new Map();
-  for (const r of rows){ const k = r[key] || '—'; m.set(k, (m.get(k)||0) + (+r.amount||0)); }
+  for (const r of rows){ const k = dimOf(r, key); m.set(k, (m.get(k)||0) + (+r.amount||0)); }
   return [...m].map(([key,total]) => ({key,total})).sort((a,b) => b.total - a.total);
 }
 const periodName = () => state.period === 'all' ? 'All time' : monthLabel(state.period);
@@ -1825,6 +1884,8 @@ function route(){
   const h = location.hash.replace('#','');
   if (h === 'add'){ history.replaceState(null, '', '#overview'); if (state.user) setTimeout(openAdd, 0); else state.wantAdd = true; }
   if (h === 'accounts'){ state.wv = 'cash'; history.replaceState(null, '', '#wealth'); }
+  // Charts live on Transactions now (List / Charts); old links still land there.
+  if (h === 'visualizations' || h === 'charts'){ state.txView = 'charts'; history.replaceState(null, '', '#transactions'); }
   // From the 9:00 "Office or home today?" notification: the Taxes view, which asks at the top.
   if (h === 'workday'){ state.wv = 'tax'; state.taxYear = null; state.taxMonth = null; state.openAcc = null; history.replaceState(null, '', '#wealth'); }
   // Something shared to the app (see sw.js): open it as a booking once signed in.
@@ -1832,8 +1893,9 @@ function route(){
   // From a "New booking to add" notification: open the forwarded booking (or the list when there are several).
   if (h === 'bookings'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(openBkInboxFromLink, 0); else state.wantBkInbox = true; }
   if (h === 'booking'){ history.replaceState(null, '', '#trips'); if (state.user) setTimeout(() => bkOpen({ source: 'upload' }), 0); }
-  state.page = h === 'accounts' || h === 'workday' ? 'wealth' : h === 'share' || h === 'booking' || h === 'bookings' ? 'trips' : PAGES.includes(h) ? h : 'overview';
+  state.page = h === 'accounts' || h === 'workday' ? 'wealth' : h === 'share' || h === 'booking' || h === 'bookings' ? 'trips' : h === 'visualizations' || h === 'charts' ? 'transactions' : PAGES.includes(h) ? h : 'overview';
   if (state.page !== 'trips') state.openTrip = null;
+  if (state.page !== 'transactions') state.sel = null;
   if (state.page !== 'wealth') state.openAcc = null;
   $('#months').hidden = state.page === 'trips' || state.page === 'wealth';
   $$('section.page').forEach(s => s.hidden = s.dataset.page !== state.page);
@@ -1856,10 +1918,11 @@ function render(){
   $('#fbadge').hidden = !n; $('#fbadge').textContent = n;
   $('#fbadge2').hidden = !n; $('#fbadge2').textContent = n;
   if (state.page === 'overview'){ renderOverview(ms); renderNextUp(); }
-  if (state.page === 'transactions') renderTransactions();
-  if (state.page === 'visualizations') renderVisualizations();
+  if (state.page === 'transactions'){ renderTransactions(); if (state.txView === 'charts') renderVisualizations(); }
+  if (state.page === 'budget') renderBudgets();
   if (state.page === 'trips'){ renderTrips(); renderPassportBar(); }
   if (state.page === 'wealth') renderWealth();
+  if (state.page === 'overview' || state.page === 'transactions') renderCcBars();
   fillDatalists();
 }
 
@@ -1917,7 +1980,7 @@ function renderOverview(ms){
     <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' + (invWho.length > 1 ? ' (' + invWho.map(([k, v]) => esc(k) + ' ' + eur0.format(v)).join(' · ') + ')' : invWho.length === 1 ? ' by ' + esc(invWho[0][0]) : '') : ''}</span></div>
     ${ENVELOPES ? envKpi() : ''}<div class="kpi" ${ENVELOPES ? 'hidden' : ''}><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
     + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${hm0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : `<span class="${nw.delta >= 0 ? 'pos' : 'neg'}">${signed(nw.delta)}</span> since end of ${MON[+nw.prevM.slice(5,7)-1]}`} · Wealth →</span></a>` : ''; })();
-  renderBudgets(); renderSetupLine();
+  renderSetupLine();
   renderIncomeVsSpend($('#ovTrend'));
   renderBars('category', $('#ovCats'), {max:6, filtered:false, goto:'transactions'});
   const recent = [...rows.map(r => ({...r, kind:'expense'})), ...inc, ...state.transfers.filter(inPeriod)]
@@ -1980,7 +2043,13 @@ const transferRows = () => state.transfers.filter(t => inPeriod(t) && (!state.q 
 const INC_HEAD = '<tr><th>Date</th><th>Source</th><th>Category</th><th>Received in</th><th>Earned by</th><th></th><th class="amt">Amount</th></tr>';
 
 function renderTransactions(){
-  const isInc = state.txKind === 'income', isTr = state.txKind === 'transfer';
+  const charts = state.txView === 'charts';
+  $$('#txView [data-txview]').forEach(b => b.setAttribute('aria-checked', b.dataset.txview === (charts ? 'charts' : 'list')));
+  $('#txKind').hidden = charts; $('#txListP').hidden = charts; $('#txCharts').hidden = !charts;
+  const isInc = !charts && state.txKind === 'income', isTr = !charts && state.txKind === 'transfer';
+  if (isInc || isTr || charts) state.sel = null;
+  $('#selBtn').hidden = isInc || isTr || charts; $('#selBtn').setAttribute('aria-pressed', !!state.sel); $('#selBtn').textContent = state.sel ? 'Done' : 'Select';
+  renderSelBar();
   $$('#txKind [data-txkind]').forEach(b => b.setAttribute('aria-checked', b.dataset.txkind === state.txKind));
   $('#toolbar').hidden = isInc || isTr || !state.showFilters; $('#txFilters').hidden = isInc || isTr; $('#filterBtn').hidden = isInc || isTr;
   $('#filterBtn').setAttribute('aria-expanded', !!state.showFilters);
@@ -2004,7 +2073,7 @@ function renderTransactions(){
   if (document.activeElement !== $('#search')) $('#search').value = state.q;
   renderChips($('#txFilters'), false);
   $('#rows').innerHTML = rows.map(r => `
-    <tr class="row" data-edit="${esc(r.id)}" tabindex="0">
+    <tr class="row${state.sel?.has(r.id) ? ' picked' : ''}" data-edit="${esc(r.id)}" tabindex="0" ${state.sel ? `aria-selected="${state.sel.has(r.id)}"` : ''}>
       <td class="date"><span class="dd">${r.date.slice(8,10)}</span> <span class="mm">${MON[+r.date.slice(5,7)-1]}${state.period==='all'?' '+r.date.slice(2,4):''}</span></td>
       <td><div class="store">${esc(r.store)}${r._pending ? ' <span class="pend" title="Saved on this device, not uploaded yet">not synced</span>' : ''}</div><div class="mmeta">${esc(r.category)}${r.subcategory?' · '+esc(r.subcategory):''} · ${esc(r.account)} · ${esc(r.spender)}${r.tripId && state.tripMap[r.tripId] ? ' · ' + esc(state.tripMap[r.tripId].name) : ''}</div>${r.comment?`<div class="cmt">${esc(r.comment)}</div>`:''}</td>
       <td class="dcol">${esc(r.category)}${r.subcategory?`<span class="tag">${esc(r.subcategory)}</span>`:''}${r.tripId && state.tripMap[r.tripId] ? `<span class="tag" title="${esc(tripLabel(state.tripMap[r.tripId]))}">${esc(state.tripMap[r.tripId].name)}</span>` : ''}</td>
@@ -2014,7 +2083,7 @@ function renderTransactions(){
       <td class="amt">${eur.format(r.amount)}${origHtml(r)}</td>
     </tr>`).join('');
   $('#foot').innerHTML = rows.length ? `<tr><td colspan="6">Total</td><td class="amt">${eur.format(sum(rows))}</td></tr>` : '';
-  $('#status').textContent = !state.ready ? 'Loading…' : rows.length ? 'Click a row to edit or delete it.' : state.items.length ? 'No transactions match. Clear a filter or pick another month.' : 'No expenses yet. Add one, or use Import CSV.';
+  $('#status').textContent = !state.ready ? 'Loading…' : rows.length ? TAP + ' a row to edit or delete it.' : state.items.length ? 'No transactions match. Clear a filter or pick another month.' : 'No expenses yet. Add one, or use Import CSV.';
   renderImportBar();
 }
 
@@ -2035,7 +2104,7 @@ function renderTransferTable(){
       <td class="amt">${eur.format(r.amount)}${origHtml(r)}</td>
     </tr>`).join('');
   $('#foot').innerHTML = rows.length ? `<tr><td colspan="6">Total moved</td><td class="amt">${eur.format(sum(rows))}</td></tr>` : '';
-  $('#status').textContent = !state.ready ? 'Loading…' : rows.length ? 'Transfers are not spending. Click a row to edit or delete it.' : 'No transfers in this period. Add one with the + button and choose Transfer.';
+  $('#status').textContent = !state.ready ? 'Loading…' : rows.length ? 'Transfers are not spending. ' + TAP + ' a row to edit or delete it.' : 'No transfers in this period. Add one with the + button and choose Transfer.';
 }
 
 function renderIncomeTable(){
@@ -2054,7 +2123,7 @@ function renderIncomeTable(){
       <td class="amt inc-amt">+${eur.format(r.amount)}${origHtml(r)}</td>
     </tr>`).join('');
   $('#foot').innerHTML = rows.length ? `<tr><td colspan="6">Total</td><td class="amt inc-amt">+${eur.format(sum(rows))}</td></tr>` : '';
-  $('#status').textContent = !state.ready ? 'Loading…' : rows.length ? 'Click a row to edit or delete it.' : 'No income in this period. Add it with the + button and choose Income.';
+  $('#status').textContent = !state.ready ? 'Loading…' : rows.length ? TAP + ' a row to edit or delete it.' : 'No income in this period. Add it with the + button and choose Income.';
 }
 
 function renderChips(el, withLink){
@@ -2077,11 +2146,10 @@ function vzSwitch(id){
 }
 
 function renderVisualizations(){
-  $('#vzTitle').textContent = 'Visualizations · ' + periodName();
   const rows = filtered();
   const act = activeFilters().length || state.q;
   $('#vzBanner').innerHTML = `<div class="left"><span class="lbl">Showing</span><strong>${rows.length} transactions · ${eur.format(sum(rows))}</strong><span class="filterline" id="vzChips"></span></div>
-    <a class="btn ${act?'primary':''}" href="#transactions">View in Transactions →</a>`;
+    <button class="btn ${act?'primary':''}" type="button" data-txview="list">Show the list →</button>`;
   renderChips($('#vzChips'), true);
   { const big = rows.reduce((a,b) => (!a || +b.amount > +a.amount) ? b : a, null), top = group(rows, 'category')[0], who = group(rows, 'spender');
     const ds = rows.map(r => r.date).sort(); let days = 1;
@@ -2103,7 +2171,8 @@ function renderVisualizations(){
   renderBreakdown('account', $('#byAccount'));
   renderBreakdown('country', $('#byCountry'));
   renderBreakdown('store', $('#byStore'), 15);
-  renderWhatIf();
+  // Envelopes plan each category ahead, which is what What if did after the fact; it comes back if envelopes are rolled back.
+  $('#wiPanel').hidden = ENVELOPES; if (!ENVELOPES) renderWhatIf();
 }
 
 // ---------- what if: for the selected month, each category's spending and a number you choose; the difference goes to investing ----------
@@ -2398,7 +2467,7 @@ document.addEventListener('click', e => {
   const hb = e.target.closest('[data-k][data-v]');
   if (hb && !hb.disabled){
     const k = hb.dataset.k, v = hb.dataset.v;
-    if (hb.dataset.goto){ for (const x of DIMS) state.filters[x] = null; state.q = ''; state.filters[k] = v; location.hash = hb.dataset.goto; return; }
+    if (hb.dataset.goto){ for (const x of DIMS) state.filters[x] = null; state.q = ''; state.filters[k] = v; state.txView = 'list'; location.hash = hb.dataset.goto; return; }
     state.filters[k] = state.filters[k] === v ? null : v; render(); return;
   }
   const fc = e.target.closest('[data-clear]');
@@ -2412,7 +2481,59 @@ document.addEventListener('click', e => {
   const tk = e.target.closest('[data-txkind]');
   if (tk){ state.txKind = tk.dataset.txkind; render(); return; }
   const ed = e.target.closest('[data-edit]');
+  if (ed && state.sel && ed.matches('#rows tr.row')){ const id = ed.dataset.edit; state.sel.has(id) ? state.sel.delete(id) : state.sel.add(id); ed.classList.toggle('picked', state.sel.has(id)); ed.setAttribute('aria-selected', state.sel.has(id)); renderSelBar(); return; }
   if (ed) openEdit(ed.dataset.edit, ed.dataset.kind || 'expense');
+});
+// Select several expenses and change their category, account, spender or trip at once (or delete them).
+function renderSelBar(){
+  const bar = $('#selBar'); if (!bar) return;
+  document.body.classList.toggle('selecting', !!state.sel);
+  if (!state.sel){ bar.hidden = true; return; }
+  const rows = filtered(), picked = state.items.filter(i => state.sel.has(i.id)), all = rows.length && rows.every(r => state.sel.has(r.id));
+  bar.hidden = false;
+  bar.innerHTML = `<span><strong>${picked.length}</strong> selected${picked.length ? ' · ' + eur.format(sum(picked)) : ` · ${TAP.toLowerCase()} rows to pick them`}</span>
+    <span class="sp"><button class="btn small" type="button" data-selall>${all ? 'None' : 'All ' + rows.length}</button><button class="btn small primary" type="button" data-selchange ${picked.length ? '' : 'disabled'}>Change…</button><button class="btn small" type="button" data-seldone>Done</button></span>`;
+}
+function openBulk(){
+  const n = state.items.filter(i => state.sel?.has(i.id)).length; if (!n) return;
+  ['category', 'subcategory', 'account'].forEach(k => $('#bk-' + k).value = ''); $('#bk-spender').value = '';
+  fillTripSelect(''); $('#bk-trip').innerHTML = '<option value="__keep">Keep</option>' + F('trip').innerHTML; $('#bk-trip').value = '__keep';
+  $('#bulkTitle').textContent = `Change ${n} entr${n === 1 ? 'y' : 'ies'}`;
+  const del = $('#bulkDel'); del.classList.remove('armed'); del.textContent = `Delete ${n}`;
+  $('#bulkErr').hidden = true; $('#bulkDlg').showModal();
+}
+document.addEventListener('click', e => {
+  const t = e.target;
+  if (t.closest('#selBtn')){ state.sel = state.sel ? null : new Set(); render(); return; }
+  if (t.closest('[data-seldone]')){ state.sel = null; render(); return; }
+  if (t.closest('[data-selall]')){ const rows = filtered(); if (rows.every(r => state.sel.has(r.id))) rows.forEach(r => state.sel.delete(r.id)); else rows.forEach(r => state.sel.add(r.id)); render(); return; }
+  if (t.closest('[data-selchange]')) return openBulk();
+});
+$('#bulkCancel').addEventListener('click', () => $('#bulkDlg').close());
+$('#bulkForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const v = k => $('#bk-' + k).value.trim(), ch = {};
+  ['category', 'subcategory', 'account'].forEach(k => { if (v(k)) ch[k] = v(k); });
+  if ($('#bk-spender').value) ch.spender = $('#bk-spender').value;
+  if ($('#bk-trip').value !== '__keep') ch.tripId = $('#bk-trip').value;
+  if (!Object.keys(ch).length){ $('#bulkErr').textContent = 'Fill in what to change.'; $('#bulkErr').hidden = false; return; }
+  const items = state.items.filter(i => state.sel?.has(i.id)), me = usernameOf(state.user);
+  $('#bulkSave').disabled = true;
+  try {
+    for (let k = 0; k < items.length; k += 400){ const b = writeBatch(fs); items.slice(k, k + 400).forEach(i => b.set(doc(fs, 'expenses', i.id), expenseDoc(i, { ...ch, updatedBy: me }))); await b.commit(); }
+    $('#bulkDlg').close(); state.sel = null; render();
+    toast(`Changed ${items.length} entr${items.length === 1 ? 'y' : 'ies'}`, { label: 'Undo', fn: () => restoreDocs('expenses', items) });
+  } catch (x){ $('#bulkErr').textContent = writeError(x); $('#bulkErr').hidden = false; }
+  finally { $('#bulkSave').disabled = false; }
+});
+$('#bulkDel').addEventListener('click', async () => {
+  const b = $('#bulkDel'), items = state.items.filter(i => state.sel?.has(i.id));
+  if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = `Confirm: delete ${items.length}`; return; }
+  try {
+    for (let k = 0; k < items.length; k += 400){ const w = writeBatch(fs); items.slice(k, k + 400).forEach(i => w.delete(doc(fs, 'expenses', i.id))); await w.commit(); }
+    $('#bulkDlg').close(); state.sel = null; render();
+    toast(`Deleted ${items.length}`, { label: 'Undo', fn: () => restoreDocs('expenses', items) });
+  } catch (x){ $('#bulkErr').textContent = writeError(x); $('#bulkErr').hidden = false; }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('tr.mrow')){ e.target.click(); return; } if (e.key === 'Enter'){ const ed = e.target.closest && e.target.closest('[data-edit]'); if (ed) openEdit(ed.dataset.edit, ed.dataset.kind || 'expense'); } });
 DIMS.forEach(k => $('#fl-'+k)?.addEventListener('change', e => { state.filters[k] = e.target.value || null; render(); }));
@@ -2430,7 +2551,18 @@ document.addEventListener('pointermove', e => {
   if (cross && t.dataset.cx){ cross.setAttribute('x1', t.dataset.cx); cross.setAttribute('x2', t.dataset.cx); cross.setAttribute('visibility','visible'); }
 });
 
-let toastT; function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3000); }
+let toastT; function toast(msg, act){
+  const t = $('#toast'); t.innerHTML = esc(msg) + (act ? ` <button type="button" class="toastact">${esc(act.label)}</button>` : ''); t.hidden = false;
+  if (act) t.querySelector('.toastact').onclick = () => { t.hidden = true; act.fn(); };
+  clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, act ? 7000 : 3000);
+}
+// What a ledger entry was in the database, to put it back (Undo): its fields without what the app adds.
+const docOf = it => { const { id, kind, _pending, tripKind, tripName, place, ...d } = it; return d; };
+const LISTS = { expenses: () => state.items, income: () => state.income, transfers: () => state.transfers };
+async function restoreDocs(col, olds){
+  try { const b = writeBatch(fs); olds.forEach(o => b.set(doc(fs, col, o.id), docOf(o))); await b.commit(); toast(olds.length === 1 ? 'Restored' : `Restored ${olds.length}`); }
+  catch (x){ toast(writeError(x)); }
+}
 function writeError(x){ return x?.code === 'permission-denied' ? 'This account isn\'t allowed to change the ledger.' : 'Couldn\'t save (' + (x?.code || 'error') + '). Try again in a moment.'; }
 
 // ---------- dialog ----------
@@ -2820,6 +2952,8 @@ function curFromAccount(){
   state.curAuto = !!want && want !== 'EUR';
 }
 F('account').addEventListener('change', curFromAccount); F('to').addEventListener('change', trHint);
+// The account's usual country fills Country, unless you typed one or the entry is on a trip.
+F('account').addEventListener('change', () => { if (state.kind !== 'expense' || state.touched?.has('country') || F('trip').value) return; const c = state.accCountry?.get(F('account').value.trim().toLowerCase()); if (c){ F('country').value = c; if (typeof moreSummary === 'function') moreSummary(); } });
 F('account').addEventListener('input', trHint); F('to').addEventListener('input', trHint);
 F('trip').addEventListener('change', () => {
   const t = state.tripMap[F('trip').value];
@@ -2833,7 +2967,7 @@ function setCur(cur, rate){
 }
 
 function openAdd(kind, tripId){
-  state.editKind = null; state.touched = new Set(); state.autoUndo = null; state.autoStore = null; $('#autoHint').hidden = true;
+  state.editKind = null; state.touched = new Set(); state.autoUndo = null; state.autoStore = null; $('#autoHint').hidden = true; state.billOk = false; $('#billAsk').hidden = true;
   if (typeof kind !== 'string') kind = (state.page === 'transactions' && state.txKind === 'income') ? 'income' : 'expense';
   state.editing = null; state.fromInbox = null; state.bkExpenseFor = null; state.bkExpNext = null;
   const mine = arr => arr.find(i => i.createdBy === usernameOf(state.user)) || arr[0] || {};
@@ -2862,7 +2996,7 @@ function openAdd(kind, tripId){
 function openEdit(id, kind = 'expense'){
   const list = kind === 'income' ? state.income : kind === 'transfer' ? state.transfers : state.items;
   const it = list.find(i => i.id === id); if (!it) return;
-  state.editing = id; state.autoUndo = null; state.bkExpenseFor = null; state.bkExpNext = null; $('#autoHint').hidden = true;
+  state.editing = id; state.autoUndo = null; state.bkExpenseFor = null; state.bkExpNext = null; $('#autoHint').hidden = true; state.billOk = false; $('#billAsk').hidden = true;
   FIELDS.forEach(k => F(k).value = it[k] ?? '');
   F('to').value = '';
   if (kind === 'transfer'){ F('account').value = it.from || ''; F('to').value = it.to || ''; }
@@ -2891,11 +3025,21 @@ $('#kindSeg').addEventListener('click', e => {
 });
 // Editing can change an entry's type (say an expense that was really a transfer): it then moves collection.
 const KIND_COL = { expense:'expenses', income:'income', transfer:'transfers' };
+const TAP = (() => { try { return matchMedia('(hover: none), (pointer: coarse), (max-width: 640px)').matches ? 'Tap' : 'Click'; } catch { return 'Click'; } })();
 const editOld = () => (state.editKind === 'income' ? state.income : state.editKind === 'transfer' ? state.transfers : state.items).find(i => i.id === state.editing) || {};
 async function putEdit(col, data){
   if (KIND_COL[state.editKind] === col) return setDoc(doc(fs, col, state.editing), data);
   const b = writeBatch(fs); b.set(doc(collection(fs, col)), data); b.delete(doc(fs, KIND_COL[state.editKind], state.editing)); return b.commit();
 }
+document.addEventListener('click', e => {
+  if (e.target.id === 'billKeep'){ state.billOk = true; $('#billAsk').hidden = true; $('#form').requestSubmit(); }
+  if (e.target.id === 'billTr'){
+    const card = $('#billCard').value, store = F('store').value.trim();
+    $('#billAsk').hidden = true; setKind('transfer'); F('to').value = card;
+    if (store && !F('comment').value.trim()) F('comment').value = store;
+    trHint(); $('#form').requestSubmit();
+  }
+});
 function resetDel(){ const b = $('#delBtn'); b.classList.remove('armed'); b.textContent = 'Delete'; }
 $('#addBtn').addEventListener('click', () => openAdd());
 $('#fab').addEventListener('click', () => openAdd());
@@ -2916,6 +3060,17 @@ $('#form').addEventListener('submit', async e => {
   const miss = Object.entries(need).filter(([,v]) => !v).map(([k]) => k);
   if (state.kind === 'transfer' && need.from && need.from.toLowerCase() === need.to.toLowerCase()){ err.textContent = 'From and To must be different accounts.'; err.hidden = false; return; }
   if (miss.length){ const nm = state.kind === 'income' ? {store:'source', account:'received in'} : state.kind === 'transfer' ? {from:'from account', to:'to account'} : {}; err.textContent = 'Fill in ' + miss.map(m => nm[m] || m).join(', ') + '.'; err.hidden = false; return; }
+  // A card bill typed in as spending: ask once whether it's really a transfer to the card.
+  if (state.kind === 'expense' && !state.billOk){
+    const cards = state.accounts.filter(a => a.type === 'card'), it = { store: need.store, category: need.category, subcategory: F('subcategory').value.trim(), comment: F('comment').value.trim(), account: need.account };
+    if (cards.length && accOf(need.account)?.type !== 'card' && (CC_RE.test(it.category) || CC_RE.test(it.subcategory))){
+      const { billCard } = makeBudget({ accounts: cards.map(a => a.name) }, accOf), g = cards.find(a => ccKey(a.name) === billCard(it));
+      $('#billAsk').innerHTML = `<span><strong>This looks like a card bill.</strong> Paying a card is a transfer to it, not spending: the purchases on the card are the spending, so saved as spending this would count twice.</span>
+        <span class="billrow"><select id="billCard" aria-label="Card">${cards.map(a => `<option ${g && a.name === g.name ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select><button class="btn small primary" type="button" id="billTr">Save as transfer to the card</button><button class="btn small" type="button" id="billKeep">Save as spending</button></span>`;
+      $('#billAsk').hidden = false; err.hidden = true; return;
+    }
+  }
+  $('#billAsk').hidden = true;
   $('#saveBtn').disabled = true;
   if (state.kind === 'transfer'){
     const rec = { amount, date, from:need.from, to:need.to, comment:F('comment').value.trim(), ...fx };
@@ -2978,7 +3133,8 @@ $('#delBtn').addEventListener('click', async () => {
   const b = $('#delBtn');
   if (!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'Confirm delete'; return; }
   b.disabled = true;
-  try { await deleteDoc(doc(fs, KIND_COL[state.editKind] || 'expenses', state.editing)); dlg.close(); toast('Deleted'); }
+  const col = KIND_COL[state.editKind] || 'expenses', old = LISTS[col]().find(i => i.id === state.editing);
+  try { await deleteDoc(doc(fs, col, state.editing)); dlg.close(); toast('Deleted', old ? { label: 'Undo', fn: () => restoreDocs(col, [old]) } : null); }
   catch (x){ $('#formErr').textContent = writeError(x); $('#formErr').hidden = false; }
   finally { b.disabled = false; }
 });
@@ -3187,6 +3343,28 @@ function renderTrips(){
     : `<div class="panel"><p class="empty" style="margin:0">${state.tripsReady ? 'No trips yet. Create one with “New trip”, then link its flights, hotels and other costs.' : 'Loading…'}</p></div>`;
 }
 
+// Bookings with a price that no expense covers yet. One without a link still counts as paid when the trip has an
+// expense of the same amount (within 2% or €1) that no booking is linked to: the flight was paid and logged before
+// the booking came in. Legs paid together (both Lufthansa flights) are matched on their sum.
+function tripUnpaid(tripId, bkEur){
+  const has = id => id && state.items.some(i => i.id === id), linked = new Set(state.bookings.map(b => b.expenseId).filter(has));
+  let open = state.bookings.filter(b => b.tripId === tripId && +b.price > 0 && !has(b.expenseId));
+  const pool = tripExpenses(tripId).filter(i => !linked.has(i.id)).sort((a, b) => a.date.localeCompare(b.date)), matched = [];
+  const take = (bs, v) => { const k = pool.findIndex(i => Math.abs(+i.amount - v) <= Math.max(1, v * 0.02)); if (k < 0) return;
+    matched.push({ bks: bs, exp: pool[k] }); pool.splice(k, 1); open = open.filter(b => !bs.includes(b)); };
+  for (const b of [...open]){ const v = bkEur(b); if (v) take([b], v); }
+  const g = new Map(); open.forEach(b => { const k = norm(b.provider || b.title); g.set(k, [...(g.get(k) || []), b]); });
+  for (const bs of g.values()) if (bs.length > 1){ const v = bs.reduce((s, b) => s + (bkEur(b) || 0), 0); if (v) take(bs, v); }
+  return { open, matched };
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-bkautolink]'); if (!b) return;
+  const t = state.tripMap[b.dataset.bkautolink]; if (!t) return;
+  const bkEur = x => { const c = (x.currency || 'EUR').toUpperCase(); return c === 'EUR' ? +x.price : state.fxLatest[c] ? +x.price * state.fxLatest[c] : 0; };
+  const { matched } = tripUnpaid(t.id, bkEur); if (!matched.length) return;
+  try { const batch = writeBatch(fs); matched.forEach(m => m.bks.forEach(x => batch.set(doc(fs, 'bookings', x.id), pickDoc(BK_KEYS, { ...x, expenseId: m.exp.id, updatedBy: usernameOf(state.user) }))));
+    await batch.commit(); toast('Linked ' + matched.map(m => m.exp.store).join(', ')); } catch (x){ toast(writeError(x)); }
+});
 function renderTripDetail(t){
   const ex = tripExpenses(t.id).sort((a,b) => b.date.localeCompare(a.date));
   const total = sum(ex);
@@ -3198,14 +3376,14 @@ function renderTripDetail(t){
   const bkEur = b => { const c = (b.currency || 'EUR').toUpperCase(); return c === 'EUR' ? +b.price : state.fxLatest[c] ? +b.price * state.fxLatest[c] : null; };
   const missingFx = [...new Set(bks.map(b => (b.currency || 'EUR').toUpperCase()).filter(c => c !== 'EUR' && !state.fxLatest[c]))];
   if (missingFx.length && !state.fxLoading){ state.fxLoading = true; Promise.all(missingFx.map(c => getRate(c, today()).then(r => { state.fxLatest[c] = typeof r === 'number' ? r : r.rate; }).catch(() => {}))).finally(() => { state.fxLoading = false; if (state.openTrip === t.id && missingFx.some(c => state.fxLatest[c])) render(); }); }
-  const booked = bks.reduce((s, b) => s + (bkEur(b) || 0), 0), unpaid = bks.filter(b => !b.expenseId || !state.items.some(i => i.id === b.expenseId));
+  const booked = bks.reduce((s, b) => s + (bkEur(b) || 0), 0), { open: unpaid, matched } = tripUnpaid(t.id, bkEur);
   const unpaidSum = unpaid.reduce((s, b) => s + (bkEur(b) || 0), 0), tb = tbEstimate(t.id);
   const expected = total + unpaidSum + tb.sum, hasBudget = +t.budget > 0;
   const budget = `<div class="kpi"><span class="lbl">Budget${t.closed ? ' · finished' : ''}</span>${hasBudget
       ? `<span class="val">${eur0.format(t.budget)}</span><span class="sub ${expected > t.budget ? 'neg' : 'pos'}">${expected > t.budget ? eur0.format(expected - t.budget) + ' over, as expected now' : eur0.format(t.budget - expected) + (t.closed ? ' left unspent' : ' left after everything')}</span>${!t.closed && total < t.budget && (t.end || t.start) >= today() ? '<span class="sub">counted in this month’s forecast</span>' : ''}`
       : `<span class="val">—</span><span class="sub">No budget yet. <button class="linkbtn" type="button" data-edittrip="${esc(t.id)}">Set one</button></span>`}</div>`;
   const money = `
-      <div class="kpi"><span class="lbl">Booked</span><span class="val">${eur0.format(booked)}</span><span class="sub">${bks.length ? `${bks.length} booking${bks.length === 1 ? '' : 's'} with a price${unpaid.length ? ` · ${eur0.format(unpaidSum)} not in expenses yet` : ' · all in expenses'}` : 'No prices on bookings yet'}${missingFx.some(c => !state.fxLatest[c]) ? ' · converting ' + missingFx.join(', ') + '…' : ''}</span></div>
+      <div class="kpi"><span class="lbl">Booked</span><span class="val">${eur0.format(booked)}</span><span class="sub">${bks.length ? `${bks.length} booking${bks.length === 1 ? '' : 's'} with a price${unpaid.length ? ` · ${eur0.format(unpaidSum)} not in expenses yet` : ' · all in expenses'}${matched.length ? ` · ${matched.map(x => esc(x.exp.store) + ' ' + eur0.format(x.exp.amount)).join(', ')} ${matched.length === 1 ? 'has' : 'have'} the same amount, so ${matched.length === 1 ? 'it counts' : 'they count'} as paid <button class="linkbtn" type="button" data-bkautolink="${esc(t.id)}">Link</button>` : ''}` : 'No prices on bookings yet'}${missingFx.some(c => !state.fxLatest[c]) ? ' · converting ' + missingFx.join(', ') + '…' : ''}</span></div>
       <div class="kpi"><span class="lbl">Still to book</span><span class="val">${tb.n ? '≈ ' + eur0.format(tb.sum) : '—'}</span><span class="sub">${tb.n ? `${tb.n} item${tb.n === 1 ? '' : 's'}${tb.guessed ? ` · ${tb.guessed} rough AI estimate${tb.guessed === 1 ? '' : 's'}` : ''}${tb.missing ? ` · ${tb.missing} without an estimate` : ''}` : 'Nothing left on the list'}</span></div>
       <div class="kpi"><span class="lbl">Expected total</span><span class="val">${eur0.format(expected)}</span><span class="sub">spent${unpaidSum ? ' + booked' : ''}${tb.sum ? ' + still to book' : ''}</span></div>`;
   // candidates for attaching
@@ -3305,7 +3483,7 @@ const leaveYear = y => ({ ...LEAVE_DEFAULT, ...(state.leave?.years?.[y] || {}) }
 function tripMoney(t){
   const spent = sum(tripExpenses(t.id));
   const bkEur = b => { const c = (b.currency || 'EUR').toUpperCase(); return c === 'EUR' ? +b.price : state.fxLatest[c] ? +b.price * state.fxLatest[c] : 0; };
-  const unpaid = state.bookings.filter(b => b.tripId === t.id && +b.price > 0 && (!b.expenseId || !state.items.some(i => i.id === b.expenseId))).reduce((a, b) => a + bkEur(b), 0);
+  const unpaid = tripUnpaid(t.id, bkEur).open.reduce((a, b) => a + bkEur(b), 0);
   const tb = tbEstimate(t.id).sum;
   const expected = spent + unpaid + tb;
   // For the year's plan a trip counts with its budget when that's higher than what's known so far.
@@ -3569,7 +3747,7 @@ function envKpi(){
   const B = budgetMonth(state.envCfg, envMonthSel(), envData());
   if (B.before) return `<div class="kpi"><span class="lbl">Ready to assign</span><span class="val">—</span><span class="sub">Envelopes start ${shortDate(state.envCfg.start, true)}</span></div>`;
   const over = B.rows.filter(r => r.available < -0.004).length;
-  return `<div class="kpi"><span class="lbl">Ready to assign</span><span class="val ${B.ready < -0.004 ? 'neg' : ''}">${signedEur(B.ready)}</span><span class="sub">${B.ready < -0.004 ? 'Assigned more than you have' : B.ready > 0.004 ? 'Give it a job' : 'Every euro has a job'}${over ? ` · <span class="neg">${over} overspent</span>` : ''}</span></div>`;
+  return `<a class="kpi kpilink" href="#budget"><span class="lbl">Ready to assign</span><span class="val ${B.ready < -0.004 ? 'neg' : ''}">${signedEur(B.ready)}</span><span class="sub">${B.ready < -0.004 ? 'Assigned more than you have' : B.ready > 0.004 ? 'Give it a job' : 'Every euro has a job'}${over ? ` · <span class="neg">${over} overspent</span>` : ''} · Budget →</span></a>`;
 }
 function renderEnvelopes(el){
   const m = envMonthSel(), cfg = state.envCfg;
@@ -3615,6 +3793,15 @@ function ccBanner(m){
   const xs = ccSuspects(), now = xs.filter(i => i.date.startsWith(m)); if (!now.length) return '';
   return `<div class="banner" style="margin:0;font-size:13px"><span><strong>${eur0.format(sum(now))} in ${MON[+m.slice(5, 7) - 1]} are credit card payments</strong> logged as spending (category ${esc(now[0].category)}). The envelopes count them as payments to the card (Credit Card Payments), but your monthly spending still counts them, twice if the card purchases are logged too. Turning them into transfers to the card fixes that.</span>
     <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small primary" type="button" data-ccfix>Review ${xs.length}</button><button class="btn small" type="button" data-cckeep>They’re real spending</button></span></div>`;
+}
+// The same bills, all months: on the Overview and Transactions, since they inflate Spent and Saved there.
+function renderCcBars(){
+  const cards = state.accounts.some(a => a.type === 'card'), xs = cards && lsGet('ccFixKept', '') !== '1' ? ccSuspects() : [];
+  $$('[data-ccbar]').forEach(el => {
+    el.hidden = !xs.length; if (!xs.length){ el.innerHTML = ''; return; }
+    el.innerHTML = `<span><strong>${eur0.format(sum(xs))} of card bills are logged as spending</strong> (${xs.length} entr${xs.length === 1 ? 'y' : 'ies'} in ${esc(xs[0].category)}), so Spent and Saved count them, twice when the card purchases are logged too. Paying a card is a transfer to it.</span>
+      <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small primary" type="button" data-ccfix>Turn into card payments</button><button class="btn small" type="button" data-cckeep>They’re real spending</button></span>`;
+  });
 }
 function openCcFix(){
   const xs = ccSuspects(), cards = state.accounts.filter(a => a.type === 'card');
@@ -4083,12 +4270,14 @@ function bRow(r, isTotal){
 }
 function renderBudgets(){
   const el = $('#budgetPanel');
+  $('#budgetEmpty').hidden = state.period !== 'all';
   if (state.period === 'all'){ el.hidden = true; return; }
   el.hidden = false;
   if (ENVELOPES) return renderEnvelopes(el);
   const has = (state.budgets.items || []).some(b => b.a > 0);
   if (!has){
-    el.hidden = true; return;
+    el.hidden = true; $('#budgetEmpty').hidden = false;
+    $('#budgetEmpty').innerHTML = '<p class="empty" style="margin:0">No budgets yet. <button class="linkbtn" type="button" data-editbudgets="suggest">Set budgets</button></p>'; return;
   }
   const b = budgetStatus(state.period);
   const counts = ['over','risk'].map(k => b.rows.filter(r => r.status === k).length);
@@ -4261,21 +4450,15 @@ function renderAccSetup(){
     <button class="btn primary" type="button" id="accSetupGo">Add ${sug.length} account${sug.length===1?'':'s'}</button>`;
 }
 
-function accCard(a){
-  const est = estimate(a);
-  const isCard = a.type === 'card', inv = a.type === 'investment' ? investInfo(a) : null;
-  const shown = est ? (isCard ? -est.balance : est.balance) : null;
-  const line = !est ? 'No check-in yet' : est.base.virtual ? `No check-in yet · counting entries since ${shortDate(est.base.added, true)}`
-    : `Checked in ${shortDate(est.base.date, true)}: ${fmtAcc(a, isCard ? -est.base.balance : est.base.balance)}${est.base.date < today() && (est.f.spent || est.f.income || est.f.tIn || est.f.tOut) ? ` · since then ${est.f.net >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(est.f.net))}` : ''}`;
-  return `<button type="button" class="tcard" data-acc="${esc(a.id)}">
-    <span class="top"><span class="ttype"><i style="background:${ACC_DOT[a.type]}"></i>${ACC_TYPE[a.type]}</span><span class="tmeta">${esc(a.owner)}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''}</span></span>
-    <span class="tname">${esc(a.name)}</span>
-    <span class="tmeta">${isCard ? 'Owed now (estimate)' : a.type === 'investment' ? 'Value (estimate)' : 'Balance now (estimate)'}</span>
-    <span class="abal ${shown !== null && !isCard && shown < 0 ? 'neg' : ''}">${shown === null ? '—' : fmtAcc(a, shown)}</span>
-    ${shown !== null && a.currency && a.currency !== 'EUR' ? `<span class="anote">${state.fxLatest[a.currency] ? '≈ ' + eur.format(toEur(a, shown)) + ' at today’s rate' : 'Euro value: waiting for today’s rate'}</span>` : ''}
-    <span class="anote">${line}</span>
-    ${inv ? `<span class="anote">Gain since ${shortDate(inv.since, true)}: <strong style="color:var(${inv.gain >= 0 ? '--good' : '--danger'})">${inv.gain >= 0 ? '+' : '−'}${fmtAcc(a, Math.abs(inv.gain))} (${inv.pct >= 0 ? '+' : ''}${inv.pct.toFixed(1)}%)</strong></span>` : ''}
-  </button>`;
+// One line per account: name, owner, how long since the last check-in, balance (owed for cards). Tap for the details.
+function accRow(a){
+  const est = estimate(a), isCard = a.type === 'card', shown = est ? (isCard ? -est.balance : est.balance) : null;
+  const ck = est && !est.base.virtual ? est.base.date : null, age = ck ? Math.round((Date.parse(today()) - Date.parse(ck)) / 864e5) : null;
+  const when = !est ? 'no check-in yet' : est.base.virtual ? 'no check-in yet, from entries' : age <= 0 ? 'checked in today' : age < 0 ? 'checked in' : `checked in ${age} day${age === 1 ? '' : 's'} ago`;
+  const fx = shown !== null && a.currency && a.currency !== 'EUR' ? (state.fxLatest[a.currency] ? `<small>≈ ${eur0.format(toEur(a, shown))}</small>` : '<small>rate loading</small>') : '';
+  return `<button type="button" class="r" data-acc="${esc(a.id)}"><span class="dot" style="background:${ACC_DOT[a.type]}"></span>
+    <span><span class="nm">${esc(a.name)}</span><br><span class="meta">${esc(a.owner)}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''} · <span style="${!ck || age > 35 ? 'color:var(--warn)' : ''}">${when}</span></span></span>
+    <span class="v ${shown !== null && !isCard && shown < 0 ? 'neg' : ''}">${shown === null ? '—' : fmtAcc(a, shown)}${fx}</span></button>`;
 }
 
 function netWorthAt(date){
@@ -4296,7 +4479,7 @@ function renderCash(){
     <div class="kpi"><span class="lbl">Bank & cash</span><span class="val">${eur.format(sumT(['bank','cash']))}</span><span class="sub">${missing.length ? missing.length + ' account' + (missing.length===1?'':'s') + ' not checked in yet' : 'Estimated from your check-ins'}${need.length ? (miss.length ? ' · waiting for ' + miss.join(', ') + ' rate' : ' · ' + need.join(', ') + ' at today’s rate') : ''}</span></div>
     <div class="kpi"><span class="lbl">Cards owed</span><span class="val">${eur.format(Math.max(0, -sumT(['card'])))}</span><span class="sub">${cashAccs.filter(a => a.type==='card').length} card${cashAccs.filter(a => a.type==='card').length===1?'':'s'}</span></div>
     <div class="kpi"><span class="lbl">Net cash</span><span class="val ${net<0?'neg':''}">${net<0?'−':''}${eur.format(Math.abs(net))}</span><span class="sub">Bank and cash minus cards</span></div>`;
-  const grp = (title, types) => { const arr = cashAccs.filter(a => types.includes(a.type)); return arr.length ? `<section class="tgroup"><h2>${title}</h2><div class="tgrid">${arr.map(accCard).join('')}</div></section>` : ''; };
+  const grp = (title, types) => { const arr = cashAccs.filter(a => types.includes(a.type)); return arr.length ? `<section class="panel"><header><h2>${title}</h2><span class="hint">${types.includes('card') ? 'owed now' : 'balance now'}, estimated</span></header><div class="ilist">${arr.map(accRow).join('')}</div></section>` : ''; };
   $('#accList').innerHTML = cashAccs.length ? grp('Bank & cash', ['bank','cash']) + grp('Credit cards', ['card'])
     : `<div class="panel"><p class="empty" style="margin:0">${state.accountsReady ? 'No accounts yet. Use the setup above, or “+ Account”.' : 'Loading…'}</p></div>`;
 }
@@ -4782,7 +4965,8 @@ function renderWealth(){
   $('#wSub').innerHTML = pf.withData.length || state.checkins.length
     ? `Net worth ≈ <strong>${hm0.format(nw)}</strong> · investments ${hm0.format(pf.value)} · ${state.checkins.length ? 'cash &amp; cards ' + (cash < 0 ? '−' : '') + hm0.format(Math.abs(cash)) : 'cash &amp; cards not checked in yet'}`
     : 'Investments, cash and your FIRE plan';
-  renderNetWorthAll();
+  // The net worth chart sits with Investments only; on the other views it pushed their content down.
+  if (state.wv === 'inv') renderNetWorthAll(); else $('#nwAllP').hidden = true;
   if (state.wv === 'inv') renderInvestments(pf);
   if (state.wv === 'cash') renderCash();
   if (state.wv === 'fire') renderFire(pf);
@@ -5478,7 +5662,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26o';
+const APP_VERSION = '2026-10-26p';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
@@ -6005,7 +6189,7 @@ function attachCombo(input){
   box.addEventListener('click', e => { const o = e.target.closest('.copt'); if (o) pick(o.dataset.v); });
   input.addEventListener('blur', () => setTimeout(close, 120));
 }
-$$('#dlg input[data-list], #sendDlg input[data-list]').forEach(attachCombo);
+$$('#dlg input[data-list], #sendDlg input[data-list], #bulkDlg input[data-list]').forEach(attachCombo);
 
 // ---------- + form: "More details" ----------
 function setMore(open){ $('#moreBox').hidden = !open; $('#moreBtn').setAttribute('aria-expanded', open); moreSummary(); }
@@ -6243,7 +6427,8 @@ function renderTodo(){
   const showClose = cl.items.length && !hidden && (open > 0 && +today().slice(8,10) <= 15 || cl.items.some(i => i.done && open > 0));
   if (!due.length && !(showClose && open)){ card.hidden = true; return; }
   card.hidden = false;
-  let h = `<header><h2>To do</h2><span class="hint">${due.length ? due.length + ' repeat' + (due.length===1?'':'s') + ' due' : ''}${due.length && showClose && open ? ' · ' : ''}${showClose && open ? `${MON[+cl.M.slice(5,7)-1]} close: ${cl.items.length - open} of ${cl.items.length} done` : ''}</span></header><div class="todo">`;
+  const first = due.length ? recTitle(due[0]) : (cl.items.find(i => !i.done)?.text || '');
+  let h = `<details id="todoDet" ${state.todoOpen ? 'open' : ''}><summary><h2>To do</h2><span class="tsum">${due.length ? due.length + ' repeat' + (due.length===1?'':'s') + ' due' : ''}${due.length && showClose && open ? ' · ' : ''}${showClose && open ? `${MON[+cl.M.slice(5,7)-1]} close: ${cl.items.length - open} of ${cl.items.length} done` : ''}<span class="tfirst"> · next: ${first}</span></span><span class="chev" aria-hidden="true">▾</span></summary><div class="todo">`;
   if (due.length){
     h += `<div class="sec">Repeats</div>` + due.map(r => `<div class="t"><span class="ic">↻</span><span class="tx"><b>${recTitle(r)}</b> · ${recAmount(r)}<span class="sub">${r.kind === 'transfer' ? transferType(r.last) : r.kind === 'income' ? 'Income · ' + esc(r.last.category) : esc(r.last.category) + ' · ' + esc(r.last.account)} · due ${shortDate(r.due)}${r.due < today() ? ' (' + Math.round((Date.parse(today()) - Date.parse(r.due)) / 864e5) + ' days ago)' : ''}</span></span>
       <span class="acts"><button class="btn small primary" type="button" data-recadd="${esc(r.key)}">Add</button><button class="btn small" type="button" data-recedit="${esc(r.key)}">Edit</button><button class="unlink" type="button" data-recskip="${esc(r.key)}|${r.due}" aria-label="Skip this time" title="Skip this time">×</button></span></div>`).join('');
@@ -6252,7 +6437,8 @@ function renderTodo(){
     h += `<div class="sec">Month close</div>` + cl.items.map(i => `<div class="t ${i.done ? 'done' : ''}"><span class="ic">${i.done ? '✓' : ''}</span><span class="tx">${i.text}<span class="sub">${i.sub}</span></span><span class="acts">${i.done ? '' : i.act}</span></div>`).join('')
       + `<div style="padding-top:8px"><button class="linkbtn" type="button" data-closehide style="font-size:12.5px;color:var(--muted)">Hide until next month</button></div>`;
   }
-  card.innerHTML = h + '</div>';
+  card.innerHTML = h + '</div></details>';
+  $('#todoDet').addEventListener('toggle', e => { state.todoOpen = e.target.open; });
   state.dueRec = due;
 }
 document.addEventListener('click', e => {
@@ -7733,6 +7919,8 @@ function renderNextUp(){
   const done = lsGet('bkCheckedIn', []), me = ME();
   const flights = soon.filter(b => b.type === 'flight' && (b.start.length > 10 ? new Date(b.start) > now || (state.flightStatus[b.id] && !state.flightStatus[b.id].landed) : b.start.slice(0, 10) >= td));
   const when = b => (b.start.slice(0, 10) === td ? 'today' : b.start.slice(0, 10) === addDays(td, 1) ? 'tomorrow' : wday(b.start)) + (b.start.length > 10 ? ' ' + b.start.slice(11, 16) : '');
+  // A flight today or tomorrow (boarding pass, check-in) goes above the numbers.
+  el.style.order = flights.some(b => b.start.slice(0, 10) <= addDays(td, 1)) ? '-1' : '';
   const acts = flights.map(b => {
     const who = bkWho(b), mine = !who.size || who.has(me), st = flightLine(b), codes = myCodes(b);
     const label = `<strong>${esc(b.number || b.title)}</strong> ${when(b)}`;
@@ -7869,7 +8057,7 @@ document.addEventListener('click', async e => {
 // ---------- backup & restore ----------
 const BK_COLS = { expenses:() => state.items, income:() => state.income, transfers:() => state.transfers, accounts:() => state.accounts,
   checkins:() => state.checkins, invSnapshots:() => state.snaps, trips:() => state.trips, bookings:() => state.bookings, toBook:() => state.toBook };
-const DERIVED = ['tripKind','tripName','kind'];
+const DERIVED = ['tripKind','tripName','kind','place'];
 function backupData(){
   const collections = {};
   for (const [c, get] of Object.entries(BK_COLS)) collections[c] = get().map(d => { const o = { ...d }; DERIVED.forEach(k => delete o[k]); return o; });
@@ -7956,6 +8144,7 @@ async function runPm(a){
     else if (isIOS) toast('In Safari: tap Share, then “Add to Home Screen”.');
   }
 }
+document.addEventListener('click', e => { const v = e.target.closest('[data-txview]'); if (!v) return; state.txView = v.dataset.txview; if (state.page !== 'transactions') location.hash = 'transactions'; else { render(); window.scrollTo(0, 0); } });
 document.addEventListener('click', e => { if (e.target.closest('[data-back]')){ if (history.length > 1) history.back(); else location.hash = 'overview'; } });
 
 // ---------- install as an app ----------
