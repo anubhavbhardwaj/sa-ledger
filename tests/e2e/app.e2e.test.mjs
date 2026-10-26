@@ -591,3 +591,35 @@ test('send to India: a new device starts from the last send saved in the databas
   assert.match(await app.text('#sendDlg .combo:has(#si-from) .cbox'), /Giro.*HDFC NRE.*ULIP Maxlife.*Wise|Giro.*Wise/, 'the list offers your accounts');
   await clean(app);
 });
+
+test('money now: Deutsche Bank, Wise Common and Wise Sulekha minus cards (also in rupees), per person and together, can go negative', async () => {
+  const app = await openApp({ init: `localStorage.removeItem('fxRates');` }), { page } = app, now = new Date().toISOString();
+  await page.route('https://api.frankfurter.dev/**', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ amount: 1, base: 'INR', date: '2026-10-26', rates: { EUR: 0.01 } }) }));
+  await app.seed({
+    accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: d(-90) }, wc: { name: 'Wise Common', type: 'bank', currency: 'EUR', owner: 'Shared', createdAt: d(-90) },
+      ws: { name: 'Wise Sulekha', type: 'bank', currency: 'EUR', owner: 'Sulekha', createdAt: d(-90) }, wci: { name: 'Wise Common INR', type: 'bank', currency: 'INR', owner: 'Shared', createdAt: d(-90) },
+      dbc: { name: 'DB Mastercard', type: 'card', currency: 'EUR', owner: 'Anubhav', createdAt: d(-90) }, idfc: { name: 'IDFC First card', type: 'card', currency: 'INR', owner: 'Anubhav', createdAt: d(-90) },
+      nre: { name: 'HDFC NRE', type: 'bank', currency: 'INR', owner: 'Anubhav', createdAt: d(-90) } },
+    checkins: { c1: { accountId: 'db', date: d(-3), balance: 1000, createdAt: now }, c2: { accountId: 'wc', date: d(-3), balance: 500, createdAt: now }, c3: { accountId: 'ws', date: d(-20), balance: 300, createdAt: now },
+      c4: { accountId: 'wci', date: d(-3), balance: 10000, createdAt: now }, c5: { accountId: 'dbc', date: d(-3), balance: -400, createdAt: now }, c6: { accountId: 'idfc', date: d(-3), balance: -50000, createdAt: now } },
+    expenses: { e1: { amount: 100, date: d(-1), store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now },
+      e2: { amount: 60, date: d(-1), store: 'Zara', category: 'Shopping', account: 'DB Mastercard', spender: 'Anubhav', createdAt: now } } });
+  await page.waitForTimeout(500);
+  await page.waitForSelector('#moneyP:not([hidden])');
+  const t = await app.text('#moneyP');
+  // Guessed from names: Anubhav = DB 900 + Wise Common 500 + Wise Common INR ₹10,000 (€100) − DB card 460 − IDFC ₹50,000 (€500) = 540
+  // Sulekha = Wise Common 500 + Wise Common INR €100 + Wise Sulekha 300 = 900. Together = 900 + 500 + 100 + 300 − 460 − 500 = 840. HDFC NRE isn't ticked.
+  assert.match(t, /Anubhav\s*€540\.00/); assert.match(t, /Sulekha\s*€900\.00/); assert.match(t, /Together\s*€840\.00/);
+  assert.match(t, /€1,500\.00 in accounts − €960\.00 on cards/); assert.match(t, /oldest balance 20 days ago/);
+  assert.doesNotMatch(t, /HDFC NRE/);
+  // Untick Wise Common for Anubhav: 900 − 460 − 500 = −60, shown as negative.
+  await page.click('#moneyP [data-moneypick]'); await page.waitForSelector('#moneyDlg[open]');
+  await page.uncheck('#moneyPick [data-mn="anubhav"][value="wc"]'); await page.uncheck('#moneyPick [data-mn="anubhav"][value="wci"]');
+  await page.click('#moneySave'); await page.waitForTimeout(200);
+  assert.match(await app.text('#moneyP'), /Anubhav\s*−€60\.00/);
+  assert.ok(await page.$('#moneyP .mnrow .neg'), 'negative in red');
+  await page.click('#moneyP [data-moneyck]'); await page.waitForSelector('#ckDlg[open]');
+  const names = await page.$$eval('#ckList .nm', els => els.map(e => e.textContent));
+  assert.deepEqual(names.sort(), ['DB Mastercard', 'Deutsche Bank', 'IDFC First card', 'Wise Common', 'Wise Common INR', 'Wise Sulekha'], 'only the ticked accounts');
+  await clean(app);
+});

@@ -86,7 +86,8 @@ service cloud.firestore {
     // Shared settings: 'budgets', 'fire' and 'fireInr' (FIRE plans in euros and rupees), 'fx' (rate on the 1st of each month),
     // 'bookings' (the address booking emails are forwarded to), 'leave' (vacation, work-from-abroad days and travel budget per year),
     // 'goals' (monthly investing and emergency fund goals), 'tax' (workplaces, job ticket and tax rate for the Taxes view)
-    // and 'people' (names as in the passport, gender, email and phone, for checking forms from a photo).
+    // 'people' (names as in the passport, gender, email and phone, for checking forms from a photo)
+    // and 'money' (which accounts and cards count in Money now, for each of you).
     function validBudgets() {
       let d = request.resource.data;
       return d.keys().hasOnly(['items','total','updatedAt','updatedBy'])
@@ -126,6 +127,12 @@ service cloud.firestore {
       let d = request.resource.data;
       return d.keys().hasOnly(['items','updatedAt','updatedBy']) && d.items is list && d.items.size() <= 30;
     }
+    function validMoney() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['anubhav','sulekha','updatedAt','updatedBy'])
+        && (!('anubhav' in d) || (d.anubhav is list && d.anubhav.size() <= 30))
+        && (!('sulekha' in d) || (d.sulekha is list && d.sulekha.size() <= 30));
+    }
     function validFxMonths() {
       let d = request.resource.data;
       return d.keys().hasOnly(['months','updatedAt','updatedBy']) && d.months is map;
@@ -141,7 +148,8 @@ service cloud.firestore {
         || (id == 'leave' && validLeave())
         || (id == 'goals' && validGoals())
         || (id == 'tax' && validTax())
-        || (id == 'people' && validPeople()));
+        || (id == 'people' && validPeople())
+        || (id == 'money' && validMoney()));
     }
 
     // Office or home, day by day, for the commuting allowance. Document id is <user>_<YYYY-MM-DD>. The 9:00
