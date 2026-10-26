@@ -1198,7 +1198,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
     <h3>Envelope budget</h3>
     <p class="muted" style="margin:0;font-size:13px">Like YNAB: your categories are the groups, their subcategories the envelopes. Only the accounts ticked here count; money moved to any other account (investing, sending to India) comes out of Savings › Investing &amp; India.</p>
     <div class="fields"><label class="f">Start on<input id="es-start" type="date"></label></div>
-    <label class="chk"><input type="checkbox" id="es-trips"> <span>Trip spending goes to Travel, one envelope per trip</span></label>
+    <label class="chk"><input type="checkbox" id="es-trips"> <span>Separate envelope per trip (under Travel). Off: trip spending goes to your envelopes by its category, like everything else.</span></label>
     <strong style="font-size:13.5px">Budget accounts and the money in them on the start day</strong>
     <div id="esAccs" class="esacc"></div>
     <p class="muted" id="esTotal" style="margin:0;font-size:13px"></p>
@@ -3572,6 +3572,8 @@ function renderEnvelopes(el){
   const noneRow = r => `<div class="ybr env" data-envcats role="button" tabindex="0"><span class="nm">${esc(r.name)}</span><span class="n a">—</span><span class="n c">${signedEur(r.activity)}</span><span class="pill av neg">${signedEur(r.available)}</span>
       <span class="sm">spent ${eur0.format(Math.abs(r.activity))} · tap to put it in an envelope</span></div>`;
   const grp = g => { if (g.empty) return `<p class="muted" style="margin:10px 0 0;font-size:13px">No categories yet. <button class="linkbtn" type="button" data-envcats>Create your categories</button></p>`;
+    if (g.group === 'Travel' && !g.gid) return `<details class="ybg" ${g.rows.some(r => r.activity) ? 'open' : ''}><summary><div class="ybr"><span class="nm">Travel <span class="muted" style="font-weight:400">(one per trip)</span></span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>
+      <p class="muted" style="margin:6px 4px;font-size:12.5px">Trip spending is kept per trip here. <button class="linkbtn" type="button" data-envnotrips>Use my categories instead</button></p>${g.rows.map(row).join('')}</details>`;
     if (g.none) return `<details class="ybg" open><summary><div class="ybr"><span class="nm" style="color:var(--danger)">Not assigned</span><span class="n a"></span><span class="n c">${signedEur(g.activity)}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(noneRow).join('')}</details>`;
     const hot = g.rows.some(r => r.available < -0.004 || r.activity || r.assigned) || !g.rows.length;
     return `<details class="ybg" ${hot ? 'open' : ''}><summary><div class="ybr"><span class="nm">${esc(g.group)}</span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(row).join('')}</details>`; };
@@ -3622,7 +3624,7 @@ function drawEnvSetup(){
 }
 function openEnvSetup(){
   const cfg = state.envCfg, on = envOn();
-  $('#es-start').value = on ? cfg.start : thisMonth() + '-01'; $('#es-trips').checked = on ? cfg.trips !== false : true;
+  $('#es-start').value = on ? cfg.start : thisMonth() + '-01'; $('#es-trips').checked = on ? cfg.trips !== false : false;
   $('#esAccs').innerHTML = (on ? cfg.accounts : envGuessAccounts()).map(n => `<input type="checkbox" data-esacc value="${esc(n)}" checked>`).join('');
   drawEnvSetup();
   if (on && cfg.openingBy) $$('#esAccs [data-esamt]').forEach(i => { if (i.dataset.esamt in cfg.openingBy){ i.value = cfg.openingBy[i.dataset.esamt]; i.dataset.touched = '1'; } });
@@ -3639,6 +3641,7 @@ document.addEventListener('click', async e => {
     return;
   }
   if (t.closest('[data-envmove]')) return openEnvMove();
+  if (t.closest('[data-envnotrips]')){ if (await saveEnv({ trips: false })) toast('Trip spending now goes to your envelopes by category. Check Not assigned for anything left.'); return; }
   if (t.closest('[data-envkey]')) return openEnvAssign(t.closest('[data-envkey]').dataset.envkey);
   if (t.closest('[data-easet]')){ $('#ea-amt').value = t.closest('[data-easet]').dataset.easet; return; }
 });
@@ -5350,7 +5353,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26h';
+const APP_VERSION = '2026-10-26i';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

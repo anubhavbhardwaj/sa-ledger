@@ -665,3 +665,23 @@ test('envelopes: a start day mid-month leaves earlier spending out, says so, and
   assert.match(t, /Ready to Assign\s*€1,000\.00/); assert.match(t, /Groceries\s*€0\s*−€100\.00\s*−€100\.00/); assert.doesNotMatch(t, /Counting from/);
   await clean(app);
 });
+
+test('envelopes: trip spending can go to your own Trips category instead of one envelope per trip', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString();
+  await app.seed({
+    accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: m + '-01' } },
+    trips: { w: { name: 'Wedding in India', type: 'other', traveller: 'Both', start: m + '-02', end: m + '-20' } },
+    expenses: { e1: { amount: 600, date: m + '-02', store: 'Air India', category: 'Travel', subcategory: 'Flights', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now, tripId: 'w' },
+      e2: { amount: 300, date: m + '-03', store: 'Taj', category: 'Travel', subcategory: 'Hotels', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now, tripId: 'w' } },
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 2000, trips: true, assigned: {}, targets: {},
+      groups: [{ id: 'g', name: 'Trips & Travel', envs: [{ id: 'tr', name: 'Transportation', src: ['Travel›Flights'] }, { id: 'ac', name: 'Accommodation', src: ['Travel›Hotels'] }] }] } } });
+  await page.waitForTimeout(300);
+  let t = await app.text('#budgetPanel');
+  assert.match(t, /Transportation\s*€0\s*€0/); assert.match(t, /Travel \(one per trip\).*Wedding in India\s*€0\s*−€900\.00/);
+  await page.click('[data-envnotrips]'); await page.waitForTimeout(250);
+  t = await app.text('#budgetPanel');
+  assert.match(t, /Transportation\s*€0\s*−€600\.00/); assert.match(t, /Accommodation\s*€0\s*−€300\.00/); assert.doesNotMatch(t, /one per trip/);
+  await page.click('#budgetPanel [data-envsetup]'); await page.waitForSelector('#envSetupDlg[open]');
+  assert.equal(await page.isChecked('#es-trips'), false);
+  await clean(app);
+});
