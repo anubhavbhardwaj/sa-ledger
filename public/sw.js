@@ -1,7 +1,7 @@
 // S&A Ledger service worker: makes the app installable and lets it open offline.
 // Your expense data is NOT cached here; Firestore keeps its own offline copy.
-const VERSION = 'sa-ledger-v20';
-const SHELL = ['/', '/bcbp.js', '/smart.js', '/recur.js', '/verify.js', '/fill.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
+const VERSION = 'sa-ledger-v21';
+const SHELL = ['/', '/bcbp.js', '/smart.js', '/recur.js', '/verify.js', '/fill.js', '/envelopes.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

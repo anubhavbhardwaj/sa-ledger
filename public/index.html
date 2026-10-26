@@ -170,6 +170,11 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .avatar[aria-expanded="true"]{box-shadow:0 0 0 3px var(--accent-soft)}
 .pmenu{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:250px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:grid}
 .pmenu[hidden]{display:none!important}
+.envready{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:var(--sunk)}.envready strong{font-family:var(--f-mono);font-size:20px}.envready .sub{flex-basis:100%;font-size:12px;color:var(--muted)}
+.envrow{display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line)}.envrow:last-child{border-bottom:0}.envrow .v{font-family:var(--f-mono);font-weight:600}.envrow .sub{grid-column:1/-1;font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.envrow .lvbar{grid-column:1/-1}.eerow,.eeadd{display:grid;grid-template-columns:minmax(0,1fr) 92px 28px;gap:6px;align-items:center}.eeadd{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 92px auto}
+.eerow input,.eeadd input,.eeadd select{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:7px 9px;font-size:13.5px;color:var(--ink);min-width:0}.eerow small{grid-column:1/-1;color:var(--muted);font-size:11.5px;margin-top:-3px}
+@media (max-width:480px){.eeadd{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 .setupline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}.setupline[hidden]{display:none}
 .morewrap{position:relative}.morewrap .pmenu{left:0;right:auto;width:240px}
 .pm-head{font-size:12.5px;color:var(--muted);padding:8px 10px 6px}
@@ -1142,6 +1147,29 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
   </form>
 </dialog>
 
+<dialog id="envMoveDlg">
+  <form id="envMoveForm" novalidate style="display:grid;gap:12px;padding:20px;max-width:440px">
+    <h3>Move money</h3>
+    <div class="fields">
+      <label class="f full">From<select id="em-from"></select></label>
+      <label class="f full">To<select id="em-to"></select></label>
+      <label class="f">Amount (€)<input id="em-amt" type="number" step="0.01" min="0" inputmode="decimal"></label>
+    </div>
+    <p class="muted" id="emHint" style="margin:0;font-size:12.5px"></p>
+    <p class="err" id="emErr" hidden></p>
+    <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="emCancel">Cancel</button><button class="btn primary" type="submit">Move</button></div></div>
+  </form>
+</dialog>
+<dialog id="envEditDlg">
+  <form id="envEditForm" novalidate style="display:grid;gap:12px;padding:20px;max-width:560px">
+    <h3>Envelopes</h3>
+    <p class="muted" style="margin:0;font-size:13px">“Each month” is what Fill month puts in. Spending goes to the envelope of its category; trip spending to Travel; money invested or sent to India to Savings &amp; investing; any other category to Everything else.</p>
+    <div id="eeList" style="display:grid;gap:8px"></div>
+    <div class="eeadd"><input id="ee-name" placeholder="New envelope, e.g. Gifts" aria-label="Name"><select id="ee-cat" aria-label="Category"></select><input id="ee-fill" type="number" step="1" min="0" inputmode="decimal" placeholder="€/month" aria-label="Each month"><button class="btn small" type="button" id="eeAdd">Add</button></div>
+    <p class="err" id="eeErr" hidden></p>
+    <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="eeCancel">Cancel</button><button class="btn primary" type="submit">Save</button></div></div>
+  </form>
+</dialog>
 <dialog id="ckDlg">
   <form id="ckForm" novalidate style="display:grid;gap:14px;padding:20px">
     <h3>Check in balances</h3>
@@ -1408,6 +1436,7 @@ import { decodeBCBP } from "./bcbp.js";
 import { detectRecurring, backtest as recurBacktest } from "./recur.js";
 import { checkPhoto, passportAlerts, human as humanDate } from "./verify.js";
 import { formPayload, peopleText, bookmarklet, FILLER_VERSION } from "./fill.js";
+import { envelopeMonth, fillMonth, moveMoney, startFromBudgets } from "./envelopes.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -1616,6 +1645,7 @@ onAuthStateChanged(auth, user => {
     const bs = snap.docs.find(x => x.id === 'bookings'); state.bkSettings = bs ? bs.data() : {};
     const lv = snap.docs.find(x => x.id === 'leave'); state.leave = lv ? lv.data() : {};
     const gl = snap.docs.find(x => x.id === 'goals'); state.goals = gl ? gl.data().items || [] : [];
+    const ev = snap.docs.find(x => x.id === 'envelopes'); state.envCfg = ev ? ev.data() : null;
     const pp = snap.docs.find(x => x.id === 'people'); state.people = pp ? pp.data().items || [] : [];
     if ($('#ppDlg')?.open && state.ppView === 'list') renderPeople();
     renderPassportBar();
@@ -1834,7 +1864,7 @@ function renderOverview(ms){
       return `<button type="button" class="sub fc linkish" data-fcopen title="${esc(tip)}">Heading for <strong>~${eur0.format(f.total)}</strong> by ${f.D} ${MON[+f.month.slice(5,7)-1]}${f.left > 0 && f.varLeft > 0 ? ` (${eur0.format(f.low)} to ${eur0.format(f.high)})` : ''} <span class="more">· how?</span></button>`; })()}</div>
     <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
     <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' + (invWho.length > 1 ? ' (' + invWho.map(([k, v]) => esc(k) + ' ' + eur0.format(v)).join(' · ') + ')' : invWho.length === 1 ? ' by ' + esc(invWho[0][0]) : '') : ''}</span></div>
-    <div class="kpi"><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
+    ${ENVELOPES ? envKpi() : ''}<div class="kpi" ${ENVELOPES ? 'hidden' : ''}><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
     + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${hm0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : `<span class="${nw.delta >= 0 ? 'pos' : 'neg'}">${signed(nw.delta)}</span> since end of ${MON[+nw.prevM.slice(5,7)-1]}`} · Wealth →</span></a>` : ''; })();
   renderBudgets(); renderSetupLine();
   renderIncomeVsSpend($('#ovTrend'));
@@ -3453,11 +3483,118 @@ function goalEmergency(g){
   for (const a of accs){ const e = estimate(a); if (!e || (e.base.virtual && Math.abs(e.balance) < 0.5)) missing.push(a.name); else have += toEur(a, e.balance); }
   return { target, avg, accs, have, missing };
 }
+// ---------- Envelopes (trial in place of budgets; set ENVELOPES = false to go back to the budgets card) ----------
+// Money that comes in is put into envelopes, spending takes it out, and what's left rolls over to next month.
+// Worked out from the entries already logged (envelopes.js). The budgets stay saved and untouched.
+const ENVELOPES = true;
+const envData = () => ({ items: state.items, income: state.income, transfers: state.transfers, acc: accOf });
+const envMonthSel = () => state.period === 'all' ? thisMonth() : state.period;
+function envState(month = envMonthSel()){ return state.envCfg?.envs?.length ? envelopeMonth(state.envCfg, month, envData()) : null; }
+async function saveEnv(cfg){
+  const d = { start: cfg.start, envs: cfg.envs, months: cfg.months || {}, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) };
+  try { await setDoc(doc(fs, 'settings', 'envelopes'), d); state.envCfg = d; render(); return true; }
+  catch (x){ toast(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); return false; }
+}
+function envKpi(){
+  const E = envState();
+  if (!E) return `<div class="kpi"><span class="lbl">Ready to assign</span><span class="val">—</span><span class="sub"><a href="#" data-envstart>Start envelopes</a></span></div>`;
+  if (E.before) return `<div class="kpi"><span class="lbl">Ready to assign</span><span class="val">—</span><span class="sub">Envelopes start in ${monthLabel(state.envCfg.start)}</span></div>`;
+  const over = E.rows.filter(r => r.avail < -0.004).length;
+  return `<div class="kpi"><span class="lbl">Ready to assign</span><span class="val ${E.ready < 0 ? 'neg' : ''}">${E.ready < 0 ? '−' : ''}${eur.format(Math.abs(E.ready))}</span><span class="sub">${E.ready < -0.004 ? 'More put in envelopes than came in' : E.ready > 0.004 ? 'Not in an envelope yet' : 'Every euro has a job'}${over ? ` · <span class="neg">${over} envelope${over === 1 ? '' : 's'} overspent</span>` : ''}</span></div>`;
+}
+function renderEnvelopes(el){
+  const m = envMonthSel(), cfg = state.envCfg;
+  if (!cfg?.envs?.length){
+    const nb = (state.budgets.items || []).filter(b => b.a > 0).length;
+    el.innerHTML = `<header><h2>Envelopes</h2></header>
+      <p class="muted" style="margin:0;font-size:13px">Every euro that comes in gets a job. Fill the envelopes each month from your income; spending takes money out of the envelope of its category, and what’s left rolls over. Overspent? Move money over from another envelope.</p>
+      <p class="muted" style="margin:0;font-size:13px">${nb ? `Starts with your ${nb} budget${nb === 1 ? '' : 's'} as envelopes` : 'Starts with'} plus Travel, Savings &amp; investing and Everything else. Your budgets stay saved.</p>
+      <div><button class="btn primary" type="button" data-envstart>Start envelopes in ${monthLabel(thisMonth())}</button></div>`;
+    return;
+  }
+  const E = envelopeMonth(cfg, m, envData());
+  if (E.before){ el.innerHTML = `<header><h2>Envelopes</h2></header><p class="muted" style="margin:0">Envelopes start in ${monthLabel(cfg.start)}.</p>`; return; }
+  const money = v => `<span class="${v < -0.004 ? 'neg' : ''}">${v < -0.004 ? '−' : ''}${eur.format(Math.abs(v))}</span>`;
+  const row = r => { const base = Math.max(0, r.carry) + r.put, pctUsed = base > 0 ? Math.min(100, r.spent / base * 100) : r.spent > 0 ? 100 : 0;
+    return `<div class="envrow"><span>${esc(r.env.name)}</span><span class="v">${money(r.avail)}</span>
+      <span class="lvbar"><i style="width:${pctUsed}%;background:${r.avail < -0.004 ? 'var(--danger)' : 'var(--accent)'}"></i></span>
+      <span class="sub">${r.carry ? `carried ${money(r.carry)} · ` : ''}put in ${eur0.format(r.put)} · spent ${eur0.format(r.spent)}${r.avail < -0.004 ? ` <button class="btn small" type="button" data-envcover="${esc(r.env.id)}">Cover</button>` : ''}</span></div>`; };
+  const over = E.rows.filter(r => r.avail < -0.004), rest = E.rows.filter(r => !over.includes(r) && (r.put || r.spent || r.carry || r.env.fill));
+  const idle = E.rows.filter(r => !over.includes(r) && !rest.includes(r)), shownN = Math.max(6, over.length);
+  const list = [...over, ...rest];
+  const filledAll = cfg.envs.every(e => !(+e.fill > 0) || e.id in ((cfg.months || {})[m] || {}));
+  el.innerHTML = `<header><h2>Envelopes · ${monthLabel(m)}</h2><span class="right"><button class="btn ${filledAll ? 'ghost' : 'primary'} small" type="button" data-envfill ${filledAll ? 'disabled' : ''}>${filledAll ? 'Filled' : 'Fill month'}</button><button class="btn small" type="button" data-envmove>Move</button><button class="btn ghost small" type="button" data-envedit>Edit</button></span></header>
+    <div class="envready"><span>Ready to assign</span><strong>${money(E.ready)}</strong><span class="sub">${monthLabel(m)}: ${eur0.format(E.income)} income${E.back ? ` + ${eur0.format(E.back)} back from savings` : ''} · ${eur0.format(E.put)} put in envelopes</span></div>
+    <div>${list.slice(0, shownN).map(row).join('')}</div>
+    ${list.length > shownN || idle.length ? `<details class="psmore"><summary>All ${E.rows.length} envelopes</summary>${[...list.slice(shownN), ...idle].map(row).join('')}</details>` : ''}`;
+}
+function openEnvMove(to, amount){
+  const E = envState(); if (!E) return;
+  const opts = (sel) => [`<option value="ready" ${sel === 'ready' ? 'selected' : ''}>Ready to assign (${eur.format(E.ready)})</option>`, ...E.rows.map(r => `<option value="${esc(r.env.id)}" ${sel === r.env.id ? 'selected' : ''}>${esc(r.env.name)} (${eur.format(r.avail)})</option>`)].join('');
+  const richest = [...E.rows].filter(r => r.env.id !== to).sort((a, b) => b.avail - a.avail)[0];
+  const from = E.ready >= (amount || 0) && E.ready > 0 ? 'ready' : richest ? richest.env.id : 'ready';
+  $('#em-from').innerHTML = opts(from); $('#em-to').innerHTML = opts(to || E.rows[0]?.env.id);
+  $('#em-amt').value = amount ? amount.toFixed(2) : ''; $('#emErr').hidden = true;
+  $('#emHint').textContent = `For ${monthLabel(envMonthSel())}. Money moved out of an envelope goes back to its source's balance this month.`;
+  $('#envMoveDlg').showModal();
+}
+function openEnvEdit(){
+  const cfg = state.envCfg; if (!cfg) return;
+  state.envDraft = JSON.parse(JSON.stringify(cfg.envs));
+  drawEnvEdit(); $('#eeErr').hidden = true; $('#envEditDlg').showModal();
+}
+function drawEnvEdit(){
+  const envs = state.envDraft, used = new Set(envs.flatMap(e => e.cats || []));
+  const role = e => e.trips ? 'all trip spending' : e.save ? 'money invested or sent to India' : e.other ? 'every category without its own envelope' : (e.cats || []).join(', ');
+  $('#eeList').innerHTML = envs.map((e, i) => `<div class="eerow"><input data-eename="${i}" value="${esc(e.name)}" aria-label="Name"><input data-eefill="${i}" type="number" step="1" min="0" inputmode="decimal" value="${+e.fill || ''}" placeholder="€/month" aria-label="Each month">${e.trips || e.save || e.other ? '<span></span>' : `<button class="unlink" type="button" data-eedel="${i}" aria-label="Remove ${esc(e.name)}">×</button>`}<small>${esc(role(e))}</small></div>`).join('');
+  const cats = [...new Set(state.items.map(i => i.category).filter(Boolean))].filter(c => !used.has(c)).sort();
+  $('#ee-cat').innerHTML = '<option value="">Category…</option>' + cats.map(c => `<option>${esc(c)}</option>`).join('');
+}
+document.addEventListener('click', async e => {
+  const t = e.target;
+  if (t.closest('[data-envstart]')){ e.preventDefault(); const ok = await saveEnv(startFromBudgets(state.budgets.items, thisMonth())); if (ok) toast('Envelopes started. Tap Fill month to put this month’s money in.'); return; }
+  if (t.closest('[data-envfill]')){
+    const m = envMonthSel(), f = fillMonth(state.envCfg, m);
+    if (!f.n) return toast('Every envelope already has money this month.');
+    if (await saveEnv({ ...state.envCfg, months: f.months })){ const E = envState(m); toast(`Put ${eur0.format(f.total)} into ${f.n} envelope${f.n === 1 ? '' : 's'}. Ready to assign: ${eur.format(E.ready)}`); }
+    return;
+  }
+  if (t.closest('[data-envmove]')) return openEnvMove();
+  if (t.closest('[data-envcover]')){ const id = t.closest('[data-envcover]').dataset.envcover, r = envState().rows.find(x => x.env.id === id); return openEnvMove(id, r ? -r.avail : 0); }
+  if (t.closest('[data-envedit]')) return openEnvEdit();
+  if (t.closest('[data-eedel]')){ state.envDraft.splice(+t.closest('[data-eedel]').dataset.eedel, 1); return drawEnvEdit(); }
+});
+$('#emCancel').addEventListener('click', () => $('#envMoveDlg').close());
+$('#envMoveForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const from = $('#em-from').value, to = $('#em-to').value, v = Math.round(parseFloat($('#em-amt').value) * 100) / 100, err = $('#emErr');
+  if (from === to){ err.textContent = 'Pick two different places.'; err.hidden = false; return; }
+  if (!(v > 0)){ err.textContent = 'Enter an amount.'; err.hidden = false; return; }
+  if (await saveEnv({ ...state.envCfg, months: moveMoney(state.envCfg, envMonthSel(), from, to, v) })){ $('#envMoveDlg').close(); toast('Moved ' + eur.format(v)); }
+});
+$('#eeCancel').addEventListener('click', () => $('#envEditDlg').close());
+$('#envEditDlg').addEventListener('input', e => {
+  const n = e.target.dataset.eename, f = e.target.dataset.eefill;
+  if (n !== undefined) state.envDraft[+n].name = e.target.value.slice(0, 40);
+  if (f !== undefined) state.envDraft[+f].fill = Math.max(0, +e.target.value || 0);
+});
+$('#eeAdd').addEventListener('click', () => {
+  const name = $('#ee-name').value.trim() || $('#ee-cat').value, cat = $('#ee-cat').value, fill = Math.max(0, +$('#ee-fill').value || 0);
+  if (!name){ $('#eeErr').textContent = 'Give the envelope a name or pick a category.'; $('#eeErr').hidden = false; return; }
+  state.envDraft.splice(state.envDraft.findIndex(x => x.trips || x.save || x.other), 0, { id: 'e-' + Math.random().toString(36).slice(2, 9), name: name.slice(0, 40), cats: cat ? [cat] : [], fill });
+  $('#ee-name').value = ''; $('#ee-fill').value = ''; $('#eeErr').hidden = true; drawEnvEdit();
+});
+$('#envEditForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (state.envDraft.some(x => !String(x.name).trim())){ $('#eeErr').textContent = 'Every envelope needs a name.'; $('#eeErr').hidden = false; return; }
+  if (await saveEnv({ ...state.envCfg, envs: state.envDraft })){ $('#envEditDlg').close(); toast('Envelopes saved'); }
+});
+
 // What isn't set up yet takes one line on the Overview instead of a card each.
 function renderSetupLine(){
   const el = $('#setupLine'); if (!el) return;
-  const noBud = state.period !== 'all' && !(state.budgets.items || []).some(b => b.a > 0), noGoals = !(state.goals || []).length;
-  el.hidden = !noBud && !noGoals; if (el.hidden) return;
+  const noBud = !ENVELOPES && state.period !== 'all' && !(state.budgets.items || []).some(b => b.a > 0), noGoals = !(state.goals || []).length;
+  el.hidden = !noBud && !noGoals; if (el.hidden){ el.innerHTML = ''; return; }
   el.innerHTML = `<span>Not set up yet:</span>${noBud ? '<button class="btn small" type="button" data-editbudgets="suggest">Budgets</button>' : ''}${noGoals ? '<button class="btn small" type="button" data-goalnew>Goals</button>' : ''}`;
 }
 function renderGoals(){
@@ -3693,6 +3830,7 @@ function renderBudgets(){
   const el = $('#budgetPanel');
   if (state.period === 'all'){ el.hidden = true; return; }
   el.hidden = false;
+  if (ENVELOPES) return renderEnvelopes(el);
   const has = (state.budgets.items || []).some(b => b.a > 0);
   if (!has){
     el.hidden = true; return;
@@ -5066,7 +5204,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26c';
+const APP_VERSION = '2026-10-26d';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
