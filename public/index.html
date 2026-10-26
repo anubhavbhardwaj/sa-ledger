@@ -181,7 +181,8 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 @media (min-width:561px){.ybr .sm{display:none}}
 .ecg{border:1px solid var(--line);border-radius:12px;padding:10px;display:grid;gap:8px}.ecgh,.eceh{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}.eceh{grid-template-columns:minmax(0,1fr) 86px auto}
 .ecgh input{font-weight:600}.ecg input,.ecg select{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:7px 9px;font-size:13.5px;color:var(--ink);min-width:0}
-.ece{display:grid;gap:6px;padding:8px;border-radius:10px;background:var(--sunk)}.ecsrc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.ecsrc select{max-width:100%}
+#envCatForm>*,#ecList,.ecg,.ece{min-width:0}.ece{display:grid;gap:6px;padding:8px;border-radius:10px;background:var(--sunk)}.ecsrc{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}.ecsrc select{flex:1 1 200px;width:100%;min-width:0;max-width:100%}.chipx{max-width:100%}
+.ecstat{font-size:12px;color:var(--muted)}.ecstat strong{color:var(--ink)}.chipx small{color:var(--muted);font-size:11px;white-space:nowrap}
 .chipx{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 4px 2px 10px;font-size:12.5px}.chipx button{all:unset;cursor:pointer;padding:0 6px;color:var(--muted)}
 .esq{display:flex;gap:6px;flex-wrap:wrap}.esacc{display:grid;grid-template-columns:auto minmax(0,1fr) 120px;gap:6px 10px;align-items:center;font-size:13.5px}.esacc input[type=number]{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:6px 8px;font-size:13.5px;color:var(--ink);min-width:0;text-align:right}
 .setupline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}.setupline[hidden]{display:none}
@@ -1471,7 +1472,7 @@ import { decodeBCBP } from "./bcbp.js";
 import { detectRecurring, backtest as recurBacktest } from "./recur.js";
 import { checkPhoto, passportAlerts, human as humanDate } from "./verify.js";
 import { formPayload, peopleText, bookmarklet, FILLER_VERSION } from "./fill.js";
-import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, srcLabel, newId, tripKey, SAVE_KEY, NONE_KEY } from "./envelopes.js";
+import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, spendingStats, srcLabel, newId, tripKey, SAVE_KEY, NONE_KEY } from "./envelopes.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -3683,10 +3684,16 @@ function drawEnvCats(){
   const D = state.ecDraft, used = new Set(D.flatMap(g => g.envs.flatMap(e => e.src || []))), all = allSources(state.items);
   const since = addMonth(thisMonth(), -2) + '-01';
   const un = unassignedSources({ ...state.envCfg, groups: D }, state.items, since);
-  const pick = (gi, ei) => `<select data-ecsrc="${gi}.${ei}" aria-label="Add spending"><option value="">+ Add spending…</option>${all.filter(x => !used.has(x)).map(x => `<option value="${esc(x)}">${esc(srcLabel(x))}</option>`).join('')}</select>`;
+  // Running totals to help pick each envelope's monthly amount.
+  const cm = thisMonth(), S = spendingStats({ ...state.envCfg, groups: D }, state.items, cm), mon = MON[+cm.slice(5, 7) - 1];
+  const srcAmt = x => { const v = S.src[x]; return !v ? '' : v.avg ? ` · about ${eur0.format(v.avg)}/mo` : v.cur ? ` · ${eur0.format(v.cur)} in ${mon}` : ''; };
+  const envLine = e => { const v = S.env[e.id]; if (!(e.src || []).length) return '';
+    if (!v) return `<div class="ecstat">No spending on the budget accounts in the last 3 months.</div>`;
+    return `<div class="ecstat">${v.avg ? `About <strong>${eur0.format(v.avg)}</strong> a month (last 3 months) · ${eur0.format(v.last)} last month` : 'Nothing in the last 3 months'} · <strong>${eur0.format(v.cur)}</strong> so far in ${mon}${v.avg > 0 && Math.round(v.avg) !== Math.round(+state.ecTargets[e.id] || 0) ? ` <button class="linkbtn" type="button" data-ecuse="${esc(e.id)}" data-v="${Math.ceil(v.avg)}">Use ${eur0.format(Math.ceil(v.avg))}</button>` : ''}</div>`; };
+  const pick = (gi, ei) => `<select data-ecsrc="${gi}.${ei}" aria-label="Add spending"><option value="">+ Add spending…</option>${all.filter(x => !used.has(x)).map(x => `<option value="${esc(x)}">${esc(srcLabel(x) + srcAmt(x))}</option>`).join('')}</select>`;
   $('#ecList').innerHTML = D.map((g, gi) => `<div class="ecg"><div class="ecgh"><input data-ecg="${gi}" value="${esc(g.name)}" placeholder="Category, e.g. Fixed" aria-label="Category name"><button class="unlink" type="button" data-ecgdel="${gi}" aria-label="Remove ${esc(g.name)}">×</button></div>
       ${g.envs.map((e, ei) => `<div class="ece"><div class="eceh"><input data-ece="${gi}.${ei}" value="${esc(e.name)}" placeholder="Envelope, e.g. Rent" aria-label="Envelope name"><input data-ect="${esc(e.id)}" type="number" step="1" min="0" inputmode="decimal" value="${+state.ecTargets[e.id] || ''}" placeholder="€/month" aria-label="Monthly target"><button class="unlink" type="button" data-ecedel="${gi}.${ei}" aria-label="Remove ${esc(e.name)}">×</button></div>
-        <div class="ecsrc">${(e.src || []).map((x, si) => `<span class="chipx">${esc(srcLabel(x))}<button type="button" data-ecsdel="${gi}.${ei}.${si}" aria-label="Remove">×</button></span>`).join('')}${pick(gi, ei)}</div></div>`).join('')}
+        <div class="ecsrc">${(e.src || []).map((x, si) => `<span class="chipx">${esc(srcLabel(x))}${S.src[x] ? ` <small>${eur0.format(S.src[x].cur)} in ${mon}</small>` : ''}<button type="button" data-ecsdel="${gi}.${ei}.${si}" aria-label="Remove">×</button></span>`).join('')}${pick(gi, ei)}</div>${envLine(e)}</div>`).join('')}
       <button class="btn small" type="button" data-ecenew="${gi}">+ Envelope</button></div>`).join('');
   $('#ecUn').innerHTML = un.length ? `<strong>Not in an envelope yet</strong> (last 3 months on the budget accounts): ${un.slice(0, 12).map(u => `${esc(srcLabel(u.src))} ${eur0.format(u.amount)}`).join(' · ')}` : '<span class="pos">All recent spending on the budget accounts has an envelope.</span>';
 }
@@ -3700,6 +3707,7 @@ document.addEventListener('click', e => {
   if (t.closest('[data-ecgdel]')){ const g = D[+t.closest('[data-ecgdel]').dataset.ecgdel]; if (g.envs.length && !confirm(`Remove ${g.name || 'this category'} and its ${g.envs.length} envelope${g.envs.length === 1 ? '' : 's'}? Money in them goes back to Ready to Assign.`)) return; D.splice(D.indexOf(g), 1); drawEnvCats(); return; }
   if (t.closest('[data-ecedel]')){ const [gi, ei] = at(t.closest('[data-ecedel]').dataset.ecedel); D[gi].envs.splice(ei, 1); drawEnvCats(); return; }
   if (t.closest('[data-ecsdel]')){ const [gi, ei, si] = at(t.closest('[data-ecsdel]').dataset.ecsdel); D[gi].envs[ei].src.splice(si, 1); drawEnvCats(); return; }
+  if (t.closest('[data-ecuse]')){ const b = t.closest('[data-ecuse]'); state.ecTargets[b.dataset.ecuse] = +b.dataset.v; drawEnvCats(); return; }
   if (t.id === 'ecCancel') $('#envCatDlg').close();
 });
 $('#envCatDlg').addEventListener('input', e => {
@@ -5340,7 +5348,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26f';
+const APP_VERSION = '2026-10-26g';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

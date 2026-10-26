@@ -100,6 +100,26 @@ export function allSources(items){
   return Object.entries(cats).sort((a, b) => a[0].localeCompare(b[0])).flatMap(([c, v]) => [srcOf(c), ...Object.keys(v.subs).sort().map(s => srcOf(c, s))]);
 }
 
+// What spending looks like, to help pick a target: per source and per envelope, this month so far, last month and
+// the average of the last three full months. Same rules as the budget (budget accounts only; trips apart when on).
+// The source figures count everything in that category or subcategory; the envelope figures count what would
+// actually land in it (the most specific source wins).
+export function spendingStats(cfg, items, month){
+  const { keyFor, isB } = makeBudget(cfg), prev = [1, 2, 3].map(k => monthsBetween(shift(month, -k), shift(month, -k))[0]);
+  const want = new Set([month, ...prev]), src = {}, env = {};
+  const bump = (o, k, m, v) => { const x = (o[k] ||= { cur: 0, last: 0, sum3: 0 }); if (m === month) x.cur += v; else { x.sum3 += v; if (m === prev[0]) x.last += v; } };
+  items.forEach(i => {
+    const m = String(i.date).slice(0, 7);
+    if (!want.has(m) || !isB(i.account) || (cfg.trips !== false && i.tripId)) return;
+    const v = +i.amount || 0;
+    bump(src, srcOf(i.category), m, v); if (i.subcategory) bump(src, srcOf(i.category, i.subcategory), m, v);
+    const k = keyFor(i); if (k !== NONE_KEY) bump(env, k, m, v);
+  });
+  const fin = o => Object.fromEntries(Object.entries(o).map(([k, x]) => [k, { cur: r2(x.cur), last: r2(x.last), avg: r2(x.sum3 / 3) }]));
+  return { src: fin(src), env: fin(env) };
+}
+const shift = (m, k) => { const d = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1)); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0'); };
+
 export function assignTargets(cfg, month){
   const ids = new Set((cfg.groups || []).flatMap(g => (g.envs || []).map(e => e.id)));
   const cur = { ...(cfg.assigned || {})[month] }; let n = 0, total = 0;

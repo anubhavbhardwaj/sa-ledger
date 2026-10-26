@@ -619,7 +619,11 @@ test('envelopes: your own categories (Fixed, Flexible) and envelopes fed by chos
   assert.equal(await page.inputValue('[data-ece="0.0"]'), 'Rent', 'named after the first spending added');
   await page.fill('[data-ect]', '800');
   await page.click('[data-ecenew="1"]'); await page.fill('[data-ece="1.0"]', 'Food');
+  assert.match(await page.$eval('[data-ecsrc="1.0"] option[value="Groceries"]', o => o.textContent), /Groceries \(all\) · €80 in /, 'the list shows a running total');
   await page.selectOption('[data-ecsrc="1.0"]', 'Groceries'); await page.selectOption('[data-ecsrc="1.0"]', 'Eating out');
+  const stat = (await app.text('#ecList .ece:has([data-ece="1.0"]) .ecstat'));
+  assert.match(stat, /Nothing in the last 3 months · €200 so far in/, 'this month: 120 eating out + 80 groceries');
+  assert.match(await app.text('#ecList .ece:has([data-ece="1.0"]) .ecsrc'), /Groceries \(all\) €80 in .*Eating out \(all\) €120 in/);
   await page.click('#envCatForm [type=submit]'); await page.waitForTimeout(250);
   let t = await app.text('#budgetPanel');
   assert.match(t, /Ready to Assign\s*€4,100\.00/, 'starting money + salary into Deutsche Bank');

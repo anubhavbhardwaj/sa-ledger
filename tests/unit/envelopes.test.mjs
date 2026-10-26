@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
+import { spendingStats, budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
 
 const cfg = () => ({ start: '2026-10-10', accounts: ['Deutsche Bank', 'Wise Common', 'Wise Sulekha', 'DB Card', 'IDFC Card'], opening: 2000, trips: true,
   groups: [
@@ -66,4 +66,22 @@ test('envelopes: set and move assigned money', () => {
   c.assigned = setAssigned(c, '2026-10', 'bakery', 0);
   assert.deepEqual(c.assigned['2026-10'], { food: 280 });
   assert.ok(budgetMonth(c, '2026-09', data).before);
+});
+
+test('envelopes: running totals per source and per envelope to help pick a target', () => {
+  const c = cfg(), items = [
+    { date: '2026-07-03', amount: 300, category: 'Groceries', subcategory: 'Supermarket', account: 'Wise Common' },
+    { date: '2026-08-03', amount: 240, category: 'Groceries', subcategory: 'Supermarket', account: 'Wise Common' },
+    { date: '2026-09-03', amount: 210, category: 'Groceries', subcategory: 'Supermarket', account: 'DB Card' },
+    { date: '2026-09-05', amount: 30, category: 'Groceries', subcategory: 'Bakery', account: 'DB Card' },
+    { date: '2026-09-06', amount: 500, category: 'Groceries', account: 'HDFC NRE' },                        // not a budget account
+    { date: '2026-09-07', amount: 90, category: 'Groceries', tripId: 'rome', account: 'Deutsche Bank' },    // trip
+    { date: '2026-10-02', amount: 75, category: 'Groceries', subcategory: 'Supermarket', account: 'Wise Common' },
+    { date: '2026-06-02', amount: 999, category: 'Groceries', account: 'Wise Common' },                     // too old
+  ];
+  const S = spendingStats(c, items, '2026-10');
+  assert.deepEqual(S.src['Groceries'], { cur: 75, last: 240, avg: 260 }, 'whole category: (300 + 240 + 240) / 3');
+  assert.deepEqual(S.src['Groceries›Bakery'], { cur: 0, last: 30, avg: 10 });
+  assert.deepEqual(S.env.food, { cur: 75, last: 210, avg: 250 }, 'Food gets Groceries except Bakery, which has its own envelope');
+  assert.deepEqual(S.env.bakery, { cur: 0, last: 30, avg: 10 });
 });
