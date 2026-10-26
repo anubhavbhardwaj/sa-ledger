@@ -184,7 +184,9 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 #envCatForm>*,#ecList,.ecg,.ece{min-width:0}.ece{display:grid;gap:6px;padding:8px;border-radius:10px;background:var(--sunk)}.ecsrc{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}.ecsrc select{flex:1 1 200px;width:100%;min-width:0;max-width:100%}.chipx{max-width:100%}
 .ecstat{font-size:12px;color:var(--muted)}.ecstat strong{color:var(--ink)}.chipx small{color:var(--muted);font-size:11px;white-space:nowrap}
 .chipx{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 4px 2px 10px;font-size:12.5px}.chipx button{all:unset;cursor:pointer;padding:0 6px;color:var(--muted)}
-.esq{display:flex;gap:6px;flex-wrap:wrap}.esacc{display:grid;grid-template-columns:auto minmax(0,1fr) 120px;gap:6px 10px;align-items:center;font-size:13.5px}.esacc input[type=number]{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:6px 8px;font-size:13.5px;color:var(--ink);min-width:0;text-align:right}
+.esq{display:flex;gap:6px;flex-wrap:wrap}
+.cover{border:1px solid color-mix(in srgb,var(--danger) 45%,var(--line));border-radius:12px;padding:10px 12px;display:grid;gap:6px}.cover strong{font-size:13.5px}
+.covlist{display:grid;gap:4px;max-height:240px;overflow:auto}.covlist button{all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:10px;padding:7px 9px;border-radius:8px;font-size:13.5px}.covlist button:hover,.covlist button:focus-visible{background:var(--sunk)}.covlist button span{font-family:var(--f-mono);color:var(--good)}.esacc{display:grid;grid-template-columns:auto minmax(0,1fr) 120px;gap:6px 10px;align-items:center;font-size:13.5px}.esacc input[type=number]{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:6px 8px;font-size:13.5px;color:var(--ink);min-width:0;text-align:right}
 .setupline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}.setupline[hidden]{display:none}
 .morewrap{position:relative}.morewrap .pmenu{left:0;right:auto;width:240px}
 .pm-head{font-size:12.5px;color:var(--muted);padding:8px 10px 6px}
@@ -1173,6 +1175,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
   <form id="envAsgForm" novalidate style="display:grid;gap:12px;padding:20px;max-width:460px">
     <h3 id="eaTitle">Envelope</h3>
     <p class="muted" id="eaNums" style="margin:0;font-size:13px"></p>
+    <div id="eaCover" class="cover" hidden></div>
     <div class="fields">
       <label class="f"><span id="eaLbl">Assigned this month (€)</span><input id="ea-amt" type="number" step="0.01" inputmode="decimal"></label>
       <label class="f">Monthly target (€)<input id="ea-target" type="number" step="1" min="0" inputmode="decimal" placeholder="none"></label>
@@ -3591,12 +3594,20 @@ function openEnvAssign(key){
   $('#ea-amt').value = r.assigned || ''; $('#ea-target').value = tgt || '';
   const prev = budgetMonth(cfg, addMonth(m, -1), envData()), pr = prev.before ? null : prev.rows.find(x => x.key === key);
   const chips = [tgt ? ['Target', tgt] : null, pr && pr.activity ? ['Spent last month', -pr.activity] : null, pr && pr.assigned ? ['Assigned last month', pr.assigned] : null,
-    r.available < -0.004 ? ['Cover overspending', r.assigned - r.available] : null, B.ready > 0.004 ? ['All of Ready to Assign', r.assigned + B.ready] : null].filter(Boolean);
+    B.ready > 0.004 ? ['All of Ready to Assign', r.assigned + B.ready] : null].filter(Boolean);
+  // YNAB-style: an overspent envelope lists where the money can come from (envelopes with money, Ready to Assign).
+  const deficit = r.available < -0.004 ? -r.available : 0, nm = x => (x.group ? x.group + ' › ' : '') + envName(x);
+  const donors = B.rows.filter(x => x.key !== key && x.key !== NONE_KEY && x.available > 0.004).sort((a, b) => b.available - a.available);
+  $('#eaCover').hidden = !deficit;
+  $('#eaCover').innerHTML = deficit ? `<strong>Cover ${eur.format(deficit)} from</strong><div class="covlist">${B.ready > 0.004 ? `<button type="button" data-cover="ready">Ready to Assign<span>${eur.format(B.ready)}</span></button>` : ''}${donors.map(x => `<button type="button" data-cover="${esc(x.key)}">${esc(nm(x))}<span>${eur.format(x.available)}</span></button>`).join('')}${!donors.length && !(B.ready > 0.004) ? '<span class="muted" style="font-size:12.5px">No envelope has money left, and Ready to Assign is empty.</span>' : ''}</div>` : '';
+  state.envCover = { key, deficit, ready: B.ready, avail: Object.fromEntries(donors.map(x => [x.key, x.available])), names: Object.fromEntries([...donors.map(x => [x.key, nm(x)]), ['ready', 'Ready to Assign']]) };
   $('#eaQuick').innerHTML = chips.map(([l, v]) => `<button class="btn small" type="button" data-easet="${v.toFixed(2)}">${l}: ${eur0.format(v)}</button>`).join('');
   const { keyFor, isB } = makeBudget(cfg), env = (cfg.groups || []).flatMap(g => g.envs || []).find(x => x.id === key);
   const acts = state.items.filter(i => i.date.startsWith(m) && i.date >= cfg.start && isB(i.account) && keyFor(i) === key).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
   if (env) $('#eaNums').innerHTML += `<br><span style="font-size:12px">Gets: ${(env.src || []).map(srcLabel).map(esc).join(', ') || 'nothing yet: add categories in Categories'}</span>`;
-  $('#eaActs').innerHTML = acts.length ? acts.map(i => `<div class="r"><span class="d">${shortDate(i.date)}</span><span><span class="store">${esc(i.store)}</span><br><span class="meta">${esc(i.account)}</span></span><span class="a">${eur.format(i.amount)}</span></div>`).join('') : '';
+  const moves = key === SAVE_KEY ? state.transfers.filter(t => t.date.startsWith(m) && t.date >= cfg.start && isB(t.from) && !isB(t.to)).sort((a, b) => b.date.localeCompare(a.date)) : [];
+  $('#eaActs').innerHTML = moves.length ? moves.map(t => `<div class="r"><span class="d">${shortDate(t.date)}</span><span><span class="store">To ${esc(t.to)}</span><br><span class="meta">from ${esc(t.from)}${t.comment ? ' · ' + esc(t.comment) : ''}</span></span><span class="a">${eur.format(t.amount)}</span></div>`).join('')
+    : acts.length ? acts.map(i => `<div class="r"><span class="d">${shortDate(i.date)}</span><span><span class="store">${esc(i.store)}</span><br><span class="meta">${esc(i.account)}</span></span><span class="a">${eur.format(i.amount)}</span></div>`).join('') : '';
   $('#envAsgDlg').showModal(); $('#ea-amt').focus();
 }
 function openEnvMove(to, amount){
@@ -3644,6 +3655,15 @@ document.addEventListener('click', async e => {
   if (t.closest('[data-envnotrips]')){ if (await saveEnv({ trips: false })) toast('Trip spending now goes to your envelopes by category. Check Not assigned for anything left.'); return; }
   if (t.closest('[data-envkey]')) return openEnvAssign(t.closest('[data-envkey]').dataset.envkey);
   if (t.closest('[data-easet]')){ $('#ea-amt').value = t.closest('[data-easet]').dataset.easet; return; }
+  if (t.closest('[data-cover]')){
+    const C = state.envCover, from = t.closest('[data-cover]').dataset.cover, have = from === 'ready' ? C.ready : C.avail[from] || 0, v = Math.round(Math.min(C.deficit, have) * 100) / 100;
+    if (!(v > 0)) return;
+    if (await saveEnv({ assigned: moveAssigned(state.envCfg, envMonthSel(), from, C.key, v) })){
+      $('#envAsgDlg').close();
+      toast(`Moved ${eur.format(v)} from ${C.names[from]}` + (v < C.deficit - 0.004 ? `. Still ${eur.format(C.deficit - v)} to cover: tap the envelope again.` : ''));
+    }
+    return;
+  }
 });
 document.addEventListener('keydown', e => { const k = e.target.closest?.('[data-envkey]'); if (k && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); openEnvAssign(k.dataset.envkey); } });
 $('#eaCancel').addEventListener('click', () => $('#envAsgDlg').close());
@@ -5353,7 +5373,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26i';
+const APP_VERSION = '2026-10-26j';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

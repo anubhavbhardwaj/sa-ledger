@@ -636,7 +636,8 @@ test('envelopes: your own categories (Fixed, Flexible) and envelopes fed by chos
   const food = await page.$eval('.ybr.env:has-text("Food")', el => el.dataset.envkey);
   await page.click(`[data-envkey="${food}"]`); await page.waitForSelector('#envAsgDlg[open]');
   assert.match(await app.text('#eaNums'), /Gets: Groceries \(all\), Eating out \(all\)/);
-  await page.click('#eaQuick >> text=Cover overspending'); await page.click('#envAsgForm [type=submit]'); await page.waitForTimeout(200);
+  assert.match(await app.text('#eaCover'), /Cover €200\.00 from\s*Ready to Assign\s*€3,300\.00/);
+  await page.click('#eaCover [data-cover="ready"]'); await page.waitForTimeout(200);
   t = await app.text('#budgetPanel');
   assert.match(t, /Ready to Assign\s*€3,100\.00/); assert.match(t, /Food\s*€200\s*−€200\.00\s*€0\.00/);
   assert.match(await app.text('#kpis'), /Ready to assign\s*€3,100\.00/);
@@ -683,5 +684,29 @@ test('envelopes: trip spending can go to your own Trips category instead of one 
   assert.match(t, /Transportation\s*€0\s*−€600\.00/); assert.match(t, /Accommodation\s*€0\s*−€300\.00/); assert.doesNotMatch(t, /one per trip/);
   await page.click('#budgetPanel [data-envsetup]'); await page.waitForSelector('#envSetupDlg[open]');
   assert.equal(await page.isChecked('#es-trips'), false);
+  await clean(app);
+});
+
+test('envelopes: cover overspending from another envelope, YNAB-style; Savings lists its transfers', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString();
+  await app.seed({
+    accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: m + '-01' }, sc: { name: 'Scalable', type: 'investment', currency: 'EUR', owner: 'Anubhav', createdAt: m + '-01' } },
+    expenses: { e1: { amount: 240, date: m + '-02', store: 'Lufthansa', category: 'Transportation', subcategory: 'Flight', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now } },
+    transfers: { t1: { amount: 500, date: m + '-03', from: 'Deutsche Bank', to: 'Scalable', comment: 'ETF', createdAt: now } },
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 0, trips: false, targets: {},
+      groups: [{ id: 'g', name: 'Travel', envs: [{ id: 'tr', name: 'Transportation', src: ['Transportation'] }] }, { id: 'h', name: 'Daily', envs: [{ id: 'food', name: 'Groceries', src: ['Groceries'] }, { id: 'fun', name: 'Fun', src: ['Fun'] }] }],
+      assigned: { [m]: { tr: 150, food: 300, fun: 50 } } } } });
+  await page.waitForTimeout(300);
+  await page.click('[data-envkey="tr"]'); await page.waitForSelector('#envAsgDlg[open]');
+  const c = await app.text('#eaCover');
+  assert.match(c, /Cover €90\.00 from\s*Daily › Groceries\s*€300\.00\s*Daily › Fun\s*€50\.00/, 'envelopes with money, fullest first; no Ready to Assign when it is negative');
+  await page.click('#eaCover [data-cover="fun"]'); await page.waitForTimeout(250);
+  let t = await app.text('#budgetPanel');
+  assert.match(t, /Transportation\s*€200\s*−€240\.00\s*−€40\.00/); assert.match(t, /Fun\s*€0\s*€0\s*€0\.00/);
+  await page.click('[data-envkey="tr"]'); await page.click('#eaCover [data-cover="food"]'); await page.waitForTimeout(250);
+  t = await app.text('#budgetPanel');
+  assert.match(t, /Transportation\s*€240\s*−€240\.00\s*€0\.00/); assert.match(t, /Groceries\s*€260\s*€0\s*€260\.00/);
+  await page.click('[data-envkey="s_save"]'); await page.waitForSelector('#envAsgDlg[open]');
+  assert.match(await app.text('#eaActs'), /To Scalable\s*from Deutsche Bank · ETF\s*€500\.00/);
   await clean(app);
 });
