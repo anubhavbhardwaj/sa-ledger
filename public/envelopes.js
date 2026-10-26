@@ -13,14 +13,19 @@
 // - like YNAB, an envelope that ends a month overspent starts the next one at zero and the overspending comes out of
 //   that month's Ready to Assign.
 //
-// cfg = { start, accounts: [names], opening, trips, groups: [{ id, name, envs: [{ id, name, src: ['Cat', 'Cat›Sub'] }] }],
+// Spending in envelope categories paid from an account outside the budget isn't counted, but it's reported (outside),
+// so it doesn't vanish silently; accounts in cfg.excluded are left out of that report on purpose.
+//
+// cfg = { start, accounts: [names], excluded: [names], opening, trips, groups: [{ id, name, envs: [{ id, name, src: ['Cat', 'Cat›Sub'] }] }],
 //         assigned: { 'YYYY-MM': { envId: € } }, targets: { envId: € } }
 
 const r2 = v => Math.round(v * 100) / 100;
 export const SEP = '›';
 export const SAVE_KEY = 's_save', NONE_KEY = 'u_none';
 export const tripKey = id => 't_' + String(id).replace(/[^A-Za-z0-9_-]/g, '');
-export const srcOf = (cat, sub) => sub ? `${cat}${SEP}${sub}` : String(cat || '');
+export const srcOf = (cat, sub) => { const c = String(cat || '').trim(), u = String(sub || '').trim(); return u ? `${c}${SEP}${u}` : c; };
+// Sources match without regard to case or extra spaces ("Eating Out" and "eating out " are the same spending).
+export const norm = s => String(s || '').trim().toLowerCase();
 export const srcLabel = s => s.includes(SEP) ? s.split(SEP).join(' › ') : `${s} (all)`;
 export const newId = () => 'e_' + Math.random().toString(36).slice(2, 10);
 export const monthsBetween = (a, b) => { const out = []; let [y, m] = a.split('-').map(Number); const [Y, M] = b.split('-').map(Number);
@@ -29,11 +34,11 @@ export const monthsBetween = (a, b) => { const out = []; let [y, m] = a.split('-
 export function makeBudget(cfg){
   const idx = new Map(), info = new Map();
   (cfg.groups || []).forEach(g => (g.envs || []).forEach(e => { info.set(e.id, { group: g.name, name: e.name, gid: g.id });
-    (e.src || []).forEach(s => { if (!idx.has(s)) idx.set(s, e.id); }); }));
+    (e.src || []).forEach(s => { if (!idx.has(norm(s))) idx.set(norm(s), e.id); }); }));
   const inB = new Set((cfg.accounts || []).map(a => String(a).toLowerCase()));
   const isB = name => inB.has(String(name || '').toLowerCase());
   const keyFor = e => cfg.trips !== false && e.tripId ? tripKey(e.tripId)
-    : idx.get(srcOf(e.category, e.subcategory)) || idx.get(srcOf(e.category)) || NONE_KEY;
+    : idx.get(norm(srcOf(e.category, e.subcategory))) || idx.get(norm(srcOf(e.category))) || NONE_KEY;
   const describe = k => k === SAVE_KEY ? { group: 'Savings', name: 'Investing & India', save: true }
     : k === NONE_KEY ? { group: 'Not assigned', name: 'Spending in no envelope', none: true }
     : k.startsWith('t_') ? { group: 'Travel', tripId: k.slice(2) }
@@ -46,9 +51,16 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
   const start = cfg.start, sm = start.slice(0, 7);
   if (month < sm) return { before: true, ready: 0, rows: [] };
   const { isB, keyFor, describe } = makeBudget(cfg), after = d => d >= start;
-  const act = {}, inflow = {};
+  const act = {}, inflow = {}, outside = {}, ex = new Set((cfg.excluded || []).map(a => String(a).toLowerCase()));
   const add = (m, k, v) => { (act[m] ||= {}); act[m][k] = (act[m][k] || 0) + v; };
-  items.forEach(e => { if (after(e.date) && isB(e.account)) add(e.date.slice(0, 7), keyFor(e), -(+e.amount || 0)); });
+  items.forEach(e => {
+    if (!after(e.date)) return;
+    const m = e.date.slice(0, 7), k = keyFor(e), v = +e.amount || 0;
+    if (isB(e.account)) return add(m, k, -v);
+    if (k === NONE_KEY || ex.has(String(e.account || '').toLowerCase())) return;
+    const o = (outside[m] ||= { total: 0, byAcc: {}, byKey: {} }), acc = e.account || '(no account)';
+    o.total += v; o.byAcc[acc] = (o.byAcc[acc] || 0) + v; o.byKey[k] = (o.byKey[k] || 0) + v;
+  });
   income.forEach(i => { if (after(i.date) && isB(i.account)) inflow[i.date.slice(0, 7)] = (inflow[i.date.slice(0, 7)] || 0) + (+i.amount || 0); });
   transfers.forEach(t => {
     if (!after(t.date)) return;
@@ -67,6 +79,7 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
     for (const k of keys) avail[k] = r2((avail[k] || 0) + (+asg[k] || 0) + (a[k] || 0));
     ready = r2(ready + (inflow[m] || 0) - assignedSum + overspent);
     if (m === month) out = { inflow: r2(inflow[m] || 0), assigned: r2(assignedSum), overspentLast: r2(-overspent),
+      outside: { total: r2((outside[m] || {}).total || 0), byAcc: Object.entries((outside[m] || {}).byAcc || {}).map(([acc, amount]) => ({ acc, amount: r2(amount) })).sort((a, b) => b.amount - a.amount), byKey: (outside[m] || {}).byKey || {} },
       rows: [...keys].map(k => ({ key: k, ...describe(k), carry: r2(carry[k] || 0), assigned: r2(+asg[k] || 0), activity: r2(a[k] || 0), available: avail[k] })) };
   }
   return { ready, ...out };
@@ -90,19 +103,23 @@ export function groupRows(cfg, rows){
 export function unassignedSources(cfg, items, since){
   const { keyFor, isB } = makeBudget(cfg), tot = {};
   items.filter(i => i.date >= since && isB(i.account) && !(cfg.trips !== false && i.tripId) && keyFor(i) === NONE_KEY)
-    .forEach(i => { const s = srcOf(i.category, i.subcategory); tot[s] = (tot[s] || 0) + (+i.amount || 0); });
-  return Object.entries(tot).map(([src, amount]) => ({ src, amount: r2(amount) })).sort((a, b) => b.amount - a.amount);
+    .forEach(i => { const s = srcOf(i.category, i.subcategory), k = norm(s); (tot[k] ||= { src: s, amount: 0 }).amount += +i.amount || 0; });
+  return Object.values(tot).map(x => ({ src: x.src, amount: r2(x.amount) })).sort((a, b) => b.amount - a.amount);
 }
 // Every source in the data, for picking: each category (all of it) followed by its subcategories.
 export function allSources(items){
-  const cats = {};
-  items.forEach(i => { if (!i.category) return; (cats[i.category] ||= { n: 0, subs: {} }).n++; if (i.subcategory) cats[i.category].subs[i.subcategory] = (cats[i.category].subs[i.subcategory] || 0) + 1; });
-  return Object.entries(cats).sort((a, b) => a[0].localeCompare(b[0])).flatMap(([c, v]) => [srcOf(c), ...Object.keys(v.subs).sort().map(s => srcOf(c, s))]);
+  // One entry per category and subcategory whatever its case, shown as most often written.
+  const cats = {}, pick = o => Object.entries(o).sort((a, b) => b[1] - a[1])[0][0];
+  items.forEach(i => { const c = String(i.category || '').trim(); if (!c) return;
+    const C = (cats[norm(c)] ||= { names: {}, subs: {} }); C.names[c] = (C.names[c] || 0) + 1;
+    const u = String(i.subcategory || '').trim(); if (u){ const U = (C.subs[norm(u)] ||= {}); U[u] = (U[u] || 0) + 1; } });
+  return Object.values(cats).map(C => ({ c: pick(C.names), subs: Object.values(C.subs).map(pick) })).sort((a, b) => a.c.localeCompare(b.c))
+    .flatMap(({ c, subs }) => [srcOf(c), ...subs.sort().map(u => srcOf(c, u))]);
 }
 
 // What spending looks like, to help pick a target: per source and per envelope, this month so far, last month and
 // the average of the last three full months. Same rules as the budget (budget accounts only; trips apart when on).
-// The source figures count everything in that category or subcategory; the envelope figures count what would
+// Source figures are keyed by norm(source) and count everything in that category or subcategory; the envelope figures count what would
 // actually land in it (the most specific source wins).
 export function spendingStats(cfg, items, month){
   const { keyFor, isB } = makeBudget(cfg), prev = [1, 2, 3].map(k => monthsBetween(shift(month, -k), shift(month, -k))[0]);
@@ -112,7 +129,7 @@ export function spendingStats(cfg, items, month){
     const m = String(i.date).slice(0, 7);
     if (!want.has(m) || !isB(i.account) || (cfg.trips !== false && i.tripId)) return;
     const v = +i.amount || 0;
-    bump(src, srcOf(i.category), m, v); if (i.subcategory) bump(src, srcOf(i.category, i.subcategory), m, v);
+    bump(src, norm(srcOf(i.category)), m, v); if (String(i.subcategory || '').trim()) bump(src, norm(srcOf(i.category, i.subcategory)), m, v);
     const k = keyFor(i); if (k !== NONE_KEY) bump(env, k, m, v);
   });
   const fin = o => Object.fromEntries(Object.entries(o).map(([k, x]) => [k, { cur: r2(x.cur), last: r2(x.last), avg: r2(x.sum3 / 3) }]));

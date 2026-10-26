@@ -129,11 +129,12 @@ service cloud.firestore {
     }
     function validEnvelopes() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['start','accounts','opening','openingBy','groups','assigned','targets','trips','updatedAt','updatedBy'])
+      return d.keys().hasOnly(['start','accounts','excluded','opening','openingBy','groups','assigned','targets','trips','updatedAt','updatedBy'])
         && isDate(d.start)
         && d.accounts is list && d.accounts.size() <= 20
         && d.opening is number
         && (!('groups' in d) || (d.groups is list && d.groups.size() <= 30))
+        && (!('excluded' in d) || (d.excluded is list && d.excluded.size() <= 30))
         && (!('openingBy' in d) || d.openingBy is map)
         && (!('assigned' in d) || (d.assigned is map && d.assigned.size() <= 240))
         && (!('targets' in d) || d.targets is map)

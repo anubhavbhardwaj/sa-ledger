@@ -710,3 +710,36 @@ test('envelopes: cover overspending from another envelope, YNAB-style; Savings l
   assert.match(await app.text('#eaActs'), /To Scalable\s*from Deutsche Bank · ETF\s*€500\.00/);
   await clean(app);
 });
+
+test('envelopes QA: spending from accounts outside the budget is shown per account (add one, keep the other out); card bills logged as spending can become card payments', async () => {
+  const app = await openApp(), { page } = app, m = month(0), pm = month(-1), now = new Date().toISOString();
+  const ex = (id, day, amount, store, category, account) => [id, { amount, date: m + '-' + day, store, category, account, spender: 'Anubhav', createdAt: now }];
+  await app.seed({
+    accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: pm + '-01' }, rf: { name: 'Raiffeisen Bank', type: 'bank', currency: 'EUR', owner: 'Sulekha', createdAt: pm + '-01' },
+      nre: { name: 'HDFC NRE', type: 'bank', currency: 'INR', owner: 'Anubhav', createdAt: pm + '-01' }, cc: { name: 'DB Credit Card', type: 'card', currency: 'EUR', owner: 'Anubhav', createdAt: pm + '-01' } },
+    checkins: { a: { accountId: 'db', date: pm + '-28', balance: 3000, createdAt: now }, d: { accountId: 'rf', date: pm + '-28', balance: 1500, createdAt: now } },
+    expenses: Object.fromEntries([ex('r1', '01', 900, 'Vigna di Casali', 'Rent', 'Raiffeisen Bank'), ex('r2', '01', 880, 'Landlord', 'Rent', 'Deutsche Bank'),
+      ex('i2', '12', 60, 'Amazon.in', 'Indian Expenses', 'HDFC NRE'), ex('k1', '10', 400, 'DB Kreditkarte', 'Credit Card', 'Deutsche Bank')]),
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank', 'DB Credit Card'], opening: 3000, openingBy: { 'Deutsche Bank': 3000, 'DB Credit Card': 0 }, trips: false, targets: {}, assigned: {},
+      groups: [{ id: 'f', name: 'Fixed', envs: [{ id: 'rent', name: 'Rent - Both', src: ['Rent'] }] }, { id: 'd', name: 'Daily', envs: [{ id: 'ind', name: 'Indian Expenses', src: ['Indian Expenses'] }] }] } } });
+  await page.waitForTimeout(300);
+  let t = await app.text('#budgetPanel');
+  assert.match(t, /€960 not counted.*Raiffeisen Bank €900.*HDFC NRE €60/); assert.match(t, /Rent - Both \+ €900 outside\s*€0\s*−€880\.00/);
+  assert.equal(await page.isHidden('#kpis .kpi:has-text("Budget left")'), true, 'the budgets summary tile is really hidden');
+  await page.click('[data-envexclude=\'["HDFC NRE"]\']'); await page.waitForTimeout(250);
+  t = await app.text('#budgetPanel'); assert.match(t, /€900 not counted/); assert.doesNotMatch(t, /HDFC NRE €60/);
+  await page.click('[data-envaddacc=\'["Raiffeisen Bank"]\']'); await page.waitForSelector('#envSetupDlg[open]');
+  assert.deepEqual((await page.$$eval('#esAccs [data-esacc]:checked', e => e.map(x => x.value))).sort(), ['DB Credit Card', 'Deutsche Bank', 'Raiffeisen Bank'], 'only the one account added');
+  assert.equal(await page.inputValue('[data-esamt="Raiffeisen Bank"]'), '1500.00');
+  await page.click('#esSave'); await page.waitForTimeout(250);
+  t = await app.text('#budgetPanel'); assert.match(t, /Rent - Both\s*€0\s*−€1,780\.00/); assert.doesNotMatch(t, /not counted/);
+  // The card bill
+  assert.match(t, /€400 in \w+ looks like credit card bills/);
+  await page.click('[data-ccfix]'); await page.waitForSelector('#ccDlg[open]');
+  assert.equal(await page.inputValue('#ccCard'), 'DB Credit Card');
+  await page.click('#ccForm [type=submit]'); await page.waitForTimeout(300);
+  t = await app.text('#budgetPanel'); assert.doesNotMatch(t, /credit card bills/); assert.doesNotMatch(t, /Not assigned/, 'no longer spending');
+  await app.go('transactions'); await page.click('[data-txkind="transfer"]'); await page.waitForTimeout(150);
+  assert.match(await app.text('#page-transactions'), /Deutsche Bank → DB Credit Card/);
+  await clean(app);
+});

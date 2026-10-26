@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spendingStats, budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
+import { norm, spendingStats, budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
 
 const cfg = () => ({ start: '2026-10-10', accounts: ['Deutsche Bank', 'Wise Common', 'Wise Sulekha', 'DB Card', 'IDFC Card'], opening: 2000, trips: true,
   groups: [
@@ -80,8 +80,26 @@ test('envelopes: running totals per source and per envelope to help pick a targe
     { date: '2026-06-02', amount: 999, category: 'Groceries', account: 'Wise Common' },                     // too old
   ];
   const S = spendingStats(c, items, '2026-10');
-  assert.deepEqual(S.src['Groceries'], { cur: 75, last: 240, avg: 260 }, 'whole category: (300 + 240 + 240) / 3');
-  assert.deepEqual(S.src['Groceries›Bakery'], { cur: 0, last: 30, avg: 10 });
+  assert.deepEqual(S.src[norm('Groceries')], { cur: 75, last: 240, avg: 260 }, 'whole category: (300 + 240 + 240) / 3');
+  assert.deepEqual(S.src[norm('Groceries›Bakery')], { cur: 0, last: 30, avg: 10 });
   assert.deepEqual(S.env.food, { cur: 75, last: 210, avg: 250 }, 'Food gets Groceries except Bakery, which has its own envelope');
   assert.deepEqual(S.env.bakery, { cur: 0, last: 30, avg: 10 });
+});
+
+test('envelopes: spending in envelope categories from accounts outside the budget is reported, not counted; excluded accounts stay quiet', () => {
+  const c = { start: '2026-10-01', accounts: ['Deutsche Bank'], opening: 0, groups: [{ id: 'g', name: 'Fixed', envs: [{ id: 'rent', name: 'Rent', src: ['Rent'] }] }], assigned: {} };
+  const items = [{ date: '2026-10-01', amount: 900, category: 'Rent', account: 'Raiffeisen Bank' }, { date: '2026-10-01', amount: 880, category: 'Rent', account: 'Deutsche Bank' },
+    { date: '2026-10-02', amount: 50, category: 'Hobby', account: 'Raiffeisen Bank' }, { date: '2026-10-03', amount: 20, category: 'Rent', account: 'HDFC NRE' }];
+  const B = budgetMonth(c, '2026-10', { items }), rent = B.rows.find(r => r.key === 'rent');
+  assert.equal(rent.activity, -880);
+  assert.deepEqual(B.outside, { total: 920, byAcc: [{ acc: 'Raiffeisen Bank', amount: 900 }, { acc: 'HDFC NRE', amount: 20 }], byKey: { rent: 920 } }, 'Hobby has no envelope, so it is not reported');
+  assert.equal(budgetMonth({ ...c, excluded: ['hdfc nre'] }, '2026-10', { items }).outside.total, 900);
+});
+
+test('envelopes: categories match whatever their case or spacing; the list shows each once', () => {
+  const c = { start: '2026-10-01', accounts: ['Wise - Common'], opening: 0, groups: [{ id: 'g', name: 'Daily', envs: [{ id: 'eat', name: 'Eating out', src: ['Eating Out'] }] }], assigned: {} };
+  const items = [{ date: '2026-10-02', amount: 20, category: 'Eating out', account: 'wise - common' }, { date: '2026-10-03', amount: 30, category: 'eating out ', account: 'Wise - Common' },
+    { date: '2026-10-04', amount: 10, category: 'Eating Out', subcategory: 'Coffee', account: 'Wise - Common' }];
+  assert.equal(budgetMonth(c, '2026-10', { items }).rows.find(r => r.key === 'eat').activity, -60);
+  assert.deepEqual(allSources(items), ['Eating out', 'Eating out›Coffee']);
 });
