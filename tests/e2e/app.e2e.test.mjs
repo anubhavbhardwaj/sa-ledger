@@ -571,3 +571,23 @@ test('phone layout: Ask AI in the top bar, the + button steps aside while scroll
   assert.doesNotMatch(await page.getAttribute('#fab', 'class'), /away/);
   await clean(app);
 });
+
+test('send to India: a new device starts from the last send saved in the database, not empty', async () => {
+  const app = await openApp(), { page } = app, at = '2026-10-01T10:00:00.000Z', c = 'Send to India';
+  await page.evaluate(() => localStorage.removeItem('sendChain'));
+  await app.seed({
+    accounts: { a: { name: 'Giro', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, b: { name: 'Wise', type: 'bank', currency: 'EUR', owner: 'Anubhav' },
+      c: { name: 'HDFC NRE', type: 'bank', currency: 'INR', owner: 'Anubhav' }, d: { name: 'ULIP Maxlife', type: 'investment', invType: 'ulip', currency: 'INR', owner: 'Anubhav' } },
+    transfers: {
+      t0: { amount: 100, date: '2026-09-01', from: 'Giro', to: 'Wise', comment: c, createdAt: '2026-09-01T09:00:00.000Z', createdBy: 'anubhav' },
+      t1: { amount: 500, date: '2026-10-01', from: 'Giro', to: 'Wise', comment: c, createdAt: at, createdBy: 'anubhav' },
+      t2: { amount: 497, date: '2026-10-01', from: 'Wise', to: 'HDFC NRE', currency: 'INR', origAmount: 52000, fxRate: 0.00956, comment: c, createdAt: at, createdBy: 'anubhav' },
+      t3: { amount: 96, date: '2026-10-01', from: 'HDFC NRE', to: 'ULIP Maxlife', currency: 'INR', origAmount: 10000, fxRate: 0.00956, comment: c, createdAt: at, createdBy: 'anubhav' } } });
+  await page.waitForTimeout(200);
+  await app.go('wealth'); await page.evaluate(() => document.querySelector('[data-sendindia]').click()); await page.waitForSelector('#sendDlg[open]');
+  assert.equal(await page.inputValue('#si-from'), 'Giro'); assert.equal(await page.inputValue('#si-via'), 'Wise'); assert.equal(await page.inputValue('#si-to'), 'HDFC NRE');
+  assert.equal(await page.inputValue('#siSplits [data-si="to"]'), 'ULIP Maxlife'); assert.equal(await page.inputValue('#siSplits [data-si="amt"]'), '10000');
+  await page.fill('#si-from', ''); await page.click('#si-from');
+  assert.match(await app.text('#sendDlg .combo:has(#si-from) .cbox'), /Giro.*HDFC NRE.*ULIP Maxlife.*Wise|Giro.*Wise/, 'the list offers your accounts');
+  await clean(app);
+});

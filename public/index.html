@@ -5067,7 +5067,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-25g';
+const APP_VERSION = '2026-10-26';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
@@ -5198,6 +5198,16 @@ document.addEventListener('change', e => {
 const sidlg = $('#sendDlg'), SI = k => $('#si-' + k);
 let siRateVal = null, siSeq = 0;
 function siMemory(){ try { return JSON.parse(localStorage.getItem('sendChain') || 'null'); } catch { return null; } }
+// The last send, from the synced transfers (all hops of one send are saved together), so every device and
+// a reinstalled app start with the same accounts. Falls back to what this device remembers, then to name guesses.
+function siLast(){
+  const all = state.transfers.filter(t => t.comment === 'Send to India' && t.createdAt);
+  if (!all.length) return null;
+  const at = all.reduce((m, t) => t.createdAt > m ? t.createdAt : m, ''), g = all.filter(t => t.createdAt === at);
+  const eur = g.find(t => !t.currency || t.currency === 'EUR'); if (!eur) return null;
+  const inr = g.find(t => t.currency === 'INR' && t.from === eur.to); if (!inr) return null;
+  return { from: eur.from, via: eur.to, to: inr.to, splits: g.filter(t => t.currency === 'INR' && t.from === inr.to).map(t => ({ to: t.to, amt: String(t.origAmount || '') })) };
+}
 function siGuess(re, cur){ const a = state.accounts.find(x => re.test(x.name) && (!cur || (x.currency || 'EUR') === cur)) || state.accounts.find(x => re.test(x.name)); return a ? a.name : ''; }
 function siRow(to = '', amt = ''){
   const d = document.createElement('div'); d.className = 'sirow';
@@ -5235,11 +5245,12 @@ async function siRefresh(){
   siShow();
 }
 function openSendIndia(){
-  const m = siMemory() || {};
+  const mem = siMemory() || {}, m = { ...mem, ...(siLast() || {}) };
   SI('date').value = today(); SI('sent').value = ''; SI('recv').value = '';
-  SI('from').value = m.from || siGuess(/deutsche/i, 'EUR');
-  SI('via').value = m.via || siGuess(/wise/i);
-  SI('to').value = m.to || siGuess(/nre/i, 'INR') || siGuess(/axis/i, 'INR');
+  const inrBank = (state.accounts.find(a => a.currency === 'INR' && a.type === 'bank') || {}).name || '';
+  SI('from').value = m.from || siGuess(/deutsche|\bdb\b|dkb|n26|sparkasse|comdirect|ing\b/i, 'EUR');
+  SI('via').value = m.via || siGuess(/wise|remitly|revolut|instarem|western union|xoom/i);
+  SI('to').value = m.to || siGuess(/nre/i, 'INR') || siGuess(/axis|icici|hdfc|sbi|idfc|kotak/i, 'INR') || inrBank;
   $('#siSplits').innerHTML = ''; (m.splits || []).forEach(x => siRow(x.to, x.amt));
   SI('fee').checked = m.fee !== false;
   $('#siErr').hidden = true;
