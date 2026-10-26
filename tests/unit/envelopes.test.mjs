@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { norm, spendingStats, budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
+import { ccKey, CC_UNKNOWN, norm, spendingStats, budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
 
 const cfg = () => ({ start: '2026-10-10', accounts: ['Deutsche Bank', 'Wise Common', 'Wise Sulekha', 'DB Card', 'IDFC Card'], opening: 2000, trips: true,
   groups: [
@@ -102,4 +102,26 @@ test('envelopes: categories match whatever their case or spacing; the list shows
     { date: '2026-10-04', amount: 10, category: 'Eating Out', subcategory: 'Coffee', account: 'Wise - Common' }];
   assert.equal(budgetMonth(c, '2026-10', { items }).rows.find(r => r.key === 'eat').activity, -60);
   assert.deepEqual(allSources(items), ['Eating out', 'Eating out›Coffee']);
+});
+
+test('envelopes: credit cards the YNAB way (card spending moves to the card envelope, payments and bills logged as spending come out of it, old debt is not taken off Ready to Assign)', () => {
+  const A = { 'deutsche bank': { type: 'bank' }, 'wise - common': { type: 'bank' }, 'amex': { type: 'card' }, 'idfc': { type: 'card', currency: 'INR' } };
+  const acc = n => A[norm(n)];
+  const c = { start: '2026-10-01', accounts: ['Deutsche Bank', 'Wise - Common', 'AMEX', 'IDFC'], opening: 2100, openingBy: { 'Deutsche Bank': 2000, 'Wise - Common': 500, 'AMEX': -300, 'IDFC': -100 },
+    groups: [{ id: 'g', name: 'Daily', envs: [{ id: 'food', name: 'Groceries', src: ['Groceries'] }, { id: 'eat', name: 'Eating out', src: ['Eating out'] }] }], assigned: {} };
+  const data = { acc,
+    items: [{ date: '2026-10-02', amount: 50, category: 'Groceries', account: 'AMEX' }, { date: '2026-10-03', amount: 30, category: 'Eating out', account: 'Wise - Common' },
+      { date: '2026-10-05', amount: 300, category: 'Credit Card', store: 'Amex payment', account: 'Deutsche Bank' }, { date: '2026-10-06', amount: 100, category: 'Credit Card', store: 'IDFC bill', account: 'Deutsche Bank' },
+      { date: '2026-10-07', amount: 20, category: 'Credit Card', store: 'Card', account: 'Deutsche Bank' }],
+    transfers: [{ date: '2026-10-08', amount: 50, from: 'Deutsche Bank', to: 'AMEX' }] };
+  const B = budgetMonth(c, '2026-10', data), by = Object.fromEntries(B.rows.map(r => [r.key, r]));
+  assert.equal(B.opening, 2500, 'cash only; card debt is not taken off Ready to Assign');
+  assert.equal(by.food.activity, -50, 'card spending comes out of its category');
+  assert.deepEqual([by[ccKey('AMEX')].activity, by[ccKey('AMEX')].debtAtStart], [50 - 300 - 50, 300], 'spending moved in, bill and transfer paid out');
+  assert.equal(by[ccKey('IDFC')].activity, -100, 'the IDFC bill found by name');
+  assert.equal(by[CC_UNKNOWN].activity, -20, 'a bill naming no card');
+  assert.equal(by[NONE_KEY], undefined, 'card bills are not spending');
+  const cash = 2000 - 300 - 100 - 20 - 50 + 500 - 30, avail = B.rows.reduce((s, r) => s + r.available, 0);
+  assert.equal(Math.round((B.ready + avail) * 100) / 100, cash, 'Ready to Assign + all envelopes = cash in the budget accounts');
+  assert.deepEqual(groupRows(c, B.rows).map(g => g.group), ['Credit Card Payments', 'Daily']);
 });

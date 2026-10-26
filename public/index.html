@@ -185,6 +185,7 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .ecstat{font-size:12px;color:var(--muted)}.ecstat strong{color:var(--ink)}.chipx small{color:var(--muted);font-size:11px;white-space:nowrap}
 .chipx{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 4px 2px 10px;font-size:12.5px}.chipx button{all:unset;cursor:pointer;padding:0 6px;color:var(--muted)}
 .esq{display:flex;gap:6px;flex-wrap:wrap}
+.ccrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 8px;align-items:center;font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--line)}.ccrow select{grid-column:2/-1;border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:5px 8px;color:var(--ink);font-size:13px}
 .cover{border:1px solid color-mix(in srgb,var(--danger) 45%,var(--line));border-radius:12px;padding:10px 12px;display:grid;gap:6px}.cover strong{font-size:13.5px}
 .covlist{display:grid;gap:4px;max-height:240px;overflow:auto}.covlist button{all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:10px;padding:7px 9px;border-radius:8px;font-size:13.5px}.covlist button:hover,.covlist button:focus-visible{background:var(--sunk)}.covlist button span{font-family:var(--f-mono);color:var(--good)}.esacc{display:grid;grid-template-columns:auto minmax(0,1fr) 120px;gap:6px 10px;align-items:center;font-size:13.5px}.esacc input[type=number]{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:6px 8px;font-size:13.5px;color:var(--ink);min-width:0;text-align:right}
 .setupline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}.setupline[hidden]{display:none}
@@ -1188,9 +1189,9 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
 <dialog id="ccDlg">
   <form id="ccForm" novalidate style="display:grid;gap:12px;padding:20px;max-width:520px">
     <h3>Card bills logged as spending</h3>
-    <p class="muted" style="margin:0;font-size:13px">Paying a credit card isn’t spending: the purchases on the card are. If those purchases are logged too, these bills count the same money twice, in your spending and in the envelopes. Ticked ones become transfers from the bank to the card (same date and amount); the rest stay as they are.</p>
+    <p class="muted" style="margin:0;font-size:13px">Paying a credit card isn’t spending: the purchases on the card are. If those purchases are logged too, these bills count the same money twice, in your spending and in the envelopes. Ticked ones become transfers from the bank to the card shown next to them (same date and amount); the rest stay as they are.</p>
     <div id="ccList" style="display:grid;gap:4px;max-height:280px;overflow:auto"></div>
-    <label class="f">Paid to card<select id="ccCard"></select></label>
+
     <p class="err" id="ccErr" hidden></p>
     <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="ccCancel">Cancel</button><button class="btn primary" type="submit">Turn into card payments</button></div></div>
   </form>
@@ -1486,7 +1487,7 @@ import { decodeBCBP } from "./bcbp.js";
 import { detectRecurring, backtest as recurBacktest } from "./recur.js";
 import { checkPhoto, passportAlerts, human as humanDate } from "./verify.js";
 import { formPayload, peopleText, bookmarklet, FILLER_VERSION } from "./fill.js";
-import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, spendingStats, srcLabel, norm as srcNorm, newId, tripKey, SAVE_KEY, NONE_KEY } from "./envelopes.js";
+import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, spendingStats, srcLabel, norm as srcNorm, newId, tripKey, ccKey, CC_RE, SAVE_KEY, NONE_KEY } from "./envelopes.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -3539,17 +3540,19 @@ function goalEmergency(g){
 // (envelopes.js); the budgets stay saved.
 const ENVELOPES = true;
 const envOn = () => !!state.envCfg?.accounts?.length;
-const envData = () => ({ items: state.items, income: state.income, transfers: state.transfers });
+const envData = () => ({ items: state.items, income: state.income, transfers: state.transfers, acc: accOf });
 const envMonthSel = () => state.period === 'all' ? thisMonth() : state.period;
 const envName = r => r.tripId ? (state.tripMap?.[r.tripId]?.name || 'Trip') : r.name;
 // All your envelopes (also empty ones), upcoming trips and Savings, on top of the ones with numbers this month.
 function envRows(month = envMonthSel()){
   const cfg = state.envCfg, B = budgetMonth(cfg, month, envData());
   if (B.before) return B;
-  const { describe } = makeBudget(cfg), have = new Set(B.rows.map(r => r.key));
-  const extra = [...(cfg.groups || []).flatMap(g => (g.envs || []).map(e => e.id)), SAVE_KEY];
+  const { describe, cards } = makeBudget(cfg, accOf), have = new Set(B.rows.map(r => r.key));
+  const extra = [...cards.map(ccKey), ...(cfg.groups || []).flatMap(g => (g.envs || []).map(e => e.id)), SAVE_KEY];
   if (cfg.trips !== false) state.trips.filter(t => ['ongoing', 'upcoming'].includes(tripStatus(t))).forEach(t => extra.push(tripKey(t.id)));
-  extra.forEach(k => { if (!have.has(k)){ have.add(k); B.rows.push({ key: k, ...describe(k), carry: 0, assigned: 0, activity: 0, available: 0 }); } });
+  extra.forEach(k => { if (!have.has(k)){ have.add(k); B.rows.push({ key: k, ...describe(k), carry: 0, assigned: 0, activity: 0, available: 0, ...(k in (B.cardDebt || {}) ? { debtAtStart: B.cardDebt[k] } : {}) }); } });
+  // What each card owes today, to show next to its payment envelope.
+  B.rows.forEach(r => { if (r.account){ const a = accOf(r.account), e = a && estimate(a); r.owes = e ? Math.max(0, -toEur(a, e.balance)) : null; } });
   return B;
 }
 async function saveEnv(patch){
@@ -3559,7 +3562,7 @@ async function saveEnv(patch){
   try { await setDoc(doc(fs, 'settings', 'envelopes'), d); state.envCfg = d; render(); return true; }
   catch (x){ toast(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); return false; }
 }
-const avCls = (r, cfg) => r.available < -0.004 ? 'neg' : (cfg.targets || {})[r.key] > 0 && r.assigned < (cfg.targets || {})[r.key] - 0.004 && r.available < (cfg.targets || {})[r.key] ? 'short' : r.available > 0.004 ? 'pos' : '';
+const avCls = (r, cfg) => r.available < -0.004 ? 'neg' : r.account && r.owes > r.available + 0.5 ? 'short' : (cfg.targets || {})[r.key] > 0 && r.assigned < (cfg.targets || {})[r.key] - 0.004 && r.available < (cfg.targets || {})[r.key] ? 'short' : r.available > 0.004 ? 'pos' : '';
 const signedEur = v => (v < -0.004 ? '−' : '') + eur.format(Math.abs(v));
 function envKpi(){
   if (!envOn()) return `<div class="kpi"><span class="lbl">Ready to assign</span><span class="val">—</span><span class="sub"><a href="#" data-envsetup>Set up envelopes</a></span></div>`;
@@ -3586,8 +3589,8 @@ function renderEnvelopes(el){
   const outBanner = O.total > 0.004 ? `<div class="banner" style="margin:0;font-size:13px;display:grid;gap:8px"><span><strong>${eur0.format(O.total)} not counted:</strong> spent in your envelope categories from accounts that aren’t in the budget.</span>
       ${O.byAcc.map(x => `<span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:140px">${esc(x.acc)} <strong>${eur0.format(x.amount)}</strong>${known.has(x.acc.toLowerCase()) ? '' : ' <span class="muted">(not set up as an account)</span>'}</span>
         ${known.has(x.acc.toLowerCase()) ? `<button class="btn small primary" type="button" data-envaddacc="${esc(JSON.stringify([x.acc]))}">Add to the budget</button>` : ''}<button class="btn small" type="button" data-envexclude="${esc(JSON.stringify([x.acc]))}">Keep out</button></span>`).join('')}</div>` : '';
-  const row = r => `<div class="ybr env" data-envkey="${esc(r.key)}" role="button" tabindex="0"><span class="nm">${esc(envName(r))}${outNote(r)}</span><span class="n a">${eur0.format(r.assigned)}</span><span class="n c">${r.activity ? signedEur(r.activity) : '€0'}</span><span class="pill av ${avCls(r, cfg)}">${signedEur(r.available)}</span>
-      <span class="sm">assigned ${eur0.format(r.assigned)} · spent ${eur0.format(Math.abs(r.activity))}${targets[r.key] ? ` · target ${eur0.format(targets[r.key])}` : ''}</span></div>`;
+  const row = r => `<div class="ybr env" data-envkey="${esc(r.key)}" role="button" tabindex="0"><span class="nm">${esc(envName(r))}${outNote(r)}${r.card && r.owes != null ? ` <span class="muted" style="font-weight:400;font-size:12px">owes ${eur0.format(r.owes)}</span>` : ''}</span><span class="n a">${eur0.format(r.assigned)}</span><span class="n c">${r.activity ? signedEur(r.activity) : '€0'}</span><span class="pill av ${avCls(r, cfg)}">${signedEur(r.available)}</span>
+      <span class="sm">${r.card ? (r.owes != null ? `card owes ${eur0.format(r.owes)} · ` : '') + `assigned ${eur0.format(r.assigned)} · net ${r.activity >= 0 ? 'moved in' : 'paid'} ${eur0.format(Math.abs(r.activity))}` : `assigned ${eur0.format(r.assigned)} · spent ${eur0.format(Math.abs(r.activity))}`}${targets[r.key] ? ` · target ${eur0.format(targets[r.key])}` : ''}</span></div>`;
   const noneRow = r => `<div class="ybr env" data-envcats role="button" tabindex="0"><span class="nm">${esc(r.name)}</span><span class="n a">—</span><span class="n c">${signedEur(r.activity)}</span><span class="pill av neg">${signedEur(r.available)}</span>
       <span class="sm">spent ${eur0.format(Math.abs(r.activity))} · tap to put it in an envelope</span></div>`;
   const grp = g => { if (g.empty) return `<p class="muted" style="margin:10px 0 0;font-size:13px">No categories yet. <button class="linkbtn" type="button" data-envcats>Create your categories</button></p>`;
@@ -3604,18 +3607,19 @@ function renderEnvelopes(el){
     <div class="ybud"><div class="ybh"><span>Envelope</span><span>Assigned</span><span>Activity</span><span>Available</span></div>${G.map(grp).join('')}</div>`;
 }
 // Card bills logged as spending: if the card's purchases are logged too, the same money counts twice.
-const CC_RE = /credit\s*card|kreditkarte|card\s*(bill|payment)|carta di credito|cc bill/i;
 function ccSuspects(){ return state.items.filter(i => (CC_RE.test(i.category || '') || CC_RE.test(i.subcategory || '')) && accOf(i.account)?.type !== 'card').sort((a, b) => b.date.localeCompare(a.date)); }
 function ccBanner(m){
   if (lsGet('ccFixKept', '') === '1') return '';
   const xs = ccSuspects(), now = xs.filter(i => i.date.startsWith(m)); if (!now.length) return '';
-  return `<div class="banner" style="margin:0;font-size:13px"><span><strong>${eur0.format(sum(now))} in ${MON[+m.slice(5, 7) - 1]} looks like credit card bills</strong> logged as spending (category ${esc(now[0].category)}). If you also log what you buy with the card, the same money counts twice. Paying a card is a transfer to the card.</span>
+  return `<div class="banner" style="margin:0;font-size:13px"><span><strong>${eur0.format(sum(now))} in ${MON[+m.slice(5, 7) - 1]} are credit card payments</strong> logged as spending (category ${esc(now[0].category)}). The envelopes count them as payments to the card (Credit Card Payments), but your monthly spending still counts them, twice if the card purchases are logged too. Turning them into transfers to the card fixes that.</span>
     <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small primary" type="button" data-ccfix>Review ${xs.length}</button><button class="btn small" type="button" data-cckeep>They’re real spending</button></span></div>`;
 }
 function openCcFix(){
   const xs = ccSuspects(), cards = state.accounts.filter(a => a.type === 'card');
-  $('#ccList').innerHTML = xs.map(i => `<label class="chk" style="display:flex;gap:8px;align-items:baseline"><input type="checkbox" data-ccid="${esc(i.id)}" checked> <span style="flex:1">${shortDate(i.date, true)} · ${esc(i.store)} <span class="muted">${esc(i.account)}</span></span><strong style="font-family:var(--f-mono)">${eur.format(i.amount)}</strong></label>`).join('');
-  $('#ccCard').innerHTML = cards.length ? cards.map(a => `<option value="${esc(a.name)}">${esc(a.name)} (${esc(a.owner)})</option>`).join('') : '<option value="">No card set up yet</option>';
+  // Each bill gets the card its text names (AMEX, Kotak, IDFC, DB…), else the one picked below.
+  const { billCard } = makeBudget({ accounts: cards.map(a => a.name) }, accOf), guess = i => { const k = billCard(i); const c = cards.find(a => ccKey(a.name) === k); return c ? c.name : ''; };
+  $('#ccList').innerHTML = xs.map(i => { const g = guess(i); return `<div class="ccrow"><input type="checkbox" data-ccid="${esc(i.id)}" checked aria-label="Convert"><span>${shortDate(i.date, true)} · ${esc(i.store)} <span class="muted">${esc(i.account)}</span></span><strong style="font-family:var(--f-mono)">${eur.format(i.amount)}</strong>
+    <select data-cccard="${esc(i.id)}" aria-label="Card">${cards.map(a => `<option value="${esc(a.name)}" ${a.name === g ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>`; }).join('');
   $('#ccErr').hidden = true; $('#ccDlg').showModal();
 }
 function openEnvAssign(key){
@@ -3623,7 +3627,7 @@ function openEnvAssign(key){
   state.envKey = key; const cfg = state.envCfg, tgt = (cfg.targets || {})[key];
   $('#eaTitle').textContent = (r.group ? r.group + ' › ' : '') + envName(r);
   $('#eaLbl').textContent = `Assigned in ${monthLabel(m)} (€)`;
-  $('#eaNums').innerHTML = `Ready to Assign ${signedEur(B.ready)} · this envelope: carried ${signedEur(r.carry)}, spent ${eur.format(Math.abs(r.activity))}, available <strong>${signedEur(r.available)}</strong>`;
+  $('#eaNums').innerHTML = `Ready to Assign ${signedEur(B.ready)} · this envelope: carried ${signedEur(r.carry)}, ${r.card ? (r.activity >= 0 ? 'moved in ' : 'paid out ') + eur.format(Math.abs(r.activity)) + ' net' : 'spent ' + eur.format(Math.abs(r.activity))}, available <strong>${signedEur(r.available)}</strong>`;
   $('#ea-amt').value = r.assigned || ''; $('#ea-target').value = tgt || '';
   const prev = budgetMonth(cfg, addMonth(m, -1), envData()), pr = prev.before ? null : prev.rows.find(x => x.key === key);
   const chips = [tgt ? ['Target', tgt] : null, pr && pr.activity ? ['Spent last month', -pr.activity] : null, pr && pr.assigned ? ['Assigned last month', pr.assigned] : null,
@@ -3635,10 +3639,21 @@ function openEnvAssign(key){
   $('#eaCover').innerHTML = deficit ? `<strong>Cover ${eur.format(deficit)} from</strong><div class="covlist">${B.ready > 0.004 ? `<button type="button" data-cover="ready">Ready to Assign<span>${eur.format(B.ready)}</span></button>` : ''}${donors.map(x => `<button type="button" data-cover="${esc(x.key)}">${esc(nm(x))}<span>${eur.format(x.available)}</span></button>`).join('')}${!donors.length && !(B.ready > 0.004) ? '<span class="muted" style="font-size:12.5px">No envelope has money left, and Ready to Assign is empty.</span>' : ''}</div>` : '';
   state.envCover = { key, deficit, ready: B.ready, avail: Object.fromEntries(donors.map(x => [x.key, x.available])), names: Object.fromEntries([...donors.map(x => [x.key, nm(x)]), ['ready', 'Ready to Assign']]) };
   $('#eaQuick').innerHTML = chips.map(([l, v]) => `<button class="btn small" type="button" data-easet="${v.toFixed(2)}">${l}: ${eur0.format(v)}</button>`).join('');
-  const { keyFor, isB } = makeBudget(cfg), env = (cfg.groups || []).flatMap(g => g.envs || []).find(x => x.id === key);
+  const { keyFor, isB } = makeBudget(cfg, accOf), env = (cfg.groups || []).flatMap(g => g.envs || []).find(x => x.id === key);
   const acts = state.items.filter(i => i.date.startsWith(m) && i.date >= cfg.start && isB(i.account) && keyFor(i) === key).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
   if (env) $('#eaNums').innerHTML += `<br><span style="font-size:12px">Gets: ${(env.src || []).map(srcLabel).map(esc).join(', ') || 'nothing yet: add categories in Categories'}</span>`;
   const outs = state.items.filter(i => i.date.startsWith(m) && i.date >= cfg.start && !isB(i.account) && keyFor(i) === key && !(cfg.excluded || []).some(a => a.toLowerCase() === String(i.account || '').toLowerCase()));
+  const card = r.account ? accOf(r.account) : null;
+  if (card){
+    const { billCard } = makeBudget(cfg, accOf), inM = x => x.date.startsWith(m) && x.date >= cfg.start;
+    const lines = [...state.items.filter(i => inM(i) && srcNorm(i.account) === srcNorm(card.name)).map(i => ({ d: i.date, t: i.store, s: 'bought on the card · ' + i.category, v: +i.amount })),
+      ...state.transfers.filter(t => inM(t) && srcNorm(t.to) === srcNorm(card.name)).map(t => ({ d: t.date, t: 'Payment from ' + t.from, s: t.comment || 'transfer', v: -t.amount })),
+      ...state.items.filter(i => inM(i) && isB(i.account) && srcNorm(i.account) !== srcNorm(card.name) && (CC_RE.test(i.category || '') || CC_RE.test(i.subcategory || '')) && billCard(i) === key).map(i => ({ d: i.date, t: 'Payment: ' + i.store, s: 'logged as spending from ' + i.account, v: -i.amount }))]
+      .sort((a, b) => b.d.localeCompare(a.d));
+    $('#eaNums').innerHTML += `<br><span style="font-size:12px">The card owes ${r.owes != null ? eur.format(r.owes) : 'an unknown amount'} now${r.debtAtStart ? `, ${eur.format(r.debtAtStart)} of it from before the start` : ''}${lines.some(x => x.s.startsWith('logged as spending')) ? ' (payments logged as spending aren’t in the card’s balance yet; turning them into transfers fixes that)' : ''}. Spending on the card moves money here; payments take it out.</span>`;
+    $('#eaActs').innerHTML = lines.map(x => `<div class="r"><span class="d">${shortDate(x.d)}</span><span><span class="store">${esc(x.t)}</span><br><span class="meta">${esc(x.s)}</span></span><span class="a ${x.v < 0 ? '' : 'pos'}">${x.v < 0 ? '−' : '+'}${eur.format(Math.abs(x.v))}</span></div>`).join('');
+    $('#envAsgDlg').showModal(); $('#ea-amt').focus(); return;
+  }
   const moves = key === SAVE_KEY ? state.transfers.filter(t => t.date.startsWith(m) && t.date >= cfg.start && isB(t.from) && !isB(t.to)).sort((a, b) => b.date.localeCompare(a.date)) : [];
   $('#eaActs').innerHTML = moves.length ? moves.map(t => `<div class="r"><span class="d">${shortDate(t.date)}</span><span><span class="store">To ${esc(t.to)}</span><br><span class="meta">from ${esc(t.from)}${t.comment ? ' · ' + esc(t.comment) : ''}</span></span><span class="a">${eur.format(t.amount)}</span></div>`).join('')
     : (acts.length ? acts.map(i => `<div class="r"><span class="d">${shortDate(i.date)}</span><span><span class="store">${esc(i.store)}</span><br><span class="meta">${esc(i.account)}</span></span><span class="a">${eur.format(i.amount)}</span></div>`).join('') : '')
@@ -3663,14 +3678,22 @@ function drawEnvSetup(){
   $$('#esAccs [data-esamt]').forEach(i => { if (i.dataset.touched) keep[i.dataset.esamt] = i.value; });
   const day = addDays(start, -1), A = state.accounts.filter(a => a.type !== 'investment');
   const noBal = [];
-  $('#esAccs').innerHTML = A.map(a => { const e = estimate(a, day), v = e ? toEur(a, e.balance) : 0, on = picked.has(a.name), none = !e || e.base.virtual;
-    if (on && none && keep[a.name] === undefined) noBal.push(a);
-    return `<input type="checkbox" data-esacc value="${esc(a.name)}" ${on ? 'checked' : ''} aria-label="${esc(a.name)}"><span>${esc(a.name)} <span class="muted">${a.type === 'card' ? 'card' : a.currency || 'EUR'}${none ? ' · <span style="color:var(--warn)">no balance in the app</span>' : e.base.back ? ' · worked back from ' + shortDate(e.base.from) : ''}</span></span>
+  const basis = e => !e ? '<span style="color:var(--warn)">nothing logged on it yet</span>' : e.base.back ? 'worked back from the balance of ' + shortDate(e.base.from)
+    : e.base.virtual ? 'all entries since ' + shortDate(e.base.added, true) : 'from the balance of ' + shortDate(e.base.date, true) + (e.f.n ? ` + ${e.f.n} entr${e.f.n === 1 ? 'y' : 'ies'}` : '');
+  $('#esAccs').innerHTML = A.map(a => { const e = estimate(a, day), v = e ? toEur(a, e.balance) : 0, on = picked.has(a.name);
+    if (on && !e && keep[a.name] === undefined) noBal.push(a);
+    return `<input type="checkbox" data-esacc value="${esc(a.name)}" ${on ? 'checked' : ''} aria-label="${esc(a.name)}"><span>${esc(a.name)} <span class="muted">${a.type === 'card' ? 'card, owed' : a.currency || 'EUR'} · ${basis(e)}</span></span>
       <input type="number" step="0.01" data-esamt="${esc(a.name)}" value="${keep[a.name] ?? v.toFixed(2)}" ${on ? '' : 'disabled'} ${keep[a.name] !== undefined ? 'data-touched="1"' : ''} aria-label="Money in ${esc(a.name)}">`; }).join('');
   $('#esNoBal').hidden = !noBal.length;
-  $('#esNoBal').innerHTML = noBal.length ? `<span>${noBal.length === 1 ? esc(noBal[0].name) + ' has' : noBal.length + ' ticked accounts have'} no balance in the app yet, so ${noBal.length === 1 ? 'it starts' : 'they start'} at €0. Easiest: type what’s in ${noBal.length === 1 ? 'it' : 'them'} today (from your bank apps); the app works back to ${shortDate(day)} through your entries.</span><button class="btn small primary" type="button" data-estoday="${esc(JSON.stringify(noBal.map(a => a.id)))}">Type today’s balances</button>` : '';
-  const total = $$('#esAccs [data-esamt]:not(:disabled)').reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
-  $('#esTotal').innerHTML = `Starting Ready to Assign: <strong>${signedEur(total)}</strong> (euros in the ticked accounts on ${shortDate(day, true)}, cards as negative debt, other currencies at today’s rate). Change a number if it’s off.`;
+  $('#esNoBal').innerHTML = noBal.length ? `<span>Nothing is logged on ${noBal.map(a => esc(a.name)).join(', ')} yet, so ${noBal.length === 1 ? 'it starts' : 'they start'} at €0. Type a number if there was money in ${noBal.length === 1 ? 'it' : 'them'}.</span>` : '';
+  esTotals(day);
+}
+// Ready to Assign starts with the cash; card debt from before is shown on each card's envelope instead (like YNAB).
+function esTotals(day = addDays($('#es-start').value || today(), -1)){
+  const card = n => accOf(n)?.type === 'card', inputs = $$('#esAccs [data-esamt]:not(:disabled)');
+  const cash = inputs.filter(i => !card(i.dataset.esamt)).reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
+  const debt = -inputs.filter(i => card(i.dataset.esamt)).reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
+  $('#esTotal').innerHTML = `Starting Ready to Assign: <strong>${signedEur(cash)}</strong>, the cash in the ticked accounts at the end of ${shortDate(day, true)} (other currencies at today’s rate).${debt > 0.004 ? ` Cards owed ${eur.format(debt)} then: that shows on each card’s envelope under Credit Card Payments, where you give it money, like YNAB.` : ''} Every number is worked out from your entries and balances; change one if it’s off.`;
 }
 function openEnvSetup(extra = []){
   const cfg = state.envCfg, on = envOn();
@@ -3679,7 +3702,7 @@ function openEnvSetup(extra = []){
   drawEnvSetup();
   if (on && cfg.openingBy) $$('#esAccs [data-esamt]').forEach(i => { if (i.dataset.esamt in cfg.openingBy && +cfg.openingBy[i.dataset.esamt]){ i.value = (+cfg.openingBy[i.dataset.esamt]).toFixed(2); i.dataset.touched = '1'; } });
   drawEnvSetup();
-  if (on) $('#esTotal').innerHTML = $('#esTotal').innerHTML.replace(/<strong>[^<]*<\/strong>/, `<strong>${signedEur($$('#esAccs [data-esamt]:not(:disabled)').reduce((s, i) => s + (parseFloat(i.value) || 0), 0))}</strong>`);
+  if (on) esTotals();
   $('#esSave').textContent = on ? 'Save' : 'Start'; $('#esErr').hidden = true; $('#envSetupDlg').showModal();
 }
 document.addEventListener('click', async e => {
@@ -3716,14 +3739,15 @@ $('#eaCancel').addEventListener('click', () => $('#envAsgDlg').close());
 $('#ccCancel').addEventListener('click', () => $('#ccDlg').close());
 $('#ccForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const card = $('#ccCard').value, ids = $$('#ccList [data-ccid]:checked').map(i => i.dataset.ccid), err = m => { $('#ccErr').textContent = m; $('#ccErr').hidden = false; };
-  if (!card) return err('Set up the card as an account first (Wealth, Cash & cards, + Account, type Credit card).');
+  const ids = $$('#ccList [data-ccid]:checked').map(i => i.dataset.ccid), err = m => { $('#ccErr').textContent = m; $('#ccErr').hidden = false; };
+  const cardOf = id => $(`#ccList [data-cccard="${CSS.escape(id)}"]`)?.value || '';
+  if (!state.accounts.some(a => a.type === 'card')) return err('Set up the card as an account first (Wealth, Cash & cards, + Account, type Credit card).');
   if (!ids.length) return err('Tick at least one.');
   const xs = ids.map(id => state.items.find(i => i.id === id)).filter(Boolean), me = usernameOf(state.user), now = new Date().toISOString();
   try {
     const b = writeBatch(fs);
-    xs.forEach(i => { b.set(doc(collection(fs, 'transfers')), { amount: i.amount, date: i.date, from: i.account, to: card, comment: 'Card payment' + (i.store ? ' · ' + i.store : ''), createdAt: now, createdBy: me }); b.delete(doc(fs, 'expenses', i.id)); });
-    await b.commit(); $('#ccDlg').close(); toast(`${xs.length} turned into card payment${xs.length === 1 ? '' : 's'} to ${card}`);
+    xs.forEach(i => { b.set(doc(collection(fs, 'transfers')), { amount: i.amount, date: i.date, from: i.account, to: cardOf(i.id), comment: 'Card payment' + (i.store ? ' · ' + i.store : ''), createdAt: now, createdBy: me }); b.delete(doc(fs, 'expenses', i.id)); });
+    await b.commit(); $('#ccDlg').close(); toast(`${xs.length} turned into card payment${xs.length === 1 ? '' : 's'}`);
   } catch (x){ err(writeError(x)); }
 });
 $('#envAsgForm').addEventListener('submit', async e => {
@@ -3743,15 +3767,14 @@ $('#envMoveForm').addEventListener('submit', async e => {
 $('#esCancel').addEventListener('click', () => $('#envSetupDlg').close());
 $('#es-start').addEventListener('change', () => { $$('#esAccs [data-esamt]').forEach(i => { delete i.dataset.touched; }); drawEnvSetup(); });
 $('#esAccs').addEventListener('change', e => { if (e.target.matches('[data-esacc]')) drawEnvSetup(); });
-$('#esAccs').addEventListener('input', e => { if (e.target.matches('[data-esamt]')){ e.target.dataset.touched = '1';
-  $('#esTotal').querySelector('strong').textContent = signedEur($$('#esAccs [data-esamt]:not(:disabled)').reduce((s, i) => s + (parseFloat(i.value) || 0), 0)); } });
+$('#esAccs').addEventListener('input', e => { if (e.target.matches('[data-esamt]')){ e.target.dataset.touched = '1'; esTotals(); } });
 $('#envSetupForm').addEventListener('submit', async e => {
   e.preventDefault();
   const start = $('#es-start').value, accounts = $$('#esAccs [data-esacc]:checked').map(i => i.value);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start)){ $('#esErr').textContent = 'Pick a start day.'; $('#esErr').hidden = false; return; }
   if (!accounts.length){ $('#esErr').textContent = 'Tick at least one account.'; $('#esErr').hidden = false; return; }
   const openingBy = Object.fromEntries($$('#esAccs [data-esamt]:not(:disabled)').map(i => [i.dataset.esamt, Math.round((parseFloat(i.value) || 0) * 100) / 100]));
-  const opening = Math.round(Object.values(openingBy).reduce((s, v) => s + v, 0) * 100) / 100;
+  const opening = Math.round(Object.entries(openingBy).filter(([n]) => accOf(n)?.type !== 'card').reduce((s, [, v]) => s + v, 0) * 100) / 100;
   const first = !envOn(), old = state.envCfg || {};
   const excluded = (old.excluded || []).filter(a => !accounts.some(x => x.toLowerCase() === a.toLowerCase()));
   const ok = await saveEnv({ start, accounts, excluded, opening, openingBy, trips: $('#es-trips').checked, groups: first ? [] : old.groups || [], targets: first ? {} : old.targets || {}, assigned: first ? {} : old.assigned || {} });
@@ -4157,6 +4180,16 @@ function flows(acc, from, to, after, before){
   return { spent:out, income:inc, tOut, tIn, net: inc + tIn - out - tOut, n: L.reduce((a, xs) => a + xs.length, 0) };
 }
 // Estimated balance on a date: last check-in on or before it, plus everything recorded since.
+// The first day anything was logged on an account (cached until the entries change).
+let firstCache = null;
+function firstEntryDate(name){
+  if (!firstCache || firstCache.i !== state.items || firstCache.n !== state.income || firstCache.t !== state.transfers){
+    const m = new Map(), put = (k, d) => { k = String(k || '').toLowerCase(); if (k && d && (!m.has(k) || d < m.get(k))) m.set(k, d); };
+    state.items.forEach(x => put(x.account, x.date)); state.income.forEach(x => put(x.account, x.date)); state.transfers.forEach(x => { put(x.from, x.date); put(x.to, x.date); });
+    firstCache = { i: state.items, n: state.income, t: state.transfers, m };
+  }
+  return firstCache.m.get(String(name || '').toLowerCase()) || '';
+}
 function estimate(acc, asOf = today()){
   const all = checkinsOf(acc), cks = all.filter(c => c.date <= asOf);
   let base = cks[cks.length - 1];
@@ -4167,9 +4200,11 @@ function estimate(acc, asOf = today()){
     return { balance: bal, base: { balance: bal, date: asOf, back: true, from: later.date }, f: { spent: 0, income: 0, tOut: 0, tIn: 0, net: 0, n: 0 } };
   }
   if (!base){
-    // No check-in yet: start from zero on the day the account was added, so moves into a new account show up.
-    const added = String(acc.createdAt || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(added) || added > asOf) return null;
+    // No balance ever typed in: start from zero before the account's first entry (or the day it was added, if that's
+    // earlier), so the balance is every entry on it added up.
+    const cr = String(acc.createdAt || '').slice(0, 10), first = firstEntryDate(acc.name);
+    const added = [cr, first].filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x)).sort()[0] || '';
+    if (!added || added > asOf) return null;
     const d = new Date(added + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 1);
     base = { balance: 0, date: d.toISOString().slice(0, 10), virtual: true, added };
   }
@@ -5440,7 +5475,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26m';
+const APP_VERSION = '2026-10-26n';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

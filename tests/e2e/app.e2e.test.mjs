@@ -627,23 +627,24 @@ test('envelopes: your own categories (Fixed, Flexible) and envelopes fed by chos
   assert.match(await app.text('#ecList .ece:has([data-ece="1.0"]) .ecsrc'), /Groceries \(all\) €80 in .*Eating out \(all\) €120 in/);
   await page.click('#envCatForm [type=submit]'); await page.waitForTimeout(250);
   let t = await app.text('#budgetPanel');
-  assert.match(t, /Ready to Assign\s*€4,100\.00/, 'starting money + salary into Deutsche Bank');
+  assert.match(t, /Ready to Assign\s*€4,300\.00/, 'starting cash + salary into Deutsche Bank (card debt is on the card envelope)');
+  assert.match(t, /Credit Card Payments.*DB Card owes €280\s*€0\s*€80\.00\s*€80\.00/, 'groceries bought on the card moved to its envelope');
   assert.match(t, /Not assigned.*Spending in no envelope\s*—\s*−€30\.00/, 'Magazines has no envelope; HDFC spending left out');
   assert.match(t, /Fixed.*Rent\s*€0\s*−€800\.00\s*−€800\.00.*Flexible.*Food\s*€0\s*−€200\.00\s*−€200\.00/);
   assert.match(t, /Savings.*Investing & India\s*€0\s*−€200\.00/);
   await page.click('[data-envtargets]'); await page.waitForTimeout(200);
-  assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€3,300\.00.*Rent\s*€800\s*−€800\.00\s*€0\.00/);
+  assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€3,500\.00.*Rent\s*€800\s*−€800\.00\s*€0\.00/);
   const food = await page.$eval('.ybr.env:has-text("Food")', el => el.dataset.envkey);
   await page.click(`[data-envkey="${food}"]`); await page.waitForSelector('#envAsgDlg[open]');
   assert.match(await app.text('#eaNums'), /Gets: Groceries \(all\), Eating out \(all\)/);
-  assert.match(await app.text('#eaCover'), /Cover €200\.00 from\s*Ready to Assign\s*€3,300\.00/);
+  assert.match(await app.text('#eaCover'), /Cover €200\.00 from\s*Ready to Assign\s*€3,500\.00/);
   await page.click('#eaCover [data-cover="ready"]'); await page.waitForTimeout(200);
   t = await app.text('#budgetPanel');
-  assert.match(t, /Ready to Assign\s*€3,100\.00/); assert.match(t, /Food\s*€200\s*−€200\.00\s*€0\.00/);
-  assert.match(await app.text('#kpis'), /Ready to assign\s*€3,100\.00/);
+  assert.match(t, /Ready to Assign\s*€3,300\.00/); assert.match(t, /Food\s*€200\s*−€200\.00\s*€0\.00/);
+  assert.match(await app.text('#kpis'), /Ready to assign\s*€3,300\.00/);
   await page.click('[data-envmove]'); await page.waitForSelector('#envMoveDlg[open]');
   await page.selectOption('#em-to', food); await page.fill('#em-amt', '50'); await page.click('#envMoveForm [type=submit]'); await page.waitForTimeout(200);
-  assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€3,050\.00.*Food\s*€250\s*−€200\.00\s*€50\.00/);
+  assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€3,250\.00.*Food\s*€250\s*−€200\.00\s*€50\.00/);
   await clean(app);
 });
 
@@ -734,34 +735,41 @@ test('envelopes QA: spending from accounts outside the budget is shown per accou
   await page.click('#esSave'); await page.waitForTimeout(250);
   t = await app.text('#budgetPanel'); assert.match(t, /Rent - Both\s*€0\s*−€1,780\.00/); assert.doesNotMatch(t, /not counted/);
   // The card bill
-  assert.match(t, /€400 in \w+ looks like credit card bills/);
+  assert.match(t, /€400 in \w+ are credit card payments logged as spending/); assert.match(t, /Credit Card Payments.*DB Credit Card owes €0\s*€0\s*−€400\.00/);
   await page.click('[data-ccfix]'); await page.waitForSelector('#ccDlg[open]');
-  assert.equal(await page.inputValue('#ccCard'), 'DB Credit Card');
+  assert.equal(await page.inputValue('[data-cccard="k1"]'), 'DB Credit Card', 'the card named in the entry');
   await page.click('#ccForm [type=submit]'); await page.waitForTimeout(300);
-  t = await app.text('#budgetPanel'); assert.doesNotMatch(t, /credit card bills/); assert.doesNotMatch(t, /Not assigned/, 'no longer spending');
+  t = await app.text('#budgetPanel'); assert.doesNotMatch(t, /payments logged as spending/); assert.match(t, /DB Credit Card owes €0\s*€0\s*−€400\.00/, 'still a payment, now as a transfer'); assert.doesNotMatch(t, /Not assigned/, 'no longer spending');
   await app.go('transactions'); await page.click('[data-txkind="transfer"]'); await page.waitForTimeout(150);
   assert.match(await app.text('#page-transactions'), /Deutsche Bank → DB Credit Card/);
   await clean(app);
 });
 
-test('envelopes: accounts with no balance in the app are flagged in setup; typing today\'s balances works back to the start day', async () => {
+test('envelopes: starting money worked out from your balances and entries (back from a later balance, or all entries); card debt goes to the card envelope', async () => {
   const app = await openApp(), { page } = app, m = month(0), pm = month(-1), now = new Date().toISOString(), td = d(0);
   await app.seed({
     accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: td }, cc: { name: 'Deutsche Bank CC', type: 'card', currency: 'EUR', owner: 'Anubhav', createdAt: td },
-      ax: { name: 'Axis NRE', type: 'bank', currency: 'INR', owner: 'Anubhav', createdAt: td } },
+      wc: { name: 'Wise - Common', type: 'bank', currency: 'EUR', owner: 'Shared', createdAt: td } },
+    checkins: { a: { accountId: 'db', date: td, balance: 2500, createdAt: now }, b: { accountId: 'cc', date: td, balance: -300, createdAt: now } },
     expenses: { e1: { amount: 120, date: m + '-02', store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now },
-      e2: { amount: 80, date: m + '-03', store: 'Zara', category: 'Shopping', account: 'Deutsche Bank CC', spender: 'Anubhav', createdAt: now } },
-    income: { i1: { amount: 1000, date: m + '-01', source: 'Salary', category: 'Salary', account: 'Deutsche Bank', earner: 'Anubhav', createdAt: now } } });
+      e2: { amount: 80, date: m + '-03', store: 'Zara', category: 'Shopping', account: 'Deutsche Bank CC', spender: 'Anubhav', createdAt: now },
+      e3: { amount: 100, date: pm + '-20', store: 'Lidl', category: 'Groceries', account: 'Wise - Common', spender: 'Anubhav', createdAt: now },
+      e4: { amount: 50, date: m + '-04', store: 'Lidl', category: 'Groceries', account: 'Wise - Common', spender: 'Anubhav', createdAt: now } },
+    income: { i1: { amount: 1000, date: m + '-01', source: 'Salary', category: 'Salary', account: 'Deutsche Bank', earner: 'Anubhav', createdAt: now },
+      i2: { amount: 800, date: pm + '-10', source: 'Gift', category: 'Gift', account: 'Wise - Common', earner: 'Anubhav', createdAt: now } } });
   await page.waitForTimeout(300);
   await page.click('#budgetPanel [data-envsetup]'); await page.waitForSelector('#envSetupDlg[open]');
-  assert.match(await app.text('#esNoBal'), /2 ticked accounts have no balance in the app yet/);
-  await page.click('[data-estoday]'); await page.waitForSelector('#ckDlg[open]');
-  assert.deepEqual(await page.$$eval('#ckList .nm', e => e.map(x => x.textContent)), ['Deutsche Bank', 'Deutsche Bank CC']);
-  await page.fill('[data-ckacc="db"]', '2500'); await page.fill('[data-ckacc="cc"]', '300');
-  await page.click('#ckForm [type=submit]'); await page.waitForTimeout(600);
-  assert.equal(await page.isHidden('#esNoBal'), true);
-  // Deutsche Bank on the day before the start: 2500 today − 1000 salary + 120 groceries = 1620. Card: owed 300 today − 80 since = 220 owed.
-  assert.equal(await page.inputValue('[data-esamt="Deutsche Bank"]'), '1620.00'); assert.equal(await page.inputValue('[data-esamt="Deutsche Bank CC"]'), '-220.00');
-  assert.match(await app.text('#esAccs'), /worked back from/);
+  // Deutsche Bank: 2500 today − 1000 salary + 120 groceries = 1620 at the end of the day before the start.
+  assert.equal(await page.inputValue('[data-esamt="Deutsche Bank"]'), '1620.00'); assert.match(await app.text('#esAccs'), /Deutsche Bank EUR · worked back from the balance of/);
+  // Wise - Common has no balance typed in: 800 − 100 from all its entries before the start.
+  assert.equal(await page.inputValue('[data-esamt="Wise - Common"]'), '700.00'); assert.match(await app.text('#esAccs'), /Wise - Common EUR · all entries since 10 /);
+  // The card owed 300 today, 80 of it spent since: 220 before the start.
+  assert.equal(await page.inputValue('[data-esamt="Deutsche Bank CC"]'), '-220.00');
+  assert.match(await app.text('#esTotal'), /Starting Ready to Assign: €2,320\.00.*Cards owed €220\.00 then/);
+  assert.equal(await page.isHidden('#esNoBal'), true, 'nothing to type');
+  await page.click('#esSave'); await page.waitForSelector('#envCatDlg[open]'); await page.click('#ecCancel'); await page.waitForTimeout(200);
+  const t = await app.text('#budgetPanel');
+  assert.match(t, /Ready to Assign\s*€3,320\.00/, '2320 + 1000 salary');
+  assert.match(t, /Credit Card Payments.*Deutsche Bank CC owes €300\s*€0\s*€80\.00\s*€80\.00/);
   await clean(app);
 });

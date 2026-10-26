@@ -5,10 +5,14 @@
 //
 // Each month every envelope has Assigned (money given to it), Activity (spent from it) and Available (what's left,
 // rolled over). Only the budget accounts count (e.g. Deutsche Bank, Wise Sulekha, Wise Common and the cards):
-// - Ready to Assign starts with the money in them the day before the start (cash minus card debt) and grows with
-//   income paid into them and money coming in from other accounts;
+// - Ready to Assign starts with the cash in them the day before the start and grows with income paid into them and
+//   money coming in from other accounts;
+// - credit cards work like YNAB: each card has an envelope under Credit Card Payments. Spending on the card comes out of
+//   its category and moves into the card's envelope, so the money to pay the card is set aside; a payment to the card
+//   (a transfer, or a bill logged as spending in a category like "Credit Card") comes out of the card's envelope.
+//   Debt from before the start isn't taken off Ready to Assign: it shows on the card's envelope, to be given money;
 // - money moved from a budget account to any other account (investing, sending to India) is Activity in
-//   Savings › Investing & India; moves between budget accounts (incl. paying a card) change nothing;
+//   Savings › Investing & India; moves between budget cash accounts change nothing;
 // - with trips on, spending on a trip goes to that trip's envelope under Travel;
 // - like YNAB, an envelope that ends a month overspent starts the next one at zero and the overspending comes out of
 //   that month's Ready to Assign.
@@ -21,7 +25,10 @@
 
 const r2 = v => Math.round(v * 100) / 100;
 export const SEP = '›';
-export const SAVE_KEY = 's_save', NONE_KEY = 'u_none';
+export const SAVE_KEY = 's_save', NONE_KEY = 'u_none', CC_UNKNOWN = 'cc_unknown';
+export const ccKey = name => 'cc_' + norm(name).replace(/[^a-z0-9]+/g, '-');
+// Card bills logged as spending: a category or subcategory like "Credit Card", "Kreditkarte", "Card payment".
+export const CC_RE = /credit\s*card|kreditkarte|card\s*(bill|payment)|carta di credito|cc bill/i;
 export const tripKey = id => 't_' + String(id).replace(/[^A-Za-z0-9_-]/g, '');
 export const srcOf = (cat, sub) => { const c = String(cat || '').trim(), u = String(sub || '').trim(); return u ? `${c}${SEP}${u}` : c; };
 // Sources match without regard to case or extra spaces ("Eating Out" and "eating out " are the same spending).
@@ -31,45 +38,69 @@ export const newId = () => 'e_' + Math.random().toString(36).slice(2, 10);
 export const monthsBetween = (a, b) => { const out = []; let [y, m] = a.split('-').map(Number); const [Y, M] = b.split('-').map(Number);
   while (y < Y || (y === Y && m <= M)){ out.push(`${y}-${String(m).padStart(2, '0')}`); m++; if (m > 12){ m = 1; y++; } } return out; };
 
-export function makeBudget(cfg){
+export function makeBudget(cfg, acc = () => null){
   const idx = new Map(), info = new Map();
   (cfg.groups || []).forEach(g => (g.envs || []).forEach(e => { info.set(e.id, { group: g.name, name: e.name, gid: g.id });
     (e.src || []).forEach(s => { if (!idx.has(norm(s))) idx.set(norm(s), e.id); }); }));
   const inB = new Set((cfg.accounts || []).map(a => String(a).toLowerCase()));
   const isB = name => inB.has(String(name || '').toLowerCase());
+  const cards = (cfg.accounts || []).filter(a => acc(a)?.type === 'card'), cardSet = new Set(cards.map(norm));
+  const isCard = name => cardSet.has(norm(name));
+  const cardName = new Map(cards.map(c => [ccKey(c), c]));
+  // Which card a bill logged as spending paid: a word of the card's name in the entry (AMEX, Kotak, IDFC, DB…).
+  const words = c => { const n = norm(c), w = n.split(/[^a-z0-9]+/).filter(x => x.length >= 3 && !['card', 'credit', 'bank', 'the'].includes(x));
+    if (/deutsche/.test(n)) w.push('db'); if (/amex/.test(n)) w.push('american express'); return w; };
+  const billCard = e => {
+    const text = ' ' + norm([e.store, e.comment, e.subcategory, e.category].filter(Boolean).join(' ')) + ' ';
+    const hits = cards.filter(c => words(c).some(w => new RegExp('(^|[^a-z0-9])' + w.replace(/[^a-z0-9 ]/g, '') + '([^a-z0-9]|$)').test(text)));
+    return hits.length === 1 ? ccKey(hits[0]) : cards.length === 1 ? ccKey(cards[0]) : CC_UNKNOWN;
+  };
+  const isBill = e => !isCard(e.account) && (CC_RE.test(e.category || '') || CC_RE.test(e.subcategory || ''));
   const keyFor = e => cfg.trips !== false && e.tripId ? tripKey(e.tripId)
     : idx.get(norm(srcOf(e.category, e.subcategory))) || idx.get(norm(srcOf(e.category))) || NONE_KEY;
   const describe = k => k === SAVE_KEY ? { group: 'Savings', name: 'Investing & India', save: true }
+    : k === CC_UNKNOWN ? { group: 'Credit Card Payments', name: 'Card payments (card not recognised)', card: true }
+    : k.startsWith('cc_') ? (cardName.has(k) ? { group: 'Credit Card Payments', name: cardName.get(k), card: true, account: cardName.get(k) } : null)
     : k === NONE_KEY ? { group: 'Not assigned', name: 'Spending in no envelope', none: true }
     : k.startsWith('t_') ? { group: 'Travel', tripId: k.slice(2) }
     : info.get(k) || null;
-  return { isB, keyFor, describe, info };
+  return { isB, isCard, isBill, billCard, keyFor, describe, info, cards };
 }
 
-// The month's numbers. data = { items, income, transfers }.
-export function budgetMonth(cfg, month, { items = [], income = [], transfers = [] } = {}){
+// The month's numbers. data = { items, income, transfers, acc } (acc(name) → the account, to know which are cards).
+export function budgetMonth(cfg, month, { items = [], income = [], transfers = [], acc = () => null } = {}){
   const start = cfg.start, sm = start.slice(0, 7);
   if (month < sm) return { before: true, ready: 0, rows: [] };
-  const { isB, keyFor, describe } = makeBudget(cfg), after = d => d >= start;
+  const { isB, isCard, isBill, billCard, keyFor, describe, cards } = makeBudget(cfg, acc), after = d => d >= start;
   const act = {}, inflow = {}, outside = {}, ex = new Set((cfg.excluded || []).map(a => String(a).toLowerCase()));
   const add = (m, k, v) => { (act[m] ||= {}); act[m][k] = (act[m][k] || 0) + v; };
   items.forEach(e => {
     if (!after(e.date)) return;
     const m = e.date.slice(0, 7), k = keyFor(e), v = +e.amount || 0;
-    if (isB(e.account)) return add(m, k, -v);
+    if (isB(e.account)){
+      if (isCard(e.account)){ add(m, k, -v); add(m, ccKey(e.account), v); return; }   // the money for the card moves to its envelope
+      if (isBill(e)) return add(m, billCard(e), -v);                                   // a card bill logged as spending is a payment
+      return add(m, k, -v);
+    }
     if (k === NONE_KEY || ex.has(String(e.account || '').toLowerCase())) return;
     const o = (outside[m] ||= { total: 0, byAcc: {}, byKey: {} }), acc = e.account || '(no account)';
     o.total += v; o.byAcc[acc] = (o.byAcc[acc] || 0) + v; o.byKey[k] = (o.byKey[k] || 0) + v;
   });
-  income.forEach(i => { if (after(i.date) && isB(i.account)) inflow[i.date.slice(0, 7)] = (inflow[i.date.slice(0, 7)] || 0) + (+i.amount || 0); });
+  income.forEach(i => { if (!after(i.date) || !isB(i.account)) return; const m = i.date.slice(0, 7), v = +i.amount || 0;
+    inflow[m] = (inflow[m] || 0) + v; if (isCard(i.account)) add(m, ccKey(i.account), -v); });
   transfers.forEach(t => {
     if (!after(t.date)) return;
     const f = isB(t.from), to = isB(t.to), m = t.date.slice(0, 7), v = +t.amount || 0;
+    if (f && isCard(t.from)) add(m, ccKey(t.from), v);       // money taken from a card (cash advance, balance transfer)
+    if (to && isCard(t.to)) add(m, ccKey(t.to), -v);         // a payment to a card
     if (f && !to) add(m, SAVE_KEY, -v); else if (!f && to) inflow[m] = (inflow[m] || 0) + v;
   });
   // Money assigned to an envelope that has since been deleted goes back to Ready to Assign.
   const known = k => !!describe(k);
-  let ready = +cfg.opening || 0, avail = {}, out = null;
+  // Ready to Assign starts with the cash only; card debt from before the start is shown on the card's envelope.
+  const ob = cfg.openingBy || {}, cardDebt = Object.fromEntries(cards.map(c => [ccKey(c), r2(-Object.entries(ob).filter(([n]) => norm(n) === norm(c)).reduce((s, [, v]) => s + (+v || 0), 0))]));
+  const opening = cards.length && Object.keys(ob).length ? Object.entries(ob).filter(([n]) => !isCard(n)).reduce((s, [, v]) => s + (+v || 0), 0) : +cfg.opening || 0;
+  let ready = r2(opening), avail = {}, out = null;
   for (const m of monthsBetween(sm, month)){
     const asg = Object.fromEntries(Object.entries((cfg.assigned || {})[m] || {}).filter(([k]) => known(k))), a = act[m] || {};
     const keys = new Set([...Object.keys(avail), ...Object.keys(asg), ...Object.keys(a)]);
@@ -80,9 +111,9 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
     ready = r2(ready + (inflow[m] || 0) - assignedSum + overspent);
     if (m === month) out = { inflow: r2(inflow[m] || 0), assigned: r2(assignedSum), overspentLast: r2(-overspent),
       outside: { total: r2((outside[m] || {}).total || 0), byAcc: Object.entries((outside[m] || {}).byAcc || {}).map(([acc, amount]) => ({ acc, amount: r2(amount) })).sort((a, b) => b.amount - a.amount), byKey: (outside[m] || {}).byKey || {} },
-      rows: [...keys].map(k => ({ key: k, ...describe(k), carry: r2(carry[k] || 0), assigned: r2(+asg[k] || 0), activity: r2(a[k] || 0), available: avail[k] })) };
+      rows: [...keys].map(k => ({ key: k, ...describe(k), carry: r2(carry[k] || 0), assigned: r2(+asg[k] || 0), activity: r2(a[k] || 0), available: avail[k], ...(k in cardDebt ? { debtAtStart: cardDebt[k] } : {}) })) };
   }
-  return { ready, ...out };
+  return { ready, opening: r2(opening), cardDebt, ...out };
 }
 
 // Rows in your order: your categories as you arranged them, then Travel and Savings; Not assigned first when it has
@@ -93,6 +124,7 @@ export function groupRows(cfg, rows){
   const pack = (group, rs, extra = {}) => ({ group, rows: rs, assigned: sum(rs, 'assigned'), activity: sum(rs, 'activity'), available: sum(rs, 'available'), ...extra });
   const out = [];
   const none = by.get(NONE_KEY); if (none && (none.activity || none.available)) out.push(pack('Not assigned', [none], { none: true }));
+  const cc = rows.filter(r => r.key.startsWith('cc_')); if (cc.length) out.push(pack('Credit Card Payments', cc, { cards: true }));
   (cfg.groups || []).forEach(g => out.push(pack(g.name, (g.envs || []).map(e => by.get(e.id)).filter(Boolean), { gid: g.id })));
   const trips = rows.filter(r => r.key.startsWith('t_')); if (trips.length) out.push(pack('Travel', trips));
   const save = by.get(SAVE_KEY); if (save) out.push(pack('Savings', [save]));
@@ -102,7 +134,7 @@ export function groupRows(cfg, rows){
 // Spending on the budget accounts by source (category, or category › subcategory) that no envelope covers yet, largest first.
 export function unassignedSources(cfg, items, since){
   const { keyFor, isB } = makeBudget(cfg), tot = {};
-  items.filter(i => i.date >= since && isB(i.account) && !(cfg.trips !== false && i.tripId) && keyFor(i) === NONE_KEY)
+  items.filter(i => i.date >= since && isB(i.account) && !(cfg.trips !== false && i.tripId) && keyFor(i) === NONE_KEY && !(CC_RE.test(i.category || '') || CC_RE.test(i.subcategory || '')))
     .forEach(i => { const s = srcOf(i.category, i.subcategory), k = norm(s); (tot[k] ||= { src: s, amount: 0 }).amount += +i.amount || 0; });
   return Object.values(tot).map(x => ({ src: x.src, amount: r2(x.amount) })).sort((a, b) => b.amount - a.amount);
 }
