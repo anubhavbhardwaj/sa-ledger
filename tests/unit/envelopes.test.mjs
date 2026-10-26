@@ -1,68 +1,69 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, keyOf, tripKey, parseKey, SAVE_KEY, monthsBetween } from '../../public/envelopes.js';
+import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
 
 const cfg = () => ({ start: '2026-10-10', accounts: ['Deutsche Bank', 'Wise Common', 'Wise Sulekha', 'DB Card', 'IDFC Card'], opening: 2000, trips: true,
-  targets: { [keyOf('Groceries', 'Supermarket')]: 300, [keyOf('Groceries', '')]: 50 }, assigned: {} });
+  groups: [
+    { id: 'g1', name: 'Fixed', envs: [{ id: 'rent', name: 'Rent', src: ['Housing›Rent'] }, { id: 'net', name: 'Internet & phone', src: ['Utilities›Internet', 'Utilities›Phone'] }] },
+    { id: 'g2', name: 'Flexible', envs: [{ id: 'food', name: 'Food', src: ['Groceries', 'Eating out›Dinner'] }, { id: 'bakery', name: 'Bakery', src: ['Groceries›Bakery'] }] },
+  ],
+  targets: { rent: 800, food: 400, gone: 99 }, assigned: {} });
 const data = {
   items: [
-    { date: '2026-10-05', amount: 99, category: 'Groceries', subcategory: 'Supermarket', account: 'Deutsche Bank' }, // before the start: ignored
-    { date: '2026-10-11', amount: 120, category: 'Groceries', subcategory: 'Supermarket', account: 'Wise Common' },
-    { date: '2026-10-12', amount: 30, category: 'Groceries', account: 'DB Card' },
+    { date: '2026-10-05', amount: 99, category: 'Groceries', account: 'Deutsche Bank' },                               // before the start
+    { date: '2026-10-11', amount: 120, category: 'Groceries', subcategory: 'Supermarket', account: 'Wise Common' },   // whole category → Food
+    { date: '2026-10-12', amount: 15, category: 'Groceries', subcategory: 'Bakery', account: 'DB Card' },             // specific wins → Bakery
     { date: '2026-10-12', amount: 70, category: 'Eating out', subcategory: 'Dinner', account: 'Wise Sulekha' },
-    { date: '2026-10-13', amount: 999, category: 'Shopping', account: 'HDFC NRE' }, // not a budget account
+    { date: '2026-10-12', amount: 40, category: 'Eating out', subcategory: 'Coffee', account: 'Wise Sulekha' },       // no envelope
+    { date: '2026-10-13', amount: 999, category: 'Shopping', account: 'HDFC NRE' },                                   // not a budget account
     { date: '2026-10-14', amount: 200, category: 'Flights', tripId: 'rome', account: 'Deutsche Bank' },
-    { date: '2026-11-02', amount: 280, category: 'Groceries', subcategory: 'Supermarket', account: 'Wise Common' },
+    { date: '2026-11-01', amount: 800, category: 'Housing', subcategory: 'Rent', account: 'Deutsche Bank' },
   ],
-  income: [{ date: '2026-10-28', amount: 3000, account: 'Deutsche Bank' }, { date: '2026-10-28', amount: 500, account: 'Sparkasse' }],
-  transfers: [
-    { date: '2026-10-15', amount: 1000, from: 'Deutsche Bank', to: 'Wise Common' },   // between budget accounts
-    { date: '2026-10-16', amount: 400, from: 'Deutsche Bank', to: 'DB Card' },        // card payment
-    { date: '2026-10-17', amount: 500, from: 'Deutsche Bank', to: 'Scalable' },       // invested
-    { date: '2026-10-18', amount: 50, from: 'Scalable', to: 'Wise Common' },          // back in
-  ],
+  income: [{ date: '2026-10-28', amount: 3000, account: 'Deutsche Bank' }],
+  transfers: [{ date: '2026-10-16', amount: 400, from: 'Deutsche Bank', to: 'DB Card' }, { date: '2026-10-17', amount: 500, from: 'Deutsche Bank', to: 'Scalable' }],
 };
 
-test('ynab: keys, groups and months', () => {
-  assert.deepEqual(parseKey(keyOf('Groceries', 'Super.market')), { group: 'Groceries', name: 'Super.market', cat: 'Groceries', sub: 'Super.market' });
-  assert.equal(parseKey(keyOf('Groceries', '')).name, 'General');
-  assert.equal(parseKey(tripKey('rome')).tripId, 'rome');
-  assert.ok(!keyOf('A.b', 'c').includes('.'), 'no dots in database keys');
+test('envelopes: your structure decides where spending goes; the most specific source wins', () => {
+  const { keyFor } = makeBudget(cfg());
+  assert.equal(keyFor({ category: 'Groceries', subcategory: 'Supermarket' }), 'food');
+  assert.equal(keyFor({ category: 'Groceries', subcategory: 'Bakery' }), 'bakery');
+  assert.equal(keyFor({ category: 'Utilities', subcategory: 'Phone' }), 'net');
+  assert.equal(keyFor({ category: 'Eating out', subcategory: 'Coffee' }), NONE_KEY);
+  assert.equal(keyFor({ category: 'Flights', tripId: 'rome' }), tripKey('rome'));
+  assert.equal(srcLabel('Groceries'), 'Groceries (all)'); assert.equal(srcLabel('Utilities›Phone'), 'Utilities › Phone');
   assert.deepEqual(monthsBetween('2026-11', '2027-01'), ['2026-11', '2026-12', '2027-01']);
 });
 
-test('ynab: ready to assign, assigned, activity and available on the budget accounts only', () => {
+test('envelopes: ready to assign, assigned, activity, available; not assigned and savings', () => {
   const c = cfg(); c.assigned = assignTargets(c, '2026-10').assigned;
+  assert.deepEqual(c.assigned['2026-10'], { rent: 800, food: 400 }, 'targets of deleted envelopes are skipped');
   const oct = budgetMonth(c, '2026-10', data), by = Object.fromEntries(oct.rows.map(r => [r.key, r]));
-  assert.equal(oct.ready, 2000 + 3000 + 50 - 350, 'opening + income into DB + money back from investments − assigned');
-  assert.deepEqual([by[keyOf('Groceries', 'Supermarket')].activity, by[keyOf('Groceries', 'Supermarket')].available], [-120, 180]);
-  assert.equal(by[keyOf('Groceries', '')].available, 20);
-  assert.equal(by[keyOf('Eating out', 'Dinner')].available, -70, 'overspent');
-  assert.equal(by[tripKey('rome')].activity, -200, 'trip spending in Travel');
-  assert.equal(by[SAVE_KEY].activity, -500, 'invested; own transfers and the card payment change nothing');
-  assert.equal(by[keyOf('Shopping', '')], undefined, 'spending on other accounts is left out');
-  const groups = groupRows(oct.rows).map(g => g.group);
-  assert.deepEqual(groups.slice(-2), ['Travel', 'Savings']);
+  assert.equal(oct.ready, 2000 + 3000 - 1200);
+  assert.deepEqual([by.food.activity, by.food.available], [-190, 210], 'supermarket 120 + dinner 70');
+  assert.equal(by.bakery.available, -15); assert.equal(by[NONE_KEY].activity, -40); assert.equal(by[SAVE_KEY].activity, -500);
+  const G = groupRows(c, oct.rows).map(g => g.group);
+  assert.deepEqual(G, ['Not assigned', 'Fixed', 'Flexible', 'Travel', 'Savings']);
+  assert.deepEqual(unassignedSources(c, data.items, '2026-10-10'), [{ src: 'Eating out›Coffee', amount: 40 }], 'only spending on budget accounts');
+  assert.deepEqual(allSources(data.items).slice(0, 4), ['Eating out', 'Eating out›Coffee', 'Eating out›Dinner', 'Flights']);
 });
 
-test('ynab: rollover; last month overspending comes out of ready to assign and the envelope starts at zero', () => {
+test('envelopes: rollover; overspending comes out of next month; deleted envelopes return their money', () => {
   const c = cfg(); c.assigned = assignTargets(c, '2026-10').assigned;
-  const octReady = budgetMonth(c, '2026-10', data).ready;
-  c.assigned = assignTargets(c, '2026-11').assigned;
+  const oct = budgetMonth(c, '2026-10', data);
   const nov = budgetMonth(c, '2026-11', data), by = Object.fromEntries(nov.rows.map(r => [r.key, r]));
-  const sm = by[keyOf('Groceries', 'Supermarket')];
-  assert.deepEqual([sm.carry, sm.assigned, sm.activity, sm.available], [180, 300, -280, 200]);
-  assert.equal(by[keyOf('Eating out', 'Dinner')].available, 0, 'reset to zero');
-  assert.equal(nov.overspentLast, 770, 'dinner 70 + Rome trip 200 + savings 500 overspent in October');
-  assert.equal(nov.ready, octReady - 350 - 770);
+  assert.deepEqual([by.rent.carry, by.rent.activity, by.rent.available], [800, -800, 0]);
+  assert.equal(by.bakery.available, 0); assert.equal(nov.overspentLast, 15 + 40 + 200 + 500);
+  assert.equal(nov.ready, oct.ready - 755);
+  c.groups[1].envs = c.groups[1].envs.filter(e => e.id !== 'food');
+  assert.equal(budgetMonth(c, '2026-10', data).ready, oct.ready + 400, 'Food deleted: its 400 is back');
 });
 
-test('ynab: set and move assigned money', () => {
-  const c = cfg(); const k1 = keyOf('Groceries', 'Supermarket'), k2 = keyOf('Eating out', 'Dinner');
-  c.assigned = setAssigned(c, '2026-10', k1, 300);
-  c.assigned = moveAssigned(c, '2026-10', k1, k2, 70);
-  assert.deepEqual(c.assigned['2026-10'], { [k1]: 230, [k2]: 70 });
-  c.assigned = setAssigned(c, '2026-10', k2, 0);
-  assert.deepEqual(c.assigned['2026-10'], { [k1]: 230 });
+test('envelopes: set and move assigned money', () => {
+  const c = cfg();
+  c.assigned = setAssigned(c, '2026-10', 'food', 300);
+  c.assigned = moveAssigned(c, '2026-10', 'food', 'bakery', 20);
+  assert.deepEqual(c.assigned['2026-10'], { food: 280, bakery: 20 });
+  c.assigned = setAssigned(c, '2026-10', 'bakery', 0);
+  assert.deepEqual(c.assigned['2026-10'], { food: 280 });
   assert.ok(budgetMonth(c, '2026-09', data).before);
 });

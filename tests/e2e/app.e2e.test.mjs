@@ -592,10 +592,9 @@ test('send to India: a new device starts from the last send saved in the databas
   await clean(app);
 });
 
-test('envelopes (YNAB way): budget accounts only, groups and subcategories, assign, cover, move, savings', async () => {
+test('envelopes: your own categories (Fixed, Flexible) and envelopes fed by chosen subcategories; not assigned; assign, cover, move', async () => {
   const app = await openApp(), { page } = app, td = d(0), now = new Date().toISOString();
   await app.seed({
-    settings: { budgets: { items: [{ c: 'Groceries', a: 300 }, { c: 'Eating out', a: 100 }], total: 400 } },
     accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: d(-90) }, wc: { name: 'Wise Common', type: 'bank', currency: 'EUR', owner: 'Shared', createdAt: d(-90) },
       ws: { name: 'Wise Sulekha', type: 'bank', currency: 'EUR', owner: 'Sulekha', createdAt: d(-90) }, cc: { name: 'DB Card', type: 'card', currency: 'EUR', owner: 'Anubhav', createdAt: d(-90) },
       sc: { name: 'Scalable', type: 'investment', currency: 'EUR', owner: 'Anubhav', createdAt: d(-90) }, nre: { name: 'HDFC NRE', type: 'bank', currency: 'INR', owner: 'Anubhav', createdAt: d(-90) } },
@@ -604,30 +603,40 @@ test('envelopes (YNAB way): budget accounts only, groups and subcategories, assi
     income: { i1: { amount: 2000, date: td, source: 'Salary', category: 'Salary', account: 'Deutsche Bank', earner: 'Anubhav', createdAt: now } },
     expenses: { e1: { amount: 120, date: td, store: 'Trattoria', category: 'Eating out', account: 'Wise Common', spender: 'Sulekha', createdAt: now },
       e2: { amount: 80, date: td, store: 'Rewe', category: 'Groceries', subcategory: 'Supermarket', account: 'DB Card', spender: 'Anubhav', createdAt: now },
-      e3: { amount: 999, date: td, store: 'Shop', category: 'Shopping', account: 'HDFC NRE', spender: 'Anubhav', createdAt: now } },
+      e3: { amount: 999, date: td, store: 'Shop', category: 'Shopping', account: 'HDFC NRE', spender: 'Anubhav', createdAt: now },
+      e4: { amount: 800, date: td, store: 'Landlord', category: 'Housing', subcategory: 'Rent', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now },
+      e5: { amount: 30, date: td, store: 'Kiosk', category: 'Shopping', subcategory: 'Magazines', account: 'Wise Common', spender: 'Anubhav', createdAt: now } },
     transfers: { t1: { amount: 200, date: td, from: 'Deutsche Bank', to: 'Scalable', createdAt: now } } });
   await page.waitForTimeout(300);
   await page.click('#budgetPanel [data-envsetup]'); await page.waitForSelector('#envSetupDlg[open]');
-  const ticked = await page.$$eval('#esAccs [data-esacc]:checked', els => els.map(e => e.value));
-  assert.deepEqual(ticked.sort(), ['DB Card', 'Deutsche Bank', 'Wise Common', 'Wise Sulekha']);
-  assert.match(await app.text('#esTotal'), /Starting Ready to Assign: €2,100\.00/, '1500 + 500 + 300 − 200 card debt');
-  await page.click('#esSave'); await page.waitForTimeout(250);
+  assert.deepEqual((await page.$$eval('#esAccs [data-esacc]:checked', els => els.map(e => e.value))).sort(), ['DB Card', 'Deutsche Bank', 'Wise Common', 'Wise Sulekha']);
+  await page.click('#esSave'); await page.waitForSelector('#envCatDlg[open]');
+  // Nothing created automatically: two empty categories to name and fill.
+  assert.deepEqual(await page.$$eval('#ecList [data-ecg]', els => els.map(e => e.value)), ['Fixed', 'Flexible']);
+  assert.equal(await page.$$eval('#ecList .ece', els => els.length), 0);
+  assert.match(await app.text('#ecUn'), /Housing › Rent €800.*Eating out \(all\) €120.*Groceries › Supermarket €80.*Shopping › Magazines €30/);
+  await page.click('[data-ecenew="0"]'); await page.selectOption('[data-ecsrc="0.0"]', 'Housing›Rent');
+  assert.equal(await page.inputValue('[data-ece="0.0"]'), 'Rent', 'named after the first spending added');
+  await page.fill('[data-ect]', '800');
+  await page.click('[data-ecenew="1"]'); await page.fill('[data-ece="1.0"]', 'Food');
+  await page.selectOption('[data-ecsrc="1.0"]', 'Groceries'); await page.selectOption('[data-ecsrc="1.0"]', 'Eating out');
+  await page.click('#envCatForm [type=submit]'); await page.waitForTimeout(250);
   let t = await app.text('#budgetPanel');
   assert.match(t, /Ready to Assign\s*€4,100\.00/, 'starting money + salary into Deutsche Bank');
-  assert.doesNotMatch(t, /Shopping/, 'spending on other accounts is left out');
+  assert.match(t, /Not assigned.*Spending in no envelope\s*—\s*−€30\.00/, 'Magazines has no envelope; HDFC spending left out');
+  assert.match(t, /Fixed.*Rent\s*€0\s*−€800\.00\s*−€800\.00.*Flexible.*Food\s*€0\s*−€200\.00\s*−€200\.00/);
+  assert.match(t, /Savings.*Investing & India\s*€0\s*−€200\.00/);
   await page.click('[data-envtargets]'); await page.waitForTimeout(200);
+  assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€3,300\.00.*Rent\s*€800\s*−€800\.00\s*€0\.00/);
+  const food = await page.$eval('.ybr.env:has-text("Food")', el => el.dataset.envkey);
+  await page.click(`[data-envkey="${food}"]`); await page.waitForSelector('#envAsgDlg[open]');
+  assert.match(await app.text('#eaNums'), /Gets: Groceries \(all\), Eating out \(all\)/);
+  await page.click('#eaQuick >> text=Cover overspending'); await page.click('#envAsgForm [type=submit]'); await page.waitForTimeout(200);
   t = await app.text('#budgetPanel');
-  assert.match(t, /Ready to Assign\s*€4,000\.00/);
-  assert.match(t, /Eating out.*General\s*€100\s*−€120\.00\s*−€20\.00/, 'group, envelope, assigned, activity, available');
-  assert.match(t, /Supermarket\s*€0\s*−€80\.00\s*−€80\.00/); assert.match(t, /Savings.*Investing & India\s*€0\s*−€200\.00/);
-  assert.match(await app.text('#kpis'), /Ready to assign\s*€4,000\.00.*3 overspent/);
-  await page.click('[data-envkey="c_Eating%20out_"]'); await page.waitForSelector('#envAsgDlg[open]');
-  await page.click('#eaQuick >> text=Cover overspending'); assert.equal(await page.inputValue('#ea-amt'), '120.00');
-  await page.click('#envAsgForm [type=submit]'); await page.waitForTimeout(200);
-  assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€3,980\.00/);
+  assert.match(t, /Ready to Assign\s*€3,100\.00/); assert.match(t, /Food\s*€200\s*−€200\.00\s*€0\.00/);
+  assert.match(await app.text('#kpis'), /Ready to assign\s*€3,100\.00/);
   await page.click('[data-envmove]'); await page.waitForSelector('#envMoveDlg[open]');
-  await page.selectOption('#em-to', 'c_Groceries_Supermarket'); await page.fill('#em-amt', '80'); await page.click('#envMoveForm [type=submit]'); await page.waitForTimeout(200);
-  t = await app.text('#budgetPanel');
-  assert.match(t, /Ready to Assign\s*€3,900\.00/); assert.match(t, /Supermarket\s*€80\s*−€80\.00\s*€0\.00/);
+  await page.selectOption('#em-to', food); await page.fill('#em-amt', '50'); await page.click('#envMoveForm [type=submit]'); await page.waitForTimeout(200);
+  assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€3,050\.00.*Food\s*€250\s*−€200\.00\s*€50\.00/);
   await clean(app);
 });

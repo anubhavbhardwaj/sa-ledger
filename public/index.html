@@ -179,6 +179,10 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .pill.av{justify-self:end;font-family:var(--f-mono);font-size:12.5px;padding:2px 9px;border-radius:999px;background:var(--sunk);color:var(--ink)}.pill.av.pos{background:color-mix(in srgb,var(--good) 22%,var(--surface))}.pill.av.neg{background:color-mix(in srgb,var(--danger) 20%,var(--surface));color:var(--danger)}.pill.av.short{background:var(--warn-soft);color:var(--warn)}
 @media (max-width:560px){.ybh,.ybr{grid-template-columns:minmax(0,1fr) auto}.ybh span:nth-child(2),.ybh span:nth-child(3),.ybr .n.a,.ybr .n.c{display:none}.ybr .sm{grid-column:1/-1;font-size:11.5px;color:var(--muted);margin-top:-4px}}
 @media (min-width:561px){.ybr .sm{display:none}}
+.ecg{border:1px solid var(--line);border-radius:12px;padding:10px;display:grid;gap:8px}.ecgh,.eceh{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}.eceh{grid-template-columns:minmax(0,1fr) 86px auto}
+.ecgh input{font-weight:600}.ecg input,.ecg select{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:7px 9px;font-size:13.5px;color:var(--ink);min-width:0}
+.ece{display:grid;gap:6px;padding:8px;border-radius:10px;background:var(--sunk)}.ecsrc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.ecsrc select{max-width:100%}
+.chipx{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 4px 2px 10px;font-size:12.5px}.chipx button{all:unset;cursor:pointer;padding:0 6px;color:var(--muted)}
 .esq{display:flex;gap:6px;flex-wrap:wrap}.esacc{display:grid;grid-template-columns:auto minmax(0,1fr) 120px;gap:6px 10px;align-items:center;font-size:13.5px}.esacc input[type=number]{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:6px 8px;font-size:13.5px;color:var(--ink);min-width:0;text-align:right}
 .setupline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}.setupline[hidden]{display:none}
 .morewrap{position:relative}.morewrap .pmenu{left:0;right:auto;width:240px}
@@ -1177,6 +1181,17 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
     <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="eaCancel">Cancel</button><button class="btn primary" type="submit">Save</button></div></div>
   </form>
 </dialog>
+<dialog id="envCatDlg">
+  <form id="envCatForm" novalidate style="display:grid;gap:12px;padding:20px;max-width:620px">
+    <h3>Your categories</h3>
+    <p class="muted" style="margin:0;font-size:13px">Make categories such as Fixed and Flexible, add envelopes to them (Rent, Internet, Groceries, …) and add the spending each envelope gets: a whole category, or one subcategory. The most specific one wins. €/month is the envelope’s monthly target.</p>
+    <div id="ecList" style="display:grid;gap:10px"></div>
+    <div><button class="btn small" type="button" id="ecNewGroup">+ Category</button></div>
+    <p class="muted" id="ecUn" style="margin:0;font-size:12.5px"></p>
+    <p class="err" id="ecErr" hidden></p>
+    <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="ecCancel">Cancel</button><button class="btn primary" type="submit">Save</button></div></div>
+  </form>
+</dialog>
 <dialog id="envSetupDlg">
   <form id="envSetupForm" novalidate style="display:grid;gap:12px;padding:20px;max-width:560px">
     <h3>Envelope budget</h3>
@@ -1456,7 +1471,7 @@ import { decodeBCBP } from "./bcbp.js";
 import { detectRecurring, backtest as recurBacktest } from "./recur.js";
 import { checkPhoto, passportAlerts, human as humanDate } from "./verify.js";
 import { formPayload, peopleText, bookmarklet, FILLER_VERSION } from "./fill.js";
-import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, keyOf, tripKey, parseKey, SAVE_KEY } from "./envelopes.js";
+import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, srcLabel, newId, tripKey, SAVE_KEY, NONE_KEY } from "./envelopes.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -3504,28 +3519,27 @@ function goalEmergency(g){
   return { target, avg, accs, have, missing };
 }
 // ---------- Envelopes, the YNAB way (in place of the budgets card; ENVELOPES = false brings budgets back) ----------
-// Groups are categories, envelopes their subcategories; Assigned, Activity and Available per month; Ready to Assign on
-// top. Only the budget accounts count. Worked out from the entries (envelopes.js); the budgets stay saved.
+// Your own categories (groups) and envelopes, each fed by the categories / subcategories you choose; Assigned, Activity
+// and Available per month; Ready to Assign on top. Only the budget accounts count. Worked out from the entries
+// (envelopes.js); the budgets stay saved.
 const ENVELOPES = true;
 const envOn = () => !!state.envCfg?.accounts?.length;
 const envData = () => ({ items: state.items, income: state.income, transfers: state.transfers });
 const envMonthSel = () => state.period === 'all' ? thisMonth() : state.period;
 const envName = r => r.tripId ? (state.tripMap?.[r.tripId]?.name || 'Trip') : r.name;
-// Every envelope worth showing: ones with numbers this month, with a target, used in the last 6 months, or an upcoming trip.
+// All your envelopes (also empty ones), upcoming trips and Savings, on top of the ones with numbers this month.
 function envRows(month = envMonthSel()){
   const cfg = state.envCfg, B = budgetMonth(cfg, month, envData());
   if (B.before) return B;
-  const have = new Set(B.rows.map(r => r.key)), extra = new Set(Object.keys(cfg.targets || {}));
-  const since = addMonth(month, -5) + '-01', inB = new Set(cfg.accounts.map(a => a.toLowerCase()));
-  state.items.filter(i => i.date >= since && i.date <= month + '-31' && inB.has(String(i.account).toLowerCase()) && !(cfg.trips !== false && i.tripId)).forEach(i => extra.add(keyOf(i.category, i.subcategory)));
-  if (cfg.trips !== false) state.trips.filter(t => ['ongoing', 'upcoming'].includes(tripStatus(t))).forEach(t => extra.add(tripKey(t.id)));
-  extra.add(SAVE_KEY);
-  extra.forEach(k => { if (!have.has(k)) B.rows.push({ key: k, ...parseKey(k), carry: 0, assigned: 0, activity: 0, available: 0 }); });
+  const { describe } = makeBudget(cfg), have = new Set(B.rows.map(r => r.key));
+  const extra = [...(cfg.groups || []).flatMap(g => (g.envs || []).map(e => e.id)), SAVE_KEY];
+  if (cfg.trips !== false) state.trips.filter(t => ['ongoing', 'upcoming'].includes(tripStatus(t))).forEach(t => extra.push(tripKey(t.id)));
+  extra.forEach(k => { if (!have.has(k)){ have.add(k); B.rows.push({ key: k, ...describe(k), carry: 0, assigned: 0, activity: 0, available: 0 }); } });
   return B;
 }
 async function saveEnv(patch){
   const d = { ...state.envCfg, ...patch, updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) };
-  const keep = ['start', 'accounts', 'opening', 'openingBy', 'assigned', 'targets', 'trips', 'updatedAt', 'updatedBy'];
+  const keep = ['start', 'accounts', 'opening', 'openingBy', 'groups', 'assigned', 'targets', 'trips', 'updatedAt', 'updatedBy'];
   Object.keys(d).forEach(k => { if (!keep.includes(k)) delete d[k]; });
   try { await setDoc(doc(fs, 'settings', 'envelopes'), d); state.envCfg = d; render(); return true; }
   catch (x){ toast(x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x)); return false; }
@@ -3543,19 +3557,24 @@ function renderEnvelopes(el){
   const m = envMonthSel(), cfg = state.envCfg;
   if (!envOn()){
     el.innerHTML = `<header><h2>Envelopes</h2></header>
-      <p class="muted" style="margin:0;font-size:13px">Budget like YNAB: your categories become groups and their subcategories the envelopes. Give every euro in Deutsche Bank, Wise and your cards a job; spending comes out of its envelope and what’s left rolls over. Your budgets stay saved.</p>
+      <p class="muted" style="margin:0;font-size:13px">Budget like YNAB with your own categories: make groups like Fixed and Flexible, put envelopes in them (Rent, Groceries, …) and choose which of your spending goes into each. Give every euro in Deutsche Bank, Wise and your cards a job; what’s left in an envelope rolls over. Your budgets stay saved.</p>
       <div><button class="btn primary" type="button" data-envsetup>Set up envelopes</button></div>`;
     return;
   }
   const B = envRows(m);
   if (B.before){ el.innerHTML = `<header><h2>Envelopes</h2><span class="right"><button class="btn ghost small" type="button" data-envsetup>Settings</button></span></header><p class="muted" style="margin:0">Envelopes start ${shortDate(cfg.start, true)}.</p>`; return; }
-  const G = groupRows(B.rows), targets = cfg.targets || {};
+  const G = groupRows(cfg, B.rows), targets = cfg.targets || {};
+  if (!(cfg.groups || []).length) G.unshift({ group: 'Your categories', rows: [], assigned: 0, activity: 0, available: 0, empty: true });
   const toFill = Object.entries(targets).filter(([k, v]) => +v > 0 && !(k in ((cfg.assigned || {})[m] || {}))).length;
   const row = r => `<div class="ybr env" data-envkey="${esc(r.key)}" role="button" tabindex="0"><span class="nm">${esc(envName(r))}</span><span class="n a">${eur0.format(r.assigned)}</span><span class="n c">${r.activity ? signedEur(r.activity) : '€0'}</span><span class="pill av ${avCls(r, cfg)}">${signedEur(r.available)}</span>
       <span class="sm">assigned ${eur0.format(r.assigned)} · spent ${eur0.format(Math.abs(r.activity))}${targets[r.key] ? ` · target ${eur0.format(targets[r.key])}` : ''}</span></div>`;
-  const grp = g => { const hot = g.rows.some(r => r.available < -0.004 || r.activity || r.assigned);
+  const noneRow = r => `<div class="ybr env" data-envcats role="button" tabindex="0"><span class="nm">${esc(r.name)}</span><span class="n a">—</span><span class="n c">${signedEur(r.activity)}</span><span class="pill av neg">${signedEur(r.available)}</span>
+      <span class="sm">spent ${eur0.format(Math.abs(r.activity))} · tap to put it in an envelope</span></div>`;
+  const grp = g => { if (g.empty) return `<p class="muted" style="margin:10px 0 0;font-size:13px">No categories yet. <button class="linkbtn" type="button" data-envcats>Create your categories</button></p>`;
+    if (g.none) return `<details class="ybg" open><summary><div class="ybr"><span class="nm" style="color:var(--danger)">Not assigned</span><span class="n a"></span><span class="n c">${signedEur(g.activity)}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(noneRow).join('')}</details>`;
+    const hot = g.rows.some(r => r.available < -0.004 || r.activity || r.assigned) || !g.rows.length;
     return `<details class="ybg" ${hot ? 'open' : ''}><summary><div class="ybr"><span class="nm">${esc(g.group)}</span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(row).join('')}</details>`; };
-  el.innerHTML = `<header><h2>Envelopes · ${monthLabel(m)}</h2><span class="right">${toFill ? `<button class="btn primary small" type="button" data-envtargets>Assign ${toFill} target${toFill === 1 ? '' : 's'}</button>` : ''}<button class="btn small" type="button" data-envmove>Move</button><button class="btn ghost small" type="button" data-envsetup>Settings</button></span></header>
+  el.innerHTML = `<header><h2>Envelopes · ${monthLabel(m)}</h2><span class="right">${toFill ? `<button class="btn primary small" type="button" data-envtargets>Assign ${toFill} target${toFill === 1 ? '' : 's'}</button>` : ''}<button class="btn small" type="button" data-envmove>Move</button><button class="btn ghost small" type="button" data-envcats>Categories</button><button class="btn ghost small" type="button" data-envsetup>Settings</button></span></header>
     <div class="rta ${B.ready > 0.004 ? 'pos' : B.ready < -0.004 ? 'neg' : ''}"><span>Ready to Assign</span><strong>${signedEur(B.ready)}</strong><span class="sub">${monthLabel(m)}: ${eur0.format(B.inflow)} came in · ${eur0.format(B.assigned)} assigned${B.overspentLast ? ` · ${eur0.format(B.overspentLast)} overspent last month` : ''}. Tap an envelope to assign money.</span></div>
     <div class="ybud"><div class="ybh"><span>Envelope</span><span>Assigned</span><span>Activity</span><span>Available</span></div>${G.map(grp).join('')}</div>`;
 }
@@ -3570,8 +3589,9 @@ function openEnvAssign(key){
   const chips = [tgt ? ['Target', tgt] : null, pr && pr.activity ? ['Spent last month', -pr.activity] : null, pr && pr.assigned ? ['Assigned last month', pr.assigned] : null,
     r.available < -0.004 ? ['Cover overspending', r.assigned - r.available] : null, B.ready > 0.004 ? ['All of Ready to Assign', r.assigned + B.ready] : null].filter(Boolean);
   $('#eaQuick').innerHTML = chips.map(([l, v]) => `<button class="btn small" type="button" data-easet="${v.toFixed(2)}">${l}: ${eur0.format(v)}</button>`).join('');
-  const P = parseKey(key), inB = new Set(cfg.accounts.map(a => a.toLowerCase()));
-  const acts = state.items.filter(i => i.date.startsWith(m) && i.date >= cfg.start && inB.has(String(i.account).toLowerCase()) && (P.tripId ? i.tripId === P.tripId : !(cfg.trips !== false && i.tripId) && keyOf(i.category, i.subcategory) === key)).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+  const { keyFor, isB } = makeBudget(cfg), env = (cfg.groups || []).flatMap(g => g.envs || []).find(x => x.id === key);
+  const acts = state.items.filter(i => i.date.startsWith(m) && i.date >= cfg.start && isB(i.account) && keyFor(i) === key).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+  if (env) $('#eaNums').innerHTML += `<br><span style="font-size:12px">Gets: ${(env.src || []).map(srcLabel).map(esc).join(', ') || 'nothing yet: add categories in Categories'}</span>`;
   $('#eaActs').innerHTML = acts.length ? acts.map(i => `<div class="r"><span class="d">${shortDate(i.date)}</span><span><span class="store">${esc(i.store)}</span><br><span class="meta">${esc(i.account)}</span></span><span class="a">${eur.format(i.amount)}</span></div>`).join('') : '';
   $('#envAsgDlg').showModal(); $('#ea-amt').focus();
 }
@@ -3647,13 +3667,63 @@ $('#envSetupForm').addEventListener('submit', async e => {
   if (!accounts.length){ $('#esErr').textContent = 'Tick at least one account.'; $('#esErr').hidden = false; return; }
   const openingBy = Object.fromEntries($$('#esAccs [data-esamt]:not(:disabled)').map(i => [i.dataset.esamt, Math.round((parseFloat(i.value) || 0) * 100) / 100]));
   const opening = Math.round(Object.values(openingBy).reduce((s, v) => s + v, 0) * 100) / 100;
-  const first = !envOn();
-  // First time: targets from the budgets where a category has no subcategories (its General envelope).
-  let targets = state.envCfg?.targets || {};
-  if (first){ targets = {}; const subs = new Set(state.items.filter(i => i.subcategory).map(i => i.category));
-    (state.budgets.items || []).filter(b => +b.a > 0 && !subs.has(b.c)).forEach(b => { targets[keyOf(b.c, '')] = +b.a; }); }
-  const ok = await saveEnv({ start, accounts, opening, openingBy, trips: $('#es-trips').checked, targets, assigned: first ? {} : state.envCfg.assigned || {} });
-  if (ok){ $('#envSetupDlg').close(); toast(first ? 'Envelopes set up. Tap an envelope to assign money.' : 'Saved'); }
+  const first = !envOn(), old = state.envCfg || {};
+  const ok = await saveEnv({ start, accounts, opening, openingBy, trips: $('#es-trips').checked, groups: first ? [] : old.groups || [], targets: first ? {} : old.targets || {}, assigned: first ? {} : old.assigned || {} });
+  if (ok){ $('#envSetupDlg').close(); if (first) openEnvCats(); else toast('Saved'); }
+});
+
+// Categories editor: your groups, the envelopes in them, and which categories / subcategories feed each envelope.
+function openEnvCats(){
+  state.ecDraft = JSON.parse(JSON.stringify(state.envCfg.groups || []));
+  state.ecTargets = { ...(state.envCfg.targets || {}) };
+  if (!state.ecDraft.length) state.ecDraft.push({ id: newId(), name: 'Fixed', envs: [] }, { id: newId(), name: 'Flexible', envs: [] });
+  drawEnvCats(); $('#ecErr').hidden = true; $('#envCatDlg').showModal();
+}
+function drawEnvCats(){
+  const D = state.ecDraft, used = new Set(D.flatMap(g => g.envs.flatMap(e => e.src || []))), all = allSources(state.items);
+  const since = addMonth(thisMonth(), -2) + '-01';
+  const un = unassignedSources({ ...state.envCfg, groups: D }, state.items, since);
+  const pick = (gi, ei) => `<select data-ecsrc="${gi}.${ei}" aria-label="Add spending"><option value="">+ Add spending…</option>${all.filter(x => !used.has(x)).map(x => `<option value="${esc(x)}">${esc(srcLabel(x))}</option>`).join('')}</select>`;
+  $('#ecList').innerHTML = D.map((g, gi) => `<div class="ecg"><div class="ecgh"><input data-ecg="${gi}" value="${esc(g.name)}" placeholder="Category, e.g. Fixed" aria-label="Category name"><button class="unlink" type="button" data-ecgdel="${gi}" aria-label="Remove ${esc(g.name)}">×</button></div>
+      ${g.envs.map((e, ei) => `<div class="ece"><div class="eceh"><input data-ece="${gi}.${ei}" value="${esc(e.name)}" placeholder="Envelope, e.g. Rent" aria-label="Envelope name"><input data-ect="${esc(e.id)}" type="number" step="1" min="0" inputmode="decimal" value="${+state.ecTargets[e.id] || ''}" placeholder="€/month" aria-label="Monthly target"><button class="unlink" type="button" data-ecedel="${gi}.${ei}" aria-label="Remove ${esc(e.name)}">×</button></div>
+        <div class="ecsrc">${(e.src || []).map((x, si) => `<span class="chipx">${esc(srcLabel(x))}<button type="button" data-ecsdel="${gi}.${ei}.${si}" aria-label="Remove">×</button></span>`).join('')}${pick(gi, ei)}</div></div>`).join('')}
+      <button class="btn small" type="button" data-ecenew="${gi}">+ Envelope</button></div>`).join('');
+  $('#ecUn').innerHTML = un.length ? `<strong>Not in an envelope yet</strong> (last 3 months on the budget accounts): ${un.slice(0, 12).map(u => `${esc(srcLabel(u.src))} ${eur0.format(u.amount)}`).join(' · ')}` : '<span class="pos">All recent spending on the budget accounts has an envelope.</span>';
+}
+document.addEventListener('click', e => {
+  const t = e.target;
+  if (t.closest('[data-envcats]')){ e.preventDefault(); if (envOn()) openEnvCats(); return; }
+  if (!t.closest('#envCatDlg')) return;
+  const D = state.ecDraft, at = a => a.split('.').map(Number);
+  if (t.id === 'ecNewGroup'){ D.push({ id: newId(), name: '', envs: [] }); drawEnvCats(); $$('#ecList [data-ecg]').pop()?.focus(); return; }
+  if (t.closest('[data-ecenew]')){ const g = D[+t.closest('[data-ecenew]').dataset.ecenew]; g.envs.push({ id: newId(), name: '', src: [] }); drawEnvCats(); return; }
+  if (t.closest('[data-ecgdel]')){ const g = D[+t.closest('[data-ecgdel]').dataset.ecgdel]; if (g.envs.length && !confirm(`Remove ${g.name || 'this category'} and its ${g.envs.length} envelope${g.envs.length === 1 ? '' : 's'}? Money in them goes back to Ready to Assign.`)) return; D.splice(D.indexOf(g), 1); drawEnvCats(); return; }
+  if (t.closest('[data-ecedel]')){ const [gi, ei] = at(t.closest('[data-ecedel]').dataset.ecedel); D[gi].envs.splice(ei, 1); drawEnvCats(); return; }
+  if (t.closest('[data-ecsdel]')){ const [gi, ei, si] = at(t.closest('[data-ecsdel]').dataset.ecsdel); D[gi].envs[ei].src.splice(si, 1); drawEnvCats(); return; }
+  if (t.id === 'ecCancel') $('#envCatDlg').close();
+});
+$('#envCatDlg').addEventListener('input', e => {
+  const t = e.target, D = state.ecDraft;
+  if (t.dataset.ecg !== undefined) D[+t.dataset.ecg].name = t.value.slice(0, 40);
+  if (t.dataset.ece !== undefined){ const [gi, ei] = t.dataset.ece.split('.').map(Number); D[gi].envs[ei].name = t.value.slice(0, 40); }
+  if (t.dataset.ect !== undefined){ const v = Math.max(0, +t.value || 0); if (v) state.ecTargets[t.dataset.ect] = v; else delete state.ecTargets[t.dataset.ect]; }
+});
+$('#envCatDlg').addEventListener('change', e => {
+  const t = e.target; if (t.dataset.ecsrc === undefined || !t.value) return;
+  const [gi, ei] = t.dataset.ecsrc.split('.').map(Number), env = state.ecDraft[gi].envs[ei];
+  env.src = [...(env.src || []), t.value];
+  if (!env.name.trim()) env.name = (t.value.split('›')[1] || t.value).slice(0, 40);
+  drawEnvCats();
+});
+$('#envCatForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const D = state.ecDraft.map(g => ({ ...g, name: g.name.trim(), envs: g.envs.map(x => ({ ...x, name: x.name.trim() })) }));
+  const err = m => { $('#ecErr').textContent = m; $('#ecErr').hidden = false; };
+  if (D.some(g => !g.name)) return err('Every category needs a name.');
+  if (D.some(g => g.envs.some(x => !x.name))) return err('Every envelope needs a name.');
+  const ids = new Set(D.flatMap(g => g.envs.map(x => x.id)));
+  const targets = Object.fromEntries(Object.entries(state.ecTargets).filter(([k]) => ids.has(k)));
+  if (await saveEnv({ groups: D, targets })){ $('#envCatDlg').close(); toast('Categories saved'); }
 });
 
 // What isn't set up yet takes one line on the Overview instead of a card each.
@@ -5270,7 +5340,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26e';
+const APP_VERSION = '2026-10-26f';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
