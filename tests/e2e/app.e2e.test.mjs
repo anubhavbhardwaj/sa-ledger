@@ -743,3 +743,25 @@ test('envelopes QA: spending from accounts outside the budget is shown per accou
   assert.match(await app.text('#page-transactions'), /Deutsche Bank → DB Credit Card/);
   await clean(app);
 });
+
+test('envelopes: accounts with no balance in the app are flagged in setup; typing today\'s balances works back to the start day', async () => {
+  const app = await openApp(), { page } = app, m = month(0), pm = month(-1), now = new Date().toISOString(), td = d(0);
+  await app.seed({
+    accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: td }, cc: { name: 'Deutsche Bank CC', type: 'card', currency: 'EUR', owner: 'Anubhav', createdAt: td },
+      ax: { name: 'Axis NRE', type: 'bank', currency: 'INR', owner: 'Anubhav', createdAt: td } },
+    expenses: { e1: { amount: 120, date: m + '-02', store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now },
+      e2: { amount: 80, date: m + '-03', store: 'Zara', category: 'Shopping', account: 'Deutsche Bank CC', spender: 'Anubhav', createdAt: now } },
+    income: { i1: { amount: 1000, date: m + '-01', source: 'Salary', category: 'Salary', account: 'Deutsche Bank', earner: 'Anubhav', createdAt: now } } });
+  await page.waitForTimeout(300);
+  await page.click('#budgetPanel [data-envsetup]'); await page.waitForSelector('#envSetupDlg[open]');
+  assert.match(await app.text('#esNoBal'), /2 ticked accounts have no balance in the app yet/);
+  await page.click('[data-estoday]'); await page.waitForSelector('#ckDlg[open]');
+  assert.deepEqual(await page.$$eval('#ckList .nm', e => e.map(x => x.textContent)), ['Deutsche Bank', 'Deutsche Bank CC']);
+  await page.fill('[data-ckacc="db"]', '2500'); await page.fill('[data-ckacc="cc"]', '300');
+  await page.click('#ckForm [type=submit]'); await page.waitForTimeout(600);
+  assert.equal(await page.isHidden('#esNoBal'), true);
+  // Deutsche Bank on the day before the start: 2500 today − 1000 salary + 120 groceries = 1620. Card: owed 300 today − 80 since = 220 owed.
+  assert.equal(await page.inputValue('[data-esamt="Deutsche Bank"]'), '1620.00'); assert.equal(await page.inputValue('[data-esamt="Deutsche Bank CC"]'), '-220.00');
+  assert.match(await app.text('#esAccs'), /worked back from/);
+  await clean(app);
+});

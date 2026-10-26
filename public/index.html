@@ -1213,6 +1213,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
     <div class="fields"><label class="f">Start on<input id="es-start" type="date"></label></div>
     <label class="chk"><input type="checkbox" id="es-trips"> <span>Separate envelope per trip (under Travel). Off: trip spending goes to your envelopes by its category, like everything else.</span></label>
     <strong style="font-size:13.5px">Budget accounts and the money in them on the start day</strong>
+    <div class="banner" id="esNoBal" style="margin:0;font-size:13px" hidden></div>
     <div id="esAccs" class="esacc"></div>
     <p class="muted" id="esTotal" style="margin:0;font-size:13px"></p>
     <p class="err" id="esErr" hidden></p>
@@ -3661,9 +3662,13 @@ function drawEnvSetup(){
   const start = $('#es-start').value || today(), picked = new Set($$('#esAccs [data-esacc]:checked').map(i => i.value)), keep = {};
   $$('#esAccs [data-esamt]').forEach(i => { if (i.dataset.touched) keep[i.dataset.esamt] = i.value; });
   const day = addDays(start, -1), A = state.accounts.filter(a => a.type !== 'investment');
-  $('#esAccs').innerHTML = A.map(a => { const e = estimate(a, day), v = e ? toEur(a, e.balance) : 0, on = picked.has(a.name);
-    return `<input type="checkbox" data-esacc value="${esc(a.name)}" ${on ? 'checked' : ''} aria-label="${esc(a.name)}"><span>${esc(a.name)} <span class="muted">${a.type === 'card' ? 'card' : a.currency || 'EUR'}${e && e.base.virtual ? ' · no balance typed in' : ''}</span></span>
+  const noBal = [];
+  $('#esAccs').innerHTML = A.map(a => { const e = estimate(a, day), v = e ? toEur(a, e.balance) : 0, on = picked.has(a.name), none = !e || e.base.virtual;
+    if (on && none && keep[a.name] === undefined) noBal.push(a);
+    return `<input type="checkbox" data-esacc value="${esc(a.name)}" ${on ? 'checked' : ''} aria-label="${esc(a.name)}"><span>${esc(a.name)} <span class="muted">${a.type === 'card' ? 'card' : a.currency || 'EUR'}${none ? ' · <span style="color:var(--warn)">no balance in the app</span>' : e.base.back ? ' · worked back from ' + shortDate(e.base.from) : ''}</span></span>
       <input type="number" step="0.01" data-esamt="${esc(a.name)}" value="${keep[a.name] ?? v.toFixed(2)}" ${on ? '' : 'disabled'} ${keep[a.name] !== undefined ? 'data-touched="1"' : ''} aria-label="Money in ${esc(a.name)}">`; }).join('');
+  $('#esNoBal').hidden = !noBal.length;
+  $('#esNoBal').innerHTML = noBal.length ? `<span>${noBal.length === 1 ? esc(noBal[0].name) + ' has' : noBal.length + ' ticked accounts have'} no balance in the app yet, so ${noBal.length === 1 ? 'it starts' : 'they start'} at €0. Easiest: type what’s in ${noBal.length === 1 ? 'it' : 'them'} today (from your bank apps); the app works back to ${shortDate(day)} through your entries.</span><button class="btn small primary" type="button" data-estoday="${esc(JSON.stringify(noBal.map(a => a.id)))}">Type today’s balances</button>` : '';
   const total = $$('#esAccs [data-esamt]:not(:disabled)').reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
   $('#esTotal').innerHTML = `Starting Ready to Assign: <strong>${signedEur(total)}</strong> (euros in the ticked accounts on ${shortDate(day, true)}, cards as negative debt, other currencies at today’s rate). Change a number if it’s off.`;
 }
@@ -3672,7 +3677,8 @@ function openEnvSetup(extra = []){
   $('#es-start').value = on ? cfg.start : thisMonth() + '-01'; $('#es-trips').checked = on ? cfg.trips !== false : false;
   $('#esAccs').innerHTML = [...new Set([...(on ? cfg.accounts : envGuessAccounts()), ...extra])].map(n => `<input type="checkbox" data-esacc value="${esc(n)}" checked>`).join('');
   drawEnvSetup();
-  if (on && cfg.openingBy) $$('#esAccs [data-esamt]').forEach(i => { if (i.dataset.esamt in cfg.openingBy){ i.value = cfg.openingBy[i.dataset.esamt]; i.dataset.touched = '1'; } });
+  if (on && cfg.openingBy) $$('#esAccs [data-esamt]').forEach(i => { if (i.dataset.esamt in cfg.openingBy && +cfg.openingBy[i.dataset.esamt]){ i.value = (+cfg.openingBy[i.dataset.esamt]).toFixed(2); i.dataset.touched = '1'; } });
+  drawEnvSetup();
   if (on) $('#esTotal').innerHTML = $('#esTotal').innerHTML.replace(/<strong>[^<]*<\/strong>/, `<strong>${signedEur($$('#esAccs [data-esamt]:not(:disabled)').reduce((s, i) => s + (parseFloat(i.value) || 0), 0))}</strong>`);
   $('#esSave').textContent = on ? 'Save' : 'Start'; $('#esErr').hidden = true; $('#envSetupDlg').showModal();
 }
@@ -3688,6 +3694,7 @@ document.addEventListener('click', async e => {
   if (t.closest('[data-envmove]')) return openEnvMove();
   if (t.closest('[data-ccfix]')) return openCcFix();
   if (t.closest('[data-cckeep]')){ lsSet('ccFixKept', '1'); render(); return; }
+  if (t.closest('[data-estoday]')){ openCheckin(JSON.parse(t.closest('[data-estoday]').dataset.estoday)); return; }
   if (t.closest('[data-envaddacc]')){ openEnvSetup(JSON.parse(t.closest('[data-envaddacc]').dataset.envaddacc)); return; }
   if (t.closest('[data-envexclude]')){ const add = JSON.parse(t.closest('[data-envexclude]').dataset.envexclude), ex = [...new Set([...(state.envCfg.excluded || []), ...add])];
     if (await saveEnv({ excluded: ex })) toast(`${add.join(', ')} stay${add.length === 1 ? 's' : ''} out of the envelopes. Settings can bring ${add.length === 1 ? 'it' : 'them'} in.`); return; }
@@ -4151,8 +4158,14 @@ function flows(acc, from, to, after, before){
 }
 // Estimated balance on a date: last check-in on or before it, plus everything recorded since.
 function estimate(acc, asOf = today()){
-  const cks = checkinsOf(acc).filter(c => c.date <= asOf);
+  const all = checkinsOf(acc), cks = all.filter(c => c.date <= asOf);
   let base = cks[cks.length - 1];
+  // Only a later balance typed in: work back from it through the entries logged in between.
+  const later = !base && all.find(c => c.date > asOf);
+  if (later){
+    const g = flows(acc, asOf, later.date, null, later.createdAt), bal = later.balance - g.net;
+    return { balance: bal, base: { balance: bal, date: asOf, back: true, from: later.date }, f: { spent: 0, income: 0, tOut: 0, tIn: 0, net: 0, n: 0 } };
+  }
   if (!base){
     // No check-in yet: start from zero on the day the account was added, so moves into a new account show up.
     const added = String(acc.createdAt || '').slice(0, 10);
@@ -4407,6 +4420,7 @@ $('#ckForm').addEventListener('submit', async e => {
     const b = writeBatch(fs), now = new Date().toISOString(), me = usernameOf(state.user);
     rows.forEach(r => b.set(doc(checkinsCol), { accountId: r.a.id, date, balance: r.balance, createdAt: now, createdBy: me }));
     await b.commit(); ckdlg.close();
+    if ($('#envSetupDlg').open){ const redo = () => { const ids = new Set(rows.map(r => r.a.name)); $$('#esAccs [data-esamt]').forEach(i => { if (ids.has(i.dataset.esamt)) delete i.dataset.touched; }); drawEnvSetup(); }; redo(); setTimeout(redo, 400); }
     toast(`Saved ${rows.length} check-in${rows.length===1?'':'s'}` + (notes.length ? ` · ${notes.map(n => `${n.a.name} ${n.gap > 0 ? '+' : '−'}${fmtAcc(n.a, Math.abs(n.gap))} vs entries`).join(', ')}` : ''));
   } catch (x){ err.textContent = writeError(x); err.hidden = false; }
   finally { $('#ckSave').disabled = false; }
@@ -5426,7 +5440,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26l';
+const APP_VERSION = '2026-10-26m';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
