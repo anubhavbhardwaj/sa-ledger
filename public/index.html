@@ -170,10 +170,6 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .avatar[aria-expanded="true"]{box-shadow:0 0 0 3px var(--accent-soft)}
 .pmenu{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:250px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:grid}
 .pmenu[hidden]{display:none!important}
-.mnrows{display:grid;gap:2px}.mnrow{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line)}.mnrow:last-child{border-bottom:0}
-.mnrow .who{font-weight:600}.mnrow .v{font-family:var(--f-mono);font-size:18px;font-weight:600;text-align:right}.mnrow .sub{grid-column:1/-1;font-size:12px;color:var(--muted)}.mnrow.tot .v{font-size:20px}
-.mnacc{display:grid;grid-template-columns:1fr auto;gap:0 10px;font-size:13px;padding:5px 0}.mnacc .age{grid-column:1/-1;font-size:11.5px;color:var(--muted)}.mnacc .age.old{color:var(--warn)}
-.mnpick{display:grid;grid-template-columns:1fr auto auto;gap:6px 14px;align-items:center;font-size:13.5px}.mnpick .h{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .setupline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}.setupline[hidden]{display:none}
 .morewrap{position:relative}.morewrap .pmenu{left:0;right:auto;width:240px}
 .pm-head{font-size:12.5px;color:var(--muted);padding:8px 10px 6px}
@@ -830,7 +826,6 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
       <section class="panel" id="nextUp" hidden></section>
       <section class="panel" id="todoCard" hidden></section>
       <div class="pagehead"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
-      <section class="panel" id="moneyP" hidden></section>
       <section class="kpis" id="kpis" aria-label="Summary"></section>
       <div class="setupline" id="setupLine" hidden></div>
       <section class="panel" id="budgetPanel" hidden></section>
@@ -1147,16 +1142,6 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
   </form>
 </dialog>
 
-<dialog id="moneyDlg">
-  <form method="dialog" id="moneyForm" style="display:grid;gap:12px;padding:20px;max-width:560px">
-    <h3>Money now: which accounts count</h3>
-    <p class="muted" style="margin:0;font-size:13px">Tick the accounts and cards each of you uses day to day. A shared account can be ticked for both; it counts once in Together. Each currency balance (e.g. Wise Common INR) is its own account, converted at today’s ECB rate.</p>
-    <div id="moneyPick" style="display:grid;gap:10px"></div>
-    <p class="muted" style="margin:0;font-size:12.5px">Missing one? <button class="linkbtn" type="button" id="moneyNewAcc">Add an account</button></p>
-    <p class="err" id="moneyErr" hidden></p>
-    <div class="dlg-actions"><div class="right"><button class="btn" type="submit">Cancel</button><button class="btn primary" type="button" id="moneySave">Save</button></div></div>
-  </form>
-</dialog>
 <dialog id="ckDlg">
   <form id="ckForm" novalidate style="display:grid;gap:14px;padding:20px">
     <h3>Check in balances</h3>
@@ -1631,7 +1616,6 @@ onAuthStateChanged(auth, user => {
     const bs = snap.docs.find(x => x.id === 'bookings'); state.bkSettings = bs ? bs.data() : {};
     const lv = snap.docs.find(x => x.id === 'leave'); state.leave = lv ? lv.data() : {};
     const gl = snap.docs.find(x => x.id === 'goals'); state.goals = gl ? gl.data().items || [] : [];
-    const mo = snap.docs.find(x => x.id === 'money'); state.money = mo ? mo.data() : null;
     const pp = snap.docs.find(x => x.id === 'people'); state.people = pp ? pp.data().items || [] : [];
     if ($('#ppDlg')?.open && state.ppView === 'list') renderPeople();
     renderPassportBar();
@@ -1852,7 +1836,7 @@ function renderOverview(ms){
     <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' + (invWho.length > 1 ? ' (' + invWho.map(([k, v]) => esc(k) + ' ' + eur0.format(v)).join(' · ') + ')' : invWho.length === 1 ? ' by ' + esc(invWho[0][0]) : '') : ''}</span></div>
     <div class="kpi"><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
     + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${hm0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : `<span class="${nw.delta >= 0 ? 'pos' : 'neg'}">${signed(nw.delta)}</span> since end of ${MON[+nw.prevM.slice(5,7)-1]}`} · Wealth →</span></a>` : ''; })();
-  renderBudgets(); renderSetupLine(); renderMoney();
+  renderBudgets(); renderSetupLine();
   renderIncomeVsSpend($('#ovTrend'));
   renderBars('category', $('#ovCats'), {max:6, filtered:false, goto:'transactions'});
   const recent = [...rows.map(r => ({...r, kind:'expense'})), ...inc, ...state.transfers.filter(inPeriod)]
@@ -3469,78 +3453,6 @@ function goalEmergency(g){
   for (const a of accs){ const e = estimate(a); if (!e || (e.base.virtual && Math.abs(e.balance) < 0.5)) missing.push(a.name); else have += toEur(a, e.balance); }
   return { target, avg, accs, have, missing };
 }
-// ---------- Money now: what each of you has right now in the accounts you use day to day, minus cards owed ----------
-// Each balance is an estimate: the last real balance typed in (a check-in) plus every entry logged on that account
-// since. Other currencies convert at today's ECB rate. Cards count as negative (what's owed).
-const MONEY_WHO = [['anubhav', 'Anubhav'], ['sulekha', 'Sulekha']];
-const moneyAccs = () => state.accounts.filter(a => a.type !== 'investment');
-// Before anything is saved: a guess from the account names (Deutsche Bank, Wise Common, Wise Sulekha) and card owners.
-function moneyGuess(){
-  const A = moneyAccs(), ids = f => A.filter(f).map(a => a.id);
-  const common = a => a.type !== 'card' && /wise/i.test(a.name) && /common|joint|shared|gemeinsam|both/i.test(a.name);
-  const card = who => a => a.type === 'card' && (a.owner === who || a.owner === 'Shared');
-  return {
-    anubhav: ids(a => (a.type !== 'card' && /deutsche|\bdb\b/i.test(a.name)) || common(a) || card('Anubhav')(a)),
-    sulekha: ids(a => common(a) || (a.type !== 'card' && /wise/i.test(a.name) && /sulekha/i.test(a.name)) || card('Sulekha')(a)),
-  };
-}
-function moneyCfg(){ const m = state.money; return m && (m.anubhav || m.sulekha) ? { anubhav: m.anubhav || [], sulekha: m.sulekha || [], saved: true } : { ...moneyGuess(), saved: false }; }
-function moneyLine(ids){
-  const accs = ids.map(id => state.accounts.find(a => a.id === id)).filter(Boolean), td = today();
-  const rows = accs.map(a => {
-    const e = estimate(a), cur = a.currency || 'EUR', rateOk = cur === 'EUR' || !!state.fxLatest[cur];
-    const days = e && !e.base.virtual ? Math.round((Date.parse(td) - Date.parse(e.base.date)) / 864e5) : null;
-    return { a, e, own: e ? e.balance : 0, eur: e ? toEur(a, e.balance) : 0, rateOk, days, none: !e || e.base.virtual };
-  });
-  const cash = rows.filter(r => r.a.type !== 'card').reduce((s, r) => s + r.eur, 0), owed = -rows.filter(r => r.a.type === 'card').reduce((s, r) => s + r.eur, 0);
-  return { rows, cash, owed, total: cash - owed, none: rows.filter(r => r.none).length, norate: rows.filter(r => !r.rateOk).length,
-    oldest: rows.filter(r => r.days !== null).reduce((m, r) => Math.max(m, r.days), -1) };
-}
-const ageText = d => d === 0 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago';
-function renderMoney(){
-  const el = $('#moneyP'); if (!el) return;
-  const cfg = moneyCfg(), all = [...new Set([...cfg.anubhav, ...cfg.sulekha])];
-  if (!state.accountsReady || !moneyAccs().length){ el.hidden = true; return; }
-  el.hidden = false;
-  if (!all.length){
-    el.innerHTML = `<header><h2>Money now</h2></header><p class="muted" style="margin:0;font-size:13px">What each of you has in your day-to-day accounts right now, minus what’s owed on cards.</p>
-      <div><button class="btn primary" type="button" data-moneypick>Choose accounts</button></div>`;
-    return;
-  }
-  const money = v => `<span class="${v < 0 ? 'neg' : ''}">${v < 0 ? '−' : ''}${eur.format(Math.abs(v))}</span>`;
-  const sub = L => [L.owed > 0.004 ? `${eur.format(L.cash)} in accounts − ${eur.format(L.owed)} on cards` : `${L.rows.length} account${L.rows.length === 1 ? '' : 's'}`,
-    L.oldest >= 0 ? `oldest balance ${ageText(L.oldest)}` : '', L.none ? `<span style="color:var(--warn)">${L.none} without a balance yet</span>` : ''].filter(Boolean).join(' · ');
-  const lines = MONEY_WHO.map(([k, name]) => cfg[k].length ? { name, L: moneyLine(cfg[k]) } : null).filter(Boolean);
-  const T = moneyLine(all);
-  const accRow = r => `<div class="mnacc"><span>${esc(r.a.name)}${r.a.type === 'card' ? ' <span class="muted">(card, owed)</span>' : ''}</span>
-      <span style="font-family:var(--f-mono)">${r.a.type === 'card' ? fmtAcc(r.a, -r.own) : fmtAcc(r.a, r.own)}${(r.a.currency || 'EUR') !== 'EUR' ? ` <span class="muted">≈ ${r.rateOk ? eur.format(Math.abs(r.eur)) : 'rate loading'}</span>` : ''}</span>
-      <span class="age ${r.none || r.days > 14 ? 'old' : ''}">${r.none ? 'No balance typed in yet: counted from entries only' : 'Balance typed in ' + ageText(r.days) + (r.e.f.n ? ` + ${r.e.f.n} entr${r.e.f.n === 1 ? 'y' : 'ies'} since` : '')}</span></div>`;
-  el.innerHTML = `<header><h2>Money now</h2><span class="right"><button class="btn ghost small" type="button" data-moneypick>${cfg.saved ? 'Accounts' : 'Check accounts'}</button><button class="btn small" type="button" data-moneyck>Update balances</button></span></header>
-    ${cfg.saved ? '' : '<p class="muted" style="margin:0;font-size:12.5px">Accounts guessed from their names. Check them once and save.</p>'}
-    <div class="mnrows">${lines.map(x => `<div class="mnrow"><span class="who">${x.name}</span><span class="v">${money(x.L.total)}</span><span class="sub">${sub(x.L)}</span></div>`).join('')}
-      ${lines.length > 1 ? `<div class="mnrow tot"><span class="who">Together</span><span class="v">${money(T.total)}</span><span class="sub">${sub(T)}</span></div>` : ''}</div>
-    <details class="psmore"><summary>By account</summary>${T.rows.map(accRow).join('')}
-      <p class="muted" style="margin:6px 0 0;font-size:12px">Each balance is the last one typed in plus the entries logged on that account since. Other currencies at today’s ECB rate.</p></details>`;
-}
-function openMoneyPick(){
-  const cfg = moneyCfg(), A = moneyAccs();
-  const row = a => `<span>${esc(a.name)} <span class="muted">${a.currency || 'EUR'} · ${esc(a.owner)}</span></span>${MONEY_WHO.map(([k]) => `<input type="checkbox" data-mn="${k}" value="${esc(a.id)}" ${cfg[k].includes(a.id) ? 'checked' : ''} aria-label="${k} ${esc(a.name)}">`).join('')}`;
-  const grp = (title, f) => { const arr = A.filter(f); return arr.length ? `<div class="mnpick"><span class="h">${title}</span><span class="h">Anubhav</span><span class="h">Sulekha</span>${arr.map(row).join('')}</div>` : ''; };
-  $('#moneyPick').innerHTML = grp('Accounts', a => a.type !== 'card') + grp('Credit cards', a => a.type === 'card') || '<p class="empty" style="margin:0">No accounts yet.</p>';
-  $('#moneyErr').hidden = true; $('#moneyDlg').showModal();
-}
-document.addEventListener('click', e => {
-  if (e.target.closest('[data-moneypick]')) return openMoneyPick();
-  if (e.target.closest('[data-moneyck]')){ const c = moneyCfg(); openCheckin([...new Set([...c.anubhav, ...c.sulekha])]); }
-});
-$('#moneyNewAcc').addEventListener('click', () => { $('#moneyDlg').close(); $('#newAcc').click(); });
-$('#moneySave').addEventListener('click', async () => {
-  const pick = k => $$(`#moneyPick [data-mn="${k}"]:checked`).map(i => i.value);
-  const d = { anubhav: pick('anubhav'), sulekha: pick('sulekha'), updatedAt: new Date().toISOString(), updatedBy: usernameOf(state.user) };
-  try { await setDoc(doc(fs, 'settings', 'money'), d); state.money = d; $('#moneyDlg').close(); renderMoney(); toast('Saved'); }
-  catch (x){ $('#moneyErr').textContent = x?.code === 'permission-denied' ? 'Not saved: publish the latest Firestore rules first.' : writeError(x); $('#moneyErr').hidden = false; }
-});
-
 // What isn't set up yet takes one line on the Overview instead of a card each.
 function renderSetupLine(){
   const el = $('#setupLine'); if (!el) return;
@@ -5154,7 +5066,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26b';
+const APP_VERSION = '2026-10-26c';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
