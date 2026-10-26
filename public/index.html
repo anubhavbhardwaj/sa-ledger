@@ -3577,6 +3577,7 @@ function renderEnvelopes(el){
     return `<details class="ybg" ${hot ? 'open' : ''}><summary><div class="ybr"><span class="nm">${esc(g.group)}</span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(row).join('')}</details>`; };
   el.innerHTML = `<header><h2>Envelopes · ${monthLabel(m)}</h2><span class="right">${toFill ? `<button class="btn primary small" type="button" data-envtargets>Assign ${toFill} target${toFill === 1 ? '' : 's'}</button>` : ''}<button class="btn small" type="button" data-envmove>Move</button><button class="btn ghost small" type="button" data-envcats>Categories</button><button class="btn ghost small" type="button" data-envsetup>Settings</button></span></header>
     <div class="rta ${B.ready > 0.004 ? 'pos' : B.ready < -0.004 ? 'neg' : ''}"><span>Ready to Assign</span><strong>${signedEur(B.ready)}</strong><span class="sub">${monthLabel(m)}: ${eur0.format(B.inflow)} came in · ${eur0.format(B.assigned)} assigned${B.overspentLast ? ` · ${eur0.format(B.overspentLast)} overspent last month` : ''}. Tap an envelope to assign money.</span></div>
+    ${cfg.start.startsWith(m) && cfg.start.slice(8) !== '01' ? `<p class="banner" style="margin:0;font-size:13px"><span>Counting from ${shortDate(cfg.start)}, your start day: ${monthLabel(m)} spending before it isn’t in the envelopes (it’s in the starting money).</span><button class="btn small" type="button" data-envwhole="${m}-01">Count all of ${MON[+m.slice(5, 7) - 1]}</button></p>` : ''}
     <div class="ybud"><div class="ybh"><span>Envelope</span><span>Assigned</span><span>Activity</span><span>Available</span></div>${G.map(grp).join('')}</div>`;
 }
 function openEnvAssign(key){
@@ -3621,7 +3622,7 @@ function drawEnvSetup(){
 }
 function openEnvSetup(){
   const cfg = state.envCfg, on = envOn();
-  $('#es-start').value = on ? cfg.start : today(); $('#es-trips').checked = on ? cfg.trips !== false : true;
+  $('#es-start').value = on ? cfg.start : thisMonth() + '-01'; $('#es-trips').checked = on ? cfg.trips !== false : true;
   $('#esAccs').innerHTML = (on ? cfg.accounts : envGuessAccounts()).map(n => `<input type="checkbox" data-esacc value="${esc(n)}" checked>`).join('');
   drawEnvSetup();
   if (on && cfg.openingBy) $$('#esAccs [data-esamt]').forEach(i => { if (i.dataset.esamt in cfg.openingBy){ i.value = cfg.openingBy[i.dataset.esamt]; i.dataset.touched = '1'; } });
@@ -3631,6 +3632,7 @@ function openEnvSetup(){
 document.addEventListener('click', async e => {
   const t = e.target;
   if (t.closest('[data-envsetup]')){ e.preventDefault(); return openEnvSetup(); }
+  if (t.closest('[data-envwhole]')){ openEnvSetup(); $('#es-start').value = t.closest('[data-envwhole]').dataset.envwhole; $('#es-start').dispatchEvent(new Event('change')); return; }
   if (t.closest('[data-envtargets]')){
     const f = assignTargets(state.envCfg, envMonthSel());
     if (await saveEnv({ assigned: f.assigned })) toast(`Assigned ${eur0.format(f.total)} to ${f.n} envelope${f.n === 1 ? '' : 's'}`);
@@ -3657,7 +3659,7 @@ $('#envMoveForm').addEventListener('submit', async e => {
   if (await saveEnv({ assigned: moveAssigned(state.envCfg, envMonthSel(), from, to, v) })){ $('#envMoveDlg').close(); toast('Moved ' + eur.format(v)); }
 });
 $('#esCancel').addEventListener('click', () => $('#envSetupDlg').close());
-$('#es-start').addEventListener('change', drawEnvSetup);
+$('#es-start').addEventListener('change', () => { $$('#esAccs [data-esamt]').forEach(i => { delete i.dataset.touched; }); drawEnvSetup(); });
 $('#esAccs').addEventListener('change', e => { if (e.target.matches('[data-esacc]')) drawEnvSetup(); });
 $('#esAccs').addEventListener('input', e => { if (e.target.matches('[data-esamt]')){ e.target.dataset.touched = '1';
   $('#esTotal').querySelector('strong').textContent = signedEur($$('#esAccs [data-esamt]:not(:disabled)').reduce((s, i) => s + (parseFloat(i.value) || 0), 0)); } });
@@ -5348,7 +5350,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26g';
+const APP_VERSION = '2026-10-26h';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

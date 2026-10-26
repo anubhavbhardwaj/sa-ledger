@@ -9,6 +9,7 @@ before(start);
 after(stop);
 
 // Every test ends with: no JavaScript errors on the page, and no write the database rules would refuse.
+const addDaysT = (s, k) => { const x = new Date(s + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + k); return x.toISOString().slice(0, 10); };
 async function clean(app){
   assert.deepEqual(app.errors, [], 'page errors');
   assert.deepEqual(await app.ruleErrors(), [], 'writes the Firestore rules would refuse');
@@ -598,8 +599,8 @@ test('envelopes: your own categories (Fixed, Flexible) and envelopes fed by chos
     accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: d(-90) }, wc: { name: 'Wise Common', type: 'bank', currency: 'EUR', owner: 'Shared', createdAt: d(-90) },
       ws: { name: 'Wise Sulekha', type: 'bank', currency: 'EUR', owner: 'Sulekha', createdAt: d(-90) }, cc: { name: 'DB Card', type: 'card', currency: 'EUR', owner: 'Anubhav', createdAt: d(-90) },
       sc: { name: 'Scalable', type: 'investment', currency: 'EUR', owner: 'Anubhav', createdAt: d(-90) }, nre: { name: 'HDFC NRE', type: 'bank', currency: 'INR', owner: 'Anubhav', createdAt: d(-90) } },
-    checkins: { k1: { accountId: 'db', date: d(-10), balance: 1500, createdAt: now }, k2: { accountId: 'wc', date: d(-10), balance: 500, createdAt: now },
-      k3: { accountId: 'ws', date: d(-10), balance: 300, createdAt: now }, k4: { accountId: 'cc', date: d(-10), balance: -200, createdAt: now } },
+    checkins: { k1: { accountId: 'db', date: addDaysT(month(0) + '-01', -5), balance: 1500, createdAt: now }, k2: { accountId: 'wc', date: addDaysT(month(0) + '-01', -5), balance: 500, createdAt: now },
+      k3: { accountId: 'ws', date: addDaysT(month(0) + '-01', -5), balance: 300, createdAt: now }, k4: { accountId: 'cc', date: addDaysT(month(0) + '-01', -5), balance: -200, createdAt: now } },
     income: { i1: { amount: 2000, date: td, source: 'Salary', category: 'Salary', account: 'Deutsche Bank', earner: 'Anubhav', createdAt: now } },
     expenses: { e1: { amount: 120, date: td, store: 'Trattoria', category: 'Eating out', account: 'Wise Common', spender: 'Sulekha', createdAt: now },
       e2: { amount: 80, date: td, store: 'Rewe', category: 'Groceries', subcategory: 'Supermarket', account: 'DB Card', spender: 'Anubhav', createdAt: now },
@@ -642,5 +643,25 @@ test('envelopes: your own categories (Fixed, Flexible) and envelopes fed by chos
   await page.click('[data-envmove]'); await page.waitForSelector('#envMoveDlg[open]');
   await page.selectOption('#em-to', food); await page.fill('#em-amt', '50'); await page.click('#envMoveForm [type=submit]'); await page.waitForTimeout(200);
   assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€3,050\.00.*Food\s*€250\s*−€200\.00\s*€50\.00/);
+  await clean(app);
+});
+
+test('envelopes: a start day mid-month leaves earlier spending out, says so, and "Count all of the month" re-estimates the starting money', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString();
+  await app.seed({
+    accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: m + '-01' } },
+    checkins: { k1: { accountId: 'db', date: addDaysT(m + '-01', -1), balance: 1000, createdAt: now } },
+    expenses: { e1: { amount: 100, date: m + '-01', store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now } },
+    settings: { envelopes: { start: m + '-02', accounts: ['Deutsche Bank'], opening: 900, openingBy: { 'Deutsche Bank': 900 }, trips: true,
+      groups: [{ id: 'g', name: 'Daily', envs: [{ id: 'food', name: 'Groceries', src: ['Groceries'] }] }], assigned: {}, targets: {} } } });
+  await page.waitForTimeout(300);
+  let t = await app.text('#budgetPanel');
+  assert.match(t, /Groceries\s*€0\s*€0\s*€0\.00/, 'the 1st is before the start day'); assert.match(t, /Counting from 2 \w+, your start day/);
+  await page.click('[data-envwhole]'); await page.waitForSelector('#envSetupDlg[open]');
+  assert.equal(await page.inputValue('#es-start'), m + '-01');
+  assert.equal(await page.inputValue('[data-esamt="Deutsche Bank"]'), '1000.00', 'money on the day before the new start');
+  await page.click('#esSave'); await page.waitForTimeout(250);
+  t = await app.text('#budgetPanel');
+  assert.match(t, /Ready to Assign\s*€1,000\.00/); assert.match(t, /Groceries\s*€0\s*−€100\.00\s*−€100\.00/); assert.doesNotMatch(t, /Counting from/);
   await clean(app);
 });
