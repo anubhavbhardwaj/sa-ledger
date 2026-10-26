@@ -3589,11 +3589,13 @@ function renderEnvelopes(el){
   const outBanner = O.total > 0.004 ? `<div class="banner" style="margin:0;font-size:13px;display:grid;gap:8px"><span><strong>${eur0.format(O.total)} not counted:</strong> spent in your envelope categories from accounts that aren’t in the budget.</span>
       ${O.byAcc.map(x => `<span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:140px">${esc(x.acc)} <strong>${eur0.format(x.amount)}</strong>${known.has(x.acc.toLowerCase()) ? '' : ' <span class="muted">(not set up as an account)</span>'}</span>
         ${known.has(x.acc.toLowerCase()) ? `<button class="btn small primary" type="button" data-envaddacc="${esc(JSON.stringify([x.acc]))}">Add to the budget</button>` : ''}<button class="btn small" type="button" data-envexclude="${esc(JSON.stringify([x.acc]))}">Keep out</button></span>`).join('')}</div>` : '';
-  const row = r => `<div class="ybr env" data-envkey="${esc(r.key)}" role="button" tabindex="0"><span class="nm">${esc(envName(r))}${outNote(r)}${r.card && r.owes != null ? ` <span class="muted" style="font-weight:400;font-size:12px">owes ${eur0.format(r.owes)}</span>` : ''}</span><span class="n a">${eur0.format(r.assigned)}</span><span class="n c">${r.activity ? signedEur(r.activity) : '€0'}</span><span class="pill av ${avCls(r, cfg)}">${signedEur(r.available)}</span>
+  const row = r => `<div class="ybr env" data-envkey="${esc(r.key)}" role="button" tabindex="0"><span class="nm">${esc(envName(r))}${outNote(r)}${r.card && r.owes != null ? ` <span class="muted" style="font-weight:400;font-size:12px">owes ${eur0.format(r.owes)}</span>` : ''}</span><span class="n a">${eur0.format(r.assigned)}</span><span class="n c">${r.activity ? signedEur(r.activity) : '€0'}</span><span class="pill av ${avCls(r, cfg)}" ${r.card && r.owes != null ? `title="Set aside ${eur.format(r.available)} of the ${eur.format(r.owes)} the card owes"` : ''}>${signedEur(r.available)}</span>
       <span class="sm">${r.card ? (r.owes != null ? `card owes ${eur0.format(r.owes)} · ` : '') + `assigned ${eur0.format(r.assigned)} · net ${r.activity >= 0 ? 'moved in' : 'paid'} ${eur0.format(Math.abs(r.activity))}` : `assigned ${eur0.format(r.assigned)} · spent ${eur0.format(Math.abs(r.activity))}`}${targets[r.key] ? ` · target ${eur0.format(targets[r.key])}` : ''}</span></div>`;
   const noneRow = r => `<div class="ybr env" data-envcats role="button" tabindex="0"><span class="nm">${esc(r.name)}</span><span class="n a">—</span><span class="n c">${signedEur(r.activity)}</span><span class="pill av neg">${signedEur(r.available)}</span>
       <span class="sm">spent ${eur0.format(Math.abs(r.activity))} · tap to put it in an envelope</span></div>`;
-  const grp = g => { if (g.empty) return `<p class="muted" style="margin:10px 0 0;font-size:13px">No categories yet. <button class="linkbtn" type="button" data-envcats>Create your categories</button></p>`;
+  const grp = g => { if (g.cards) return `<details class="ybg" open><summary><div class="ybr"><span class="nm">Credit Card Payments</span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>
+      <p class="muted" style="margin:6px 4px;font-size:12.5px">Money set aside to pay each card. Buying with a card moves the money here from its category (+); paying the card takes it out (−). Amber: less set aside than the card owes.</p>${g.rows.map(row).join('')}</details>`;
+    if (g.empty) return `<p class="muted" style="margin:10px 0 0;font-size:13px">No categories yet. <button class="linkbtn" type="button" data-envcats>Create your categories</button></p>`;
     if (g.group === 'Travel' && !g.gid) return `<details class="ybg" ${g.rows.some(r => r.activity) ? 'open' : ''}><summary><div class="ybr"><span class="nm">Travel <span class="muted" style="font-weight:400">(one per trip)</span></span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>
       <p class="muted" style="margin:6px 4px;font-size:12.5px">Trip spending is kept per trip here. <button class="linkbtn" type="button" data-envnotrips>Use my categories instead</button></p>${g.rows.map(row).join('')}</details>`;
     if (g.none) return `<details class="ybg" open><summary><div class="ybr"><span class="nm" style="color:var(--danger)">Not assigned</span><span class="n a"></span><span class="n c">${signedEur(g.activity)}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(noneRow).join('')}</details>`;
@@ -3631,6 +3633,7 @@ function openEnvAssign(key){
   $('#ea-amt').value = r.assigned || ''; $('#ea-target').value = tgt || '';
   const prev = budgetMonth(cfg, addMonth(m, -1), envData()), pr = prev.before ? null : prev.rows.find(x => x.key === key);
   const chips = [tgt ? ['Target', tgt] : null, pr && pr.activity ? ['Spent last month', -pr.activity] : null, pr && pr.assigned ? ['Assigned last month', pr.assigned] : null,
+    r.card && r.owes > r.available + 0.004 ? ['Set aside what it owes', r.assigned + (r.owes - Math.max(0, r.available))] : null,
     B.ready > 0.004 ? ['All of Ready to Assign', r.assigned + B.ready] : null].filter(Boolean);
   // YNAB-style: an overspent envelope lists where the money can come from (envelopes with money, Ready to Assign).
   const deficit = r.available < -0.004 ? -r.available : 0, nm = x => (x.group ? x.group + ' › ' : '') + envName(x);
@@ -5475,7 +5478,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26n';
+const APP_VERSION = '2026-10-26o';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
