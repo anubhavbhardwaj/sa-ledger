@@ -1480,7 +1480,7 @@ test('adding: the form shows which envelope the entry lands in and what it leave
   await clean(app);
 });
 
-test('left after envelopes: common groceries bought on Anubhav’s card are the common money’s to pay, not his', async () => {
+test('left after envelopes: a card’s bill counts against its owner, also for common spending on it', async () => {
   const app = await openApp(), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString();
   await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, wc: { name: 'Wise Common', type: 'bank', currency: 'EUR', owner: 'Shared' }, amex: { name: 'AMEX', type: 'card', currency: 'EUR', owner: 'Anubhav' } },
     checkins: { c1: { accountId: 'db', date: s, balance: 1000, createdAt: s + 'T06:00:00Z' }, c2: { accountId: 'wc', date: s, balance: 500, createdAt: s + 'T06:00:00Z' }, c3: { accountId: 'amex', date: s, balance: 0, createdAt: s + 'T06:00:00Z' } },
@@ -1489,9 +1489,9 @@ test('left after envelopes: common groceries bought on Anubhav’s card are the 
       groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'groc', name: 'Groceries', src: ['Groceries'], owner: 'Both' }] }], assigned: { [m]: { groc: 300 } } } } });
   await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
   const t = await app.text('.rwho summary');
-  assert.match(t, /Anubhav\s*€1,000/); assert.match(t, /Common\s*€200/);
+  assert.match(t, /Anubhav\s*€900/); assert.match(t, /Common\s*€300/);
   await page.click('.rwho summary'); await page.waitForTimeout(100);
-  assert.match(await app.text('.rwt'), /bank − cards\s*€1,000\s*€500 − €100/);
+  assert.match(await app.text('.rwt'), /bank − cards\s*€1,000 − €100\s*€500/);
   await clean(app);
 });
 
@@ -1546,16 +1546,3 @@ test('a flight saved without its departure time gets it from the flight data, sa
   await clean(app);
 });
 
-test('left after envelopes: common spending on Anubhav’s card is said to be paid with his card, and only the rest is a transfer', async () => {
-  const app = await openApp(), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString();
-  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, wc: { name: 'Wise Common', type: 'bank', currency: 'EUR', owner: 'Shared' }, amex: { name: 'AMEX', type: 'card', currency: 'EUR', owner: 'Anubhav' } },
-    checkins: { c1: { accountId: 'db', date: s, balance: 1000, createdAt: s + 'T06:00:00Z' }, c2: { accountId: 'wc', date: s, balance: 100, createdAt: s + 'T06:00:00Z' }, c3: { accountId: 'amex', date: s, balance: 0, createdAt: s + 'T06:00:00Z' } },
-    expenses: { e1: { amount: 100, date: s, store: 'Rewe', category: 'Groceries', account: 'AMEX', spender: 'Anubhav', createdAt: s + 'T09:00:00Z' } },
-    settings: { envelopes: { start: s, accounts: ['Deutsche Bank', 'Wise Common', 'AMEX'], opening: 1100, openingBy: { 'Deutsche Bank': 1000, 'Wise Common': 100, AMEX: 0 }, trips: false, updatedAt: now,
-      groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'groc', name: 'Groceries', src: ['Groceries'], owner: 'Both' }] }], assigned: { [m]: { groc: 300 } } } } });
-  await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
-  const t = (await page.$$eval('.rwmove', els => els.map(e => e.textContent.replace(/\s+/g, ' ').trim())));
-  assert.deepEqual(t, ['€100 of the common spending is on Anubhav’s cards: it’s paid when Anubhav pays them, so Anubhav’s €100 left goes there.',
-    'Common is €100 short for the common envelopes; Anubhav has it to spare.Move €100 from Deutsche Bank to Wise Common']);
-  await clean(app);
-});

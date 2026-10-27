@@ -1641,7 +1641,7 @@ import { decodeBCBP } from "./bcbp.js";
 import { detectRecurring, backtest as recurBacktest } from "./recur.js";
 import { checkPhoto, passportAlerts, human as humanDate } from "./verify.js";
 import { formPayload, peopleText, bookmarklet, FILLER_VERSION } from "./fill.js";
-import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, spendingStats, srcLabel, norm as srcNorm, newId, tripKey, ccKey, CC_RE, SAVE_KEY, NONE_KEY, SAVE_A, SAVE_S, saveKeyOf, isSaveKey, committedBy, splitOf, PEOPLE, transferSources, TO, cardShares } from "./envelopes.js";
+import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, spendingStats, srcLabel, norm as srcNorm, newId, tripKey, ccKey, CC_RE, SAVE_KEY, NONE_KEY, SAVE_A, SAVE_S, saveKeyOf, isSaveKey, committedBy, splitOf, PEOPLE, transferSources, TO } from "./envelopes.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -4065,21 +4065,14 @@ function envKpi(){
 function envWho(m, B0){
   const cm = thisMonth(), [y, mo] = m.split('-').map(Number), asOf = m < cm ? new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10) : today(), out = {};
   const B = B0 || envRows(m), tripOwner = id => { const t = state.tripMap[id]; return t && PEOPLE.includes(t.traveller) ? t.traveller : 'Both'; };
-  const cfg = state.envCfg, slot = p => (out[p] ||= { cash: 0, cards: 0, n: 0, noRate: false }), asP = w => w === 'Both' ? 'Shared' : w;
+  const cfg = state.envCfg, slot = p => (out[p] ||= { cash: 0, cards: 0, n: 0, noRate: false });
   for (const name of cfg.accounts || []){
     const a = accOf(name); if (!a || !['Anubhav', 'Sulekha', 'Shared'].includes(a.owner)) continue;
     const e = estimate(a, asOf); if (!e) continue;
     const v = toEur(a, e.balance), o = slot(a.owner);
     if ((a.currency || 'EUR') !== 'EUR' && !state.fxLatest[a.currency]) o.noRate = true;
     o.n++;
-    if (a.type !== 'card'){ o.cash += v; continue; }
-    // A card's debt is shared out by whose envelopes it was spent from (common groceries on Anubhav's card are the
-    // common money's to pay), oldest paid off first; the card's owner keeps what came before the budget.
-    const debt = -v, sh = debt > 0.004 ? cardShares(cfg, a.name, { ...envData(), items: state.items.filter(i => i.date <= asOf), transfers: state.transfers.filter(t => t.date <= asOf), income: state.income.filter(i => i.date <= asOf),
-      tripOwner, debtAtStart: +((B.cardDebt || {})[ccKey(a.name)] || 0), cardOwner: a.owner === 'Shared' ? 'Both' : a.owner }) : null;
-    if (!sh){ o.cards += debt; continue; }
-    // What one of you owes on the other's card: paid when the card's owner pays the card (see whoMoves).
-    for (const [w, f] of Object.entries(sh)){ const t = slot(asP(w)); t.cards += debt * f; if (asP(w) !== a.owner){ t.onCards ||= {}; t.onCards[a.owner] = (t.onCards[a.owner] || 0) + debt * f; } }
+    if (a.type === 'card') o.cards -= v; else o.cash += v;
   }
   // What's still set aside for each, from the envelopes they own: the rest of the balance is free.
   const set = B.before ? { Anubhav: 0, Sulekha: 0, Both: 0 } : committedBy(state.envCfg, B.rows, { futureBy: B.futureBy || {}, tripOwner });
@@ -4094,13 +4087,6 @@ function whoMoves(W, ppl, left){
     .map(a => ({ a, v: estimate(a)?.balance || 0 })).sort((x, y) => y.v - x.v);
   const short = ppl.filter(p => left(p) < -5).sort((a, b) => left(a) - left(b)), spare = ppl.filter(p => left(p) > 5).sort((a, b) => left(b) - left(a));
   const have = Object.fromEntries(ppl.map(p => [p, left(p)])), out = [];
-  // Spending of one of you on the other's card is paid when that card is paid, from the card owner's money: no transfer
-  // for that part, just say so (it is why the card owner seems to have money left over).
-  for (const p of short) for (const q of spare){
-    const owed = Math.floor(Math.min(W.who[p]?.onCards?.[q] || 0, -have[p], have[q])); if (owed < 5) continue;
-    have[p] += owed; have[q] -= owed;
-    out.push(`<div class="rwmove"><span>${eur0.format(owed)} of ${p === 'Shared' ? 'the common' : nm(p) + '’s'} spending is on ${nm(q)}’s cards: it’s paid when ${nm(q)} pays them, so ${nm(q)}’s ${eur0.format(owed)} left goes there.</span></div>`);
-  }
   for (const p of short) for (const q of spare){
     const amt = Math.floor(Math.min(-have[p], have[q])); if (amt < 5) continue;
     const from = accs(q)[0], to = accs(p)[0]; if (!from || !to) continue;
@@ -4125,7 +4111,7 @@ function envWhoHtml(m, B){
       <span class="k sm">bank − cards</span>${ppl.map(p => `<span class="sm">${eur0.format(W.who[p].cash)}${Math.abs(W.who[p].cards) > 0.5 ? ' − ' + eur0.format(W.who[p].cards) : ''}</span>`).join('')}
       <span class="k">In envelopes</span>${ppl.map(p => `<span>${(W.who[p].set || 0) > 0.5 ? '−' + eur0.format(W.who[p].set) : '–'}</span>`).join('')}
       <span class="k tot">Left</span>${ppl.map(p => `<span class="tot ${left(p) < -0.5 ? 'neg' : ''}">${m0(left(p))}</span>`).join('')}
-    </div><p class="rwnote">Accounts in the budget, ${W.past ? 'at the end of the month' : 'today'}; envelopes count for whoever owns them, and so does what a card owes for them${rate ? ' · *rupee rate loading' : ''}.</p></details>${W.past || rate ? '' : whoMoves(W, ppl, left)}`;
+    </div><p class="rwnote">Accounts in the budget, ${W.past ? 'at the end of the month' : 'today'}; envelopes count for whoever owns them${rate ? ' · *rupee rate loading' : ''}.</p></details>${W.past || rate ? '' : whoMoves(W, ppl, left)}`;
 }
 function renderEnvelopes(el){
   const m = envMonthSel(), cfg = state.envCfg;
