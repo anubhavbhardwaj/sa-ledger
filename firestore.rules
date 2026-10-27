@@ -17,11 +17,16 @@ service cloud.firestore {
         && (!('fxRate' in d) || (d.fxRate is number && d.fxRate > 0));
     }
 
+    // On a day you also logged an account's balance: whether this entry is already in that balance (true) or came
+    // after it (false), per account name in lower case. Without it, the order things were entered decides.
+    function validInBal(d) {
+      return !('inBal' in d) || (d.inBal is map && d.inBal.size() <= 2);
+    }
     function validExpense() {
       let d = request.resource.data;
       return d.keys().hasOnly(['amount','date','store','category','subcategory','account',
                                'spender','country','comment','createdAt','createdBy','updatedBy','tripId',
-                               'currency','origAmount','fxRate','tax'])
+                               'currency','origAmount','fxRate','tax','inBal'])
         && d.keys().hasAll(['amount','date','store','category','account','spender'])
         && d.amount is number && d.amount > 0 && d.amount < 1000000
         && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
@@ -32,6 +37,7 @@ service cloud.firestore {
         && (!('comment' in d) || str(d.comment, 500))
         && (!('tripId' in d) || str(d.tripId, 60))
         && (!('tax' in d) || d.tax in ['work','training','advice','donation','household','trades','no'])
+        && validInBal(d)
         && validFx(d);
     }
 
@@ -43,13 +49,14 @@ service cloud.firestore {
     function validIncome() {
       let d = request.resource.data;
       return d.keys().hasOnly(['amount','date','source','category','account','earner',
-                               'comment','createdAt','createdBy','updatedBy','currency','origAmount','fxRate'])
+                               'comment','createdAt','createdBy','updatedBy','currency','origAmount','fxRate','inBal'])
         && d.keys().hasAll(['amount','date','source','category','account','earner'])
         && d.amount is number && d.amount > 0 && d.amount < 10000000
         && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && str(d.source, 120) && d.source.size() > 0
         && str(d.category, 60) && str(d.account, 60) && str(d.earner, 40)
         && (!('comment' in d) || str(d.comment, 500))
+        && validInBal(d)
         && validFx(d);
     }
 
@@ -87,7 +94,8 @@ service cloud.firestore {
     // 'bookings' (the address booking emails are forwarded to), 'leave' (vacation, work-from-abroad days and travel budget per year),
     // 'goals' (monthly investing and emergency fund goals), 'tax' (workplaces, job ticket and tax rate for the Taxes view)
     // 'people' (names as in the passport, gender, email and phone, for checking forms from a photo)
-    // and 'envelopes' (envelope budgeting: budget accounts, starting money, your categories and envelopes, money assigned per month, targets).
+    // and 'envelopes' (envelope budgeting: budget accounts, starting money, your categories and envelopes, money assigned per month, targets,
+    // adjustments from reconciling, and which envelope a trip's spending goes to).
     function validBudgets() {
       let d = request.resource.data;
       return d.keys().hasOnly(['items','total','updatedAt','updatedBy'])
@@ -129,7 +137,7 @@ service cloud.firestore {
     }
     function validEnvelopes() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['start','accounts','excluded','opening','openingBy','groups','assigned','targets','trips','updatedAt','updatedBy'])
+      return d.keys().hasOnly(['start','accounts','excluded','opening','openingBy','groups','assigned','targets','trips','adjust','tripEnv','updatedAt','updatedBy'])
         && isDate(d.start)
         && d.accounts is list && d.accounts.size() <= 20
         && d.opening is number
@@ -138,7 +146,9 @@ service cloud.firestore {
         && (!('openingBy' in d) || d.openingBy is map)
         && (!('assigned' in d) || (d.assigned is map && d.assigned.size() <= 240))
         && (!('targets' in d) || d.targets is map)
-        && (!('trips' in d) || d.trips is bool);
+        && (!('trips' in d) || d.trips is bool)
+        && (!('adjust' in d) || (d.adjust is list && d.adjust.size() <= 200))
+        && (!('tripEnv' in d) || (d.tripEnv is map && d.tripEnv.size() <= 100));
     }
     function validFxMonths() {
       let d = request.resource.data;
@@ -197,12 +207,13 @@ service cloud.firestore {
     function validTransfer() {
       let d = request.resource.data;
       return d.keys().hasOnly(['amount','date','from','to','comment','createdAt','createdBy','updatedBy',
-                               'currency','origAmount','fxRate'])
+                               'currency','origAmount','fxRate','inBal'])
         && d.keys().hasAll(['amount','date','from','to'])
         && d.amount is number && d.amount > 0 && d.amount < 10000000
         && isDate(d.date)
         && str(d.from, 60) && d.from.size() > 0 && str(d.to, 60) && d.to.size() > 0
         && (!('comment' in d) || str(d.comment, 500))
+        && validInBal(d)
         && validFx(d);
     }
 

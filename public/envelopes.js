@@ -26,7 +26,7 @@
 // split by fixed amounts (Rent: { Anubhav: 860, Sulekha: 900 }). It doesn't change the budget; it tells each of you
 // how much of your balance is still set aside (committedBy).
 //
-// cfg = { start, accounts: [names], excluded: [names], opening, trips,
+// cfg = { start, accounts: [names], excluded: [names], opening, trips, adjust: [{ id, date, amount, note }],
 //         groups: [{ id, name, envs: [{ id, name, src: ['Cat', 'Cat›Sub'], owner?: 'Anubhav'|'Sulekha'|'Both', split?: { Anubhav: €, Sulekha: € } }] }],
 //         assigned: { 'YYYY-MM': { envId: € } }, targets: { envId: € } }
 
@@ -106,6 +106,10 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
   });
   income.forEach(i => { if (!after(i.date) || !isB(i.account)) return; const m = i.date.slice(0, 7), v = +i.amount || 0;
     inflow[m] = (inflow[m] || 0) + v; if (isCard(i.account)) add(m, ccKey(i.account), -v); });
+  // Adjustments from reconciling: money your accounts turned out to have (or not) that no entry explains.
+  const adj = {};
+  (cfg.adjust || []).forEach(a => { if (!a || !/^\d{4}-\d{2}-\d{2}$/.test(a.date || '') || !after(a.date)) return; const m = a.date.slice(0, 7), v = +a.amount || 0;
+    inflow[m] = (inflow[m] || 0) + v; adj[m] = (adj[m] || 0) + v; });
   transfers.forEach(t => {
     if (!after(t.date)) return;
     const f = isB(t.from), to = isB(t.to), m = t.date.slice(0, 7), v = +t.amount || 0;
@@ -127,7 +131,7 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
     const carry = { ...avail }, assignedSum = Object.values(asg).reduce((s, v) => s + (+v || 0), 0);
     for (const k of keys) avail[k] = r2((avail[k] || 0) + (+asg[k] || 0) + (a[k] || 0));
     ready = r2(ready + (inflow[m] || 0) - assignedSum + overspent);
-    if (m === month) out = { inflow: r2(inflow[m] || 0), assigned: r2(assignedSum), overspentLast: r2(-overspent),
+    if (m === month) out = { inflow: r2(inflow[m] || 0), adjusted: r2(adj[m] || 0), assigned: r2(assignedSum), overspentLast: r2(-overspent),
       outside: { total: r2((outside[m] || {}).total || 0), byAcc: Object.entries((outside[m] || {}).byAcc || {}).map(([acc, amount]) => ({ acc, amount: r2(amount) })).sort((a, b) => b.amount - a.amount), byKey: (outside[m] || {}).byKey || {} },
       rows: [...keys].map(k => ({ key: k, ...describe(k), carry: r2(carry[k] || 0), assigned: r2(+asg[k] || 0), activity: r2(a[k] || 0), available: avail[k], ...(k in cardDebt ? { debtAtStart: cardDebt[k] } : {}) })) };
   }

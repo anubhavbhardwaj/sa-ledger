@@ -188,3 +188,12 @@ test('envelopes: an envelope can take the transfers to an account (Transfers to 
   const S = spendingStats(c, data.items, '2026-10', transfers);
   assert.deepEqual(S.src[norm(TO + 'Scalable')], { cur: 500, last: 0, avg: 0 }); assert.deepEqual(S.env.inv, { cur: 500, last: 0, avg: 0 });
 });
+
+test('envelopes: an adjustment from reconciling goes into Ready to Assign in its month (not before the start), and is shown', () => {
+  const c = { ...cfg(), adjust: [{ id: 'a1', date: '2026-10-20', amount: 896, note: 'reconciled' }, { id: 'a2', date: '2026-11-03', amount: -50 }, { id: 'a3', date: '2026-09-30', amount: 1000 }, { id: 'bad', date: 'x', amount: 5 }] };
+  const acc = n => ({ 'DB Card': { type: 'card' }, 'IDFC Card': { type: 'card' } })[n] || { type: 'bank' };
+  const base = budgetMonth(cfg(), '2026-10', { ...data, acc, now: '2026-10' }), oct = budgetMonth(c, '2026-10', { ...data, acc, now: '2026-10' }), nov = budgetMonth(c, '2026-11', { ...data, acc, now: '2026-11' });
+  assert.equal(oct.ready, base.ready + 896); assert.equal(oct.adjusted, 896); assert.equal(oct.inflow, base.inflow + 896);
+  assert.equal(nov.adjusted, -50);
+  assert.equal(nov.ready, budgetMonth(cfg(), '2026-11', { ...data, acc, now: '2026-11' }).ready + 846);
+});

@@ -925,7 +925,7 @@ test('envelopes: plan ahead like YNAB: assign in next month, Ready to Assign now
   await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(200);
   assert.match(await envText(app), /Ready to Assign\s*€2,600\.00/);
   await page.click('[data-envnav="1"]'); await page.waitForTimeout(200);
-  assert.equal(await page.getAttribute(`#months [data-p="${nx}"]`, 'aria-pressed'), 'true');
+  assert.equal(await page.isHidden('#months'), true, 'one month picker on the Budget page: its own ‹ ›');
   let t = await envText(app);
   assert.match(t, /Planning ahead/); assert.match(t, /Food\s*–\s*–\s*€300/, 'starts with this month’s leftover');
   await page.click('[data-envkey="food"]'); await page.waitForSelector('#envAsgDlg[open]');
@@ -938,7 +938,7 @@ test('envelopes: plan ahead like YNAB: assign in next month, Ready to Assign now
   assert.match(await app.text('#kpis'), /Ready to assign\s*€2,150\.00.*€450 set for later months/);
   assert.equal(await page.$(`#months [data-p="${nx}"]`), null, 'months ahead only on the Budget page');
   await app.go('budget'); await page.waitForTimeout(150);
-  assert.match(await page.getAttribute(`#months [data-p="${nx}"]`, 'class'), /ahead/, 'a month with money planned stays listed');
+  assert.match(await envText(app), /Ready to Assign\s*€2,150\.00/, 'the Budget page opens on this month');
   await clean(app);
 });
 
@@ -1301,5 +1301,84 @@ test('Ask AI is given the envelope budget (Ready to Assign, envelopes, overspent
   assert.match(body.context, /## Envelope budget for /); assert.match(body.context, /Ready to Assign 950: came in this month 0, assigned this month 50/);
   assert.match(body.context, /Groceries \| Flexible \| Both \| 50 \| -80 \| -30 \| 300 \| -/);
   assert.match(body.context, /Overspent: Groceries/); assert.doesNotMatch(body.context, /## Budgets for/);
+  await clean(app);
+});
+
+// The October case: Sulekha's rent logged on Wise a minute before its balance (so counted in it), and the €900 from
+// Raiffeisen logged weeks later on the same date (so counted on top): the budget and the balance disagree by €900.
+const balDay = () => {
+  const s = month(-1) + '-01', later = addDaysT(s, 25) + 'T22:10:00Z';
+  return { s, later, seed: { accounts: { ws: { name: 'Wise Sulekha', type: 'bank', currency: 'EUR', owner: 'Sulekha', createdAt: s + 'T07:00:00Z' }, rf: { name: 'Raiffeisen', type: 'bank', currency: 'EUR', owner: 'Sulekha', createdAt: s + 'T07:00:00Z' } },
+    checkins: { c1: { accountId: 'ws', date: s, balance: 4397, createdAt: s + 'T20:33:00Z' }, c2: { accountId: 'rf', date: s, balance: 14491, createdAt: s + 'T20:31:00Z' } },
+    expenses: { rent: { amount: 900, date: s, store: 'Landlord', category: 'Rent', account: 'Wise Sulekha', spender: 'Sulekha', createdAt: s + 'T20:32:00Z' } },
+    transfers: { tr: { amount: 900, date: s, from: 'Raiffeisen', to: 'Wise Sulekha', comment: 'Just for envelope purpose', createdAt: later } },
+    settings: { envelopes: { start: s, accounts: ['Wise Sulekha'], opening: 4397, openingBy: { 'Wise Sulekha': 4397 }, trips: false, updatedAt: s + 'T21:00:00Z',
+      groups: [{ id: 'g', name: 'Fixed', envs: [{ id: 'rent', name: 'Rent', src: ['Rent'], owner: 'Sulekha' }] }], assigned: { [month(-1)]: { rent: 900 } } } } } };
+};
+
+test('budget vs accounts: a €900 gap is shown with its cause, and saying the transfer was already in that day’s balance closes it', async () => {
+  const app = await openApp(), { page } = app, { seed } = balDay();
+  await app.seed(seed); await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
+  let t = await app.text('[data-gapline]');
+  assert.match(t, /Your accounts hold €900 more than the budget counts/);
+  await page.click('[data-gapwhy]');
+  t = await app.text('[data-gapline] .gapwhy');
+  assert.match(t, /From Raiffeisen \+€900\.00 on Wise Sulekha, .* typed in on .*: counted on top of the €4,397\.00 you logged that day/);
+  await page.click('[data-gapline] [data-inbal$="|1"]'); await page.waitForTimeout(300);
+  assert.equal(await page.$('[data-gapline]'), null, 'agree now');
+  const tr = (await dbDocs(app, 'transfers'))[0]; assert.deepEqual(tr.inBal, { 'wise sulekha': true }); assert.equal(tr.comment, 'Just for envelope purpose');
+  // The account page says it, and can change it back.
+  await app.go('wealth'); await page.waitForTimeout(200); await page.click('[data-wv="cash"]').catch(() => {}); await page.waitForTimeout(200); await page.click('[data-acc="ws"]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#accDetail'), /Balance now \(estimate\)\s*€4,397\.00/, 'rent and the €900 from Raiffeisen both in that day’s balance: they cancel');
+  assert.match(await app.text('#accDetail .recent'), /From Raiffeisen.*in that day’s balance/);
+  await clean(app);
+});
+
+test('budget vs accounts: "Add to Ready to Assign" records an adjustment (listed in Settings, removable); a kept starting amount shows what the entries say now', async () => {
+  const app = await openApp(), { page } = app, { seed } = balDay();
+  await app.seed(seed); await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
+  await page.click('[data-gapadj]'); await page.waitForTimeout(300);
+  assert.equal(await page.$('[data-gapline]'), null);
+  assert.match(await app.text('#budgetPanel .rta'), /Ready to Assign\s*€5,297\.00\s*€900 came in \(€900 adjusted\)/);
+  const cfg = (await dbDocs(app, 'settings')).find(x => x.id === 'envelopes'); assert.equal(cfg.adjust.length, 1); assert.equal(cfg.adjust[0].amount, 900);
+  await page.click('[data-envmore]'); await page.click('#budgetPanel [data-envsetup]'); await page.waitForSelector('#envSetupDlg[open]');
+  assert.match(await app.text('#esAdj'), /Adjustments to Ready to Assign.*\+€900\.00/);
+  assert.match(await app.text('#esAccs'), /Wise Sulekha.*your entries now say €5,297\.00 Use/, 'the rent typed in before the balance makes the entries say 5,297 for the day before');
+  await page.click('#esAdj [data-adjdel]'); await page.waitForTimeout(300);
+  assert.equal((await dbDocs(app, 'settings')).find(x => x.id === 'envelopes').adjust.length, 0);
+  await clean(app);
+});
+
+test('adding an entry dated on a day you logged that account’s balance asks which side of it the entry is on', async () => {
+  const app = await openApp(), { page } = app, { s, seed } = balDay();
+  await app.seed(seed); await page.waitForTimeout(400);
+  await page.click('#addBtn'); await page.waitForSelector('#dlg[open]');
+  await page.fill('#f-amount', '25'); await page.fill('#f-store', 'Pharmacy'); await page.fill('#f-category', 'Health'); await page.fill('#f-account', 'Wise Sulekha'); await page.fill('#f-date', s);
+  await page.click('#saveBtn'); await page.waitForTimeout(200);
+  assert.match(await app.text('#balAsk'), /You logged Wise Sulekha’s balance on .*: €4,397\.00\. Was this already in that balance, or did it come after\?/);
+  assert.equal((await dbDocs(app, 'expenses')).length, 1, 'not saved yet');
+  await page.click('[data-balans$="|0"]'); await page.waitForTimeout(300);
+  assert.deepEqual((await dbDocs(app, 'expenses')).find(e => e.store === 'Pharmacy').inBal, { 'wise sulekha': false });
+  // Today's date, no balance logged today: nothing to ask.
+  await page.click('#addBtn'); await page.waitForSelector('#dlg[open]');
+  await page.fill('#f-amount', '5'); await page.fill('#f-store', 'Bakery'); await page.fill('#f-category', 'Groceries'); await page.fill('#f-account', 'Wise Sulekha');
+  await page.click('#saveBtn'); await page.waitForTimeout(300);
+  assert.ok((await dbDocs(app, 'expenses')).some(e => e.store === 'Bakery' && !e.inBal));
+  await clean(app);
+});
+
+test('checking in a balance lists that day’s entries on the account; untick what came after and it is saved on the entry', async () => {
+  const app = await openApp(), { page } = app, now = new Date().toISOString(), td = d(0);
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    expenses: { e1: { amount: 40, date: td, store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now }, e2: { amount: 12, date: td, store: 'Cafe', category: 'Eating Out', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now } } });
+  await page.waitForTimeout(300); await app.go('wealth'); await page.waitForTimeout(200); await page.click('[data-wv="cash"]'); await page.waitForTimeout(200); await page.click('#checkinAll'); await page.waitForSelector('#ckDlg[open]');
+  await page.fill('[data-ckacc="db"]', '1000'); await page.waitForTimeout(100);
+  const t = await app.text('[data-ckday="db"]');
+  assert.match(t, /tick what is already in this balance\..*Rewe\s*−€40\.00.*Cafe\s*−€12\.00/);
+  await page.uncheck('[data-ckin="expense|e2|deutsche bank"]'); await page.click('#ckSave'); await page.waitForTimeout(300);
+  const ex = await dbDocs(app, 'expenses');
+  assert.deepEqual(ex.find(e => e.id === 'e2').inBal, { 'deutsche bank': false }); assert.equal(ex.find(e => e.id === 'e1').inBal, undefined, 'unchanged ones are left alone');
+  await page.click('[data-acc="db"]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#accDetail'), /Balance now \(estimate\)\s*€988\.00/, '1000 minus the coffee that came after');
   await clean(app);
 });
