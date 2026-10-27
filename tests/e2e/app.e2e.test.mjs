@@ -1158,3 +1158,20 @@ test('investing goal set before the budget: linked to the savings category on it
   await app.go('budget'); await page.waitForTimeout(200); assert.doesNotMatch(await envText(app), /Investing goal/);
   await clean(app);
 });
+
+test('investing goal linked to the budget counts what was sent to the accounts in that category, even ones Wealth doesn’t call investments', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString(), td = d(0);
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, ws: { name: 'Wise Sulekha', type: 'bank', currency: 'EUR', owner: 'Sulekha' },
+      t: { name: 'T212', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' }, tr: { name: 'TR Emergency', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    transfers: { t1: { amount: 812, date: td, from: 'Deutsche Bank', to: 'T212', createdAt: now }, t2: { amount: 500, date: td, from: 'Deutsche Bank', to: 'TR Emergency', createdAt: now },
+      t3: { amount: 500, date: td, from: 'Wise Sulekha', to: 'Fineco', createdAt: now } },
+    settings: { goals: { items: [{ type: 'invest', owner: 'Both', amount: 2500 }], updatedAt: now },
+      envelopes: { start: m + '-01', accounts: ['Deutsche Bank', 'Wise Sulekha'], opening: 9000, updatedAt: now,
+        groups: [{ id: 'gs', name: 'Savings & investing', envs: [{ id: 'a', name: 'T212', src: ['→T212'], owner: 'Anubhav' }, { id: 'b', name: 'TR Emergency', src: ['→TR Emergency'], owner: 'Anubhav' }, { id: 'c', name: 'Fineco', src: ['→Fineco'], owner: 'Sulekha' }] }],
+        assigned: { [m]: { a: 1000, b: 500, c: 1000 } } } } });
+  await page.waitForTimeout(300);
+  const t = await app.text('#goalsP');
+  assert.match(t, /€1,812 of €2,500 sent in \w+/, '812 + 500 + 500 sent, though TR Emergency is a bank account and Fineco isn’t set up');
+  assert.match(t, /€688 to go/); assert.match(t, /In the budget: €2,500 of €2,500 assigned in Savings & investing · covered/);
+  await clean(app);
+});

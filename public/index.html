@@ -3811,13 +3811,17 @@ async function fillGoal(i){
 document.addEventListener('click', e => { const b = e.target.closest('[data-goalfill]'); if (b){ b.disabled = true; fillGoal(+b.dataset.goalfill); } });
 function goalInvest(g){
   const cm = thisMonth(), months = [5, 4, 3, 2, 1, 0].map(k => addMonth(cm, -k));
-  const hist = months.map(m => ({ m, v: goalOwnerVal(investedBy(m), g.owner) }));
+  // Linked to a budget category: from the envelopes' start on, invested is what was sent to the accounts that category
+  // takes (the same money the budget counts); before it, what went into investment accounts (Wealth).
+  const linked = !!goalBudget(g, cm), es = linked ? state.envCfg.start.slice(0, 7) : '';
+  const val = m => { const X = linked && m >= es ? goalBudget(g, m) : null; return X ? X.sent : goalOwnerVal(investedBy(m), g.owner); };
+  const hist = months.map(m => ({ m, v: val(m) }));
   // Months before anything was invested at all don't count as misses.
   const first = [...state.snaps.map(x => x.month), ...state.transfers.filter(t => transferType(t) === 'Investment').map(t => t.date.slice(0, 7))].sort()[0] || cm;
   const now = hist[hist.length - 1], done = hist.slice(0, -1).filter(h => h.m >= first);
   const hits = done.filter(h => h.v >= g.amount).length;
   const [y, mo] = cm.split('-').map(Number), daysLeft = new Date(y, mo, 0).getDate() - +today().slice(8, 10);
-  return { now, hist, hits, of: done.length, daysLeft };
+  return { now, hist, hits, of: done.length, daysLeft, linked };
 }
 function goalEmergency(g){
   const avg = avgMonthlySpend(), target = +g.fixed > 0 ? +g.fixed : avg ? Math.round(avg.v * (g.months || 6) / 100) * 100 : null;
@@ -4373,7 +4377,7 @@ function renderGoals(){
     if (g.type === 'invest'){
       const x = goalInvest(g), v = x.now.v, left = g.amount - v;
       return `<div class="goal"><div class="gh"><strong>Invest ${eur0.format(g.amount)} a month${who}</strong><button class="linkbtn" type="button" data-goaledit="${i}">Edit</button></div>
-        <span class="gv">${eur0.format(v)} <small>of ${eur0.format(g.amount)} in ${MON[+x.now.m.slice(5, 7) - 1]}</small></span>${bar(v, g.amount)}
+        <span class="gv">${eur0.format(v)} <small>of ${eur0.format(g.amount)} ${x.linked ? 'sent' : ''} in ${MON[+x.now.m.slice(5, 7) - 1]}</small></span>${bar(v, g.amount)}
         <span class="muted" style="font-size:12.5px">${left <= 0 ? '<span class="pos">Done for this month</span>' : `${eur0.format(left)} to go · ${x.daysLeft} day${x.daysLeft === 1 ? '' : 's'} left`}</span>
         ${(() => { const X = goalBudget(g, thisMonth()); return X ? `<span class="muted" style="font-size:12.5px">In the budget: ${eur0.format(X.assigned)} of ${eur0.format(g.amount)} assigned in ${esc(X.name)}${X.short >= 0.5 ? ` · <a href="#budget">assign ${eur0.format(X.short)} →</a>` : ' · <span class="pos">covered</span>'}</span>` : ''; })()}
         <span class="gdots" title="Last 6 months">${x.hist.map((h, j) => `<i class="${j === x.hist.length - 1 ? (h.v >= g.amount ? 'hit now' : 'now') : h.v >= g.amount ? 'hit' : 'miss'}" title="${monthLabel(h.m)}: ${eur0.format(h.v)}"></i>`).join('')} <span>${x.hits} of the last ${x.of} months</span></span></div>`;
@@ -4390,7 +4394,7 @@ function goalKind(k){
   $$('#goalKind [data-gkind]').forEach(b => b.setAttribute('aria-checked', b.dataset.gkind === k));
   $$('.g-invest').forEach(x => x.hidden = k !== 'invest'); $$('.g-emergency').forEach(x => x.hidden = k !== 'emergency');
   const avg = avgMonthlySpend();
-  $('#goalHint').textContent = k === 'invest' ? 'Counts what goes into investment accounts each month (monthly values under Wealth, else transfers in).'
+  $('#goalHint').textContent = k === 'invest' ? 'Linked to a budget category, it counts what you send to the accounts in it (the same money the budget counts). Not linked, what goes into investment accounts (monthly values under Wealth, else transfers in).'
     : avg ? `Your daily-life spending averages ${eur0.format(avg.v)} a month (last ${avg.n} full months, trips left out).` : 'Not enough months of spending yet to work out a target: set a fixed amount for now.';
 }
 function openGoal(i){
@@ -5995,7 +5999,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-27m';
+const APP_VERSION = '2026-10-27n';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
