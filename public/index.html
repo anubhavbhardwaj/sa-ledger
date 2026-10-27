@@ -201,6 +201,7 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .envalerts{display:grid;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .envalerts .al{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;padding:9px 12px;font-size:13px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--warn) 7%,var(--surface))}
 .envalerts .al:last-child{border-bottom:0}.envalerts .al.info{background:var(--surface)}
+.envalerts .al.bad{background:color-mix(in srgb,var(--danger) 9%,var(--surface))}
 .envalerts .al>span:first-child{flex:1 1 220px;min-width:0}.envalerts .al .acts{display:flex;gap:6px;flex-wrap:wrap}
 .ybud{display:grid}
 .ybh,.ybr{display:grid;grid-template-columns:minmax(0,1fr) 78px 84px 92px;gap:8px;align-items:center;padding:8px 6px}
@@ -849,6 +850,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
 .dlg-actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
 .dlg-actions .right{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
 .err{color:var(--danger);font-size:13px;margin:0}
+.ccdup{grid-column:1/-1;font-size:12px;color:var(--warn)}
 .billask{display:grid;gap:8px;background:var(--warn-soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
 .billask .billrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .billask select{border:1px solid var(--line);background:var(--ground);border-radius:8px;padding:5px 8px;font-size:13px;color:var(--ink);max-width:100%}
@@ -928,6 +930,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
       <div class="banner" id="ppBar" data-ppbar hidden></div>
       <div class="banner" data-bkinboxbar hidden></div>
       <div class="banner" data-ccbar hidden></div>
+      <div data-paybar hidden></div>
       <section class="panel" id="nextUp" hidden></section>
       <section class="panel todo1" id="todoCard" hidden></section>
       <div class="setupline" id="setupLine" hidden></div>
@@ -1087,6 +1090,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
           <div class="pagehead" style="align-items:center"><p style="margin:0">Check in a real balance now and then; the app keeps an estimate in between.</p>
             <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="newAcc" type="button">+ Account</button><button class="btn" type="button" data-sendindia>Send to India</button><button class="btn primary" id="checkinAll" type="button">Check in balances</button></div></div>
           <div class="banner" id="accSetup" hidden></div>
+          <div data-paybar hidden></div>
           <section class="kpis" id="accKpis" aria-label="Cash and cards"></section>
           <div id="accList" style="display:grid;gap:18px"></div>
         </div>
@@ -1982,6 +1986,7 @@ function render(){
   if (state.page === 'trips'){ renderTrips(); renderPassportBar(); }
   if (state.page === 'wealth') renderWealth();
   if (state.page === 'overview' || state.page === 'transactions') renderCcBars();
+  if (state.page === 'overview' || state.page === 'wealth') renderPayBars();
   fillDatalists();
 }
 
@@ -3873,6 +3878,7 @@ function renderEnvelopes(el){
   const al = [];
   if (ahead) al.push(`<div class="al info"><span><b>Planning ahead.</b> Money assigned here comes out of Ready to Assign now.</span><span class="acts"><button class="btn small" type="button" data-envnow>Back to ${MM(cm)}</button></span></div>`);
   { const cc = ccLine(m); if (cc) al.push(cc); }
+  al.push(...payCheckLines());
   O.byAcc.forEach(x => { const k = known.has(x.acc.toLowerCase());
     al.push(`<div class="al" title="Spent in your envelope categories from an account that isn’t in the budget, so the envelopes don’t count it."><span><b>${eur0.format(x.amount)}</b> spent from ${esc(x.acc)}${k ? '' : ' (not an account yet)'}, outside the budget</span><span class="acts">${k ? `<button class="btn small primary" type="button" data-envaddacc="${esc(JSON.stringify([x.acc]))}">Add to budget</button>` : ''}<button class="btn small" type="button" data-envexclude="${esc(JSON.stringify([x.acc]))}">Keep out</button></span></div>`); });
   if (cfg.start.startsWith(m) && cfg.start.slice(8) !== '01') al.push(`<div class="al" title="${MM(m)} spending before your start day is in the starting money, not in the envelopes."><span>Counting from ${shortDate(cfg.start)}, your start day</span><span class="acts"><button class="btn small" type="button" data-envwhole="${m}-01">Count all of ${MM(m)}</button></span></div>`);
@@ -3928,12 +3934,70 @@ function renderCcBars(){
       <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small primary" type="button" data-ccfix>Turn into card payments</button><button class="btn small" type="button" data-cckeep>They’re real spending</button></span>`;
   });
 }
+// A transfer to a card that is the same payment as a bill logged as spending: same account, about the same amount
+// (within €1 or 1%), within 5 days. Each transfer pairs with one bill at most.
+const lc = v => String(v || '').trim().toLowerCase(), dayN = d => Math.round(Date.parse(String(d).slice(0, 10) + 'T00:00:00Z') / 864e5);
+const nearAmt = (a, b) => Math.abs(+a - +b) <= Math.max(1, Math.min(+a, +b) * 0.01);
+function billTransfers(bills){
+  const cards = new Set(state.accounts.filter(a => a.type === 'card').map(a => lc(a.name))), used = new Set(), out = new Map();
+  for (const i of bills){
+    const t = state.transfers.filter(t => !used.has(t.id) && cards.has(lc(t.to)) && lc(t.from) === lc(i.account) && nearAmt(t.amount, i.amount) && Math.abs(dayN(t.date) - dayN(i.date)) <= 5)
+      .sort((a, b) => Math.abs(dayN(a.date) - dayN(i.date)) - Math.abs(dayN(b.date) - dayN(i.date)))[0];
+    if (t){ used.add(t.id); out.set(i.id, t); }
+  }
+  return out;
+}
+// Checks that the card payments aren't counted twice, on what's already in the ledger:
+// - the same payment twice: two transfers from one account to one card, about the same amount, within 5 days;
+// - a bill still logged as spending next to the transfer for it (kept as "real spending");
+// - a payment turned from a bill, dated on a day you checked in a balance and logged after that check: if the
+//   balance you typed already had it, it's counted on top.
+function payChecks(){
+  const cards = new Set(state.accounts.filter(a => a.type === 'card').map(a => lc(a.name))), ok = lsGet('payOk', []);
+  const pays = state.transfers.filter(t => cards.has(lc(t.to))).sort((a, b) => a.date.localeCompare(b.date)), used = new Set(), dups = [];
+  const conv = t => /^Card payment/.test(t.comment || '');
+  for (let i = 0; i < pays.length; i++) for (let j = i + 1; j < pays.length; j++){
+    const a = pays[i], b = pays[j]; if (dayN(b.date) - dayN(a.date) > 5) break;
+    if (used.has(a.id) || used.has(b.id) || lc(a.from) !== lc(b.from) || lc(a.to) !== lc(b.to) || !nearAmt(a.amount, b.amount)) continue;
+    const key = 'd:' + [a.id, b.id].sort().join('|'); if (ok.includes(key)) continue;
+    const copy = conv(b) && !conv(a) ? b : conv(a) && !conv(b) ? a : String(a.createdAt || '') > String(b.createdAt || '') ? a : b;
+    dups.push({ key, copy, keep: copy === a ? b : a }); used.add(a.id); used.add(b.id);
+  }
+  const kept = [...billTransfers(ccSuspects())].map(([id, t]) => ({ key: 'b:' + id + '|' + t.id, bill: state.items.find(i => i.id === id), t })).filter(x => x.bill && !ok.includes(x.key));
+  const late = state.transfers.filter(t => conv(t) && !used.has(t.id) && !ok.includes('l:' + t.id)).map(t => {
+    const hit = [t.from, t.to].map(accOf).filter(Boolean).find(a => checkinsOf(a).some(c => c.date === t.date && String(t.createdAt || '') > String(c.createdAt || '')));
+    return hit ? { key: 'l:' + t.id, t, acc: hit } : null; }).filter(Boolean);
+  return { dups, kept, late, n: dups.length + kept.length + late.length };
+}
+function payCheckLines(){
+  const P = payChecks(), d = x => shortDate(x.date);
+  return [
+    ...P.dups.map(x => `<div class="al bad" title="Two transfers from ${esc(x.keep.from)} to ${esc(x.keep.to)} for about the same amount, ${Math.abs(dayN(x.copy.date) - dayN(x.keep.date))} day(s) apart. If it was one payment, the card looks paid twice and the bank looks too low."><span><b>Paid twice?</b> ${eur.format(x.keep.amount)} ${esc(x.keep.from)} → ${esc(x.keep.to)} on ${d(x.keep)} and ${eur.format(x.copy.amount)} on ${d(x.copy)}</span><span class="acts"><button class="btn small primary" type="button" data-paydel="${esc(x.copy.id)}">Remove the ${d(x.copy)} one</button><button class="btn small" type="button" data-payok="${esc(x.key)}">Two payments</button></span></div>`),
+    ...P.kept.map(x => `<div class="al bad" title="This bill is logged as spending and also as a transfer to the card: the card's envelope counts the payment twice."><span><b>Logged twice?</b> ${eur.format(x.bill.amount)} ${esc(x.bill.store)} as spending on ${d(x.bill)} and as a transfer to ${esc(x.t.to)} on ${d(x.t)}</span><span class="acts"><button class="btn small primary" type="button" data-billdel="${esc(x.bill.id)}">Remove the spending entry</button><button class="btn small" type="button" data-payok="${esc(x.key)}">Both are right</button></span></div>`),
+    ...P.late.map(x => `<div class="al bad" title="You checked in ${esc(x.acc.name)}'s balance on ${d(x.t)}. This payment, turned from a bill, was logged after that check, so it counts on top of the balance you typed."><span><b>Counted on top of a balance?</b> ${eur.format(x.t.amount)} ${esc(x.t.from)} → ${esc(x.t.to)} on ${d(x.t)}, the day you checked in ${esc(x.acc.name)}</span><span class="acts"><button class="btn small primary" type="button" data-paylate="${esc(x.t.id)}">It was already in that balance</button><button class="btn small" type="button" data-payok="${esc(x.key)}">It wasn’t</button></span></div>`),
+  ];
+}
+function renderPayBars(){
+  const L = payCheckLines();
+  $$('[data-paybar]').forEach(el => { el.hidden = !L.length; el.innerHTML = L.length ? `<div class="envalerts">${L.join('')}</div>` : ''; });
+}
+document.addEventListener('click', async e => {
+  const t = e.target, me = usernameOf(state.user);
+  const pd = t.closest('[data-paydel]'); if (pd){ const x = state.transfers.find(y => y.id === pd.dataset.paydel); if (!x) return; pd.disabled = true;
+    try { await deleteDoc(doc(fs, 'transfers', x.id)); toast('Removed the copy', { label: 'Undo', fn: () => restoreDocs('transfers', [x]) }); } catch (er){ toast(writeError(er)); pd.disabled = false; } return; }
+  const bd = t.closest('[data-billdel]'); if (bd){ const x = state.items.find(y => y.id === bd.dataset.billdel); if (!x) return; bd.disabled = true;
+    try { await deleteDoc(doc(fs, 'expenses', x.id)); toast('Removed the spending entry', { label: 'Undo', fn: () => restoreDocs('expenses', [x]) }); } catch (er){ toast(writeError(er)); bd.disabled = false; } return; }
+  const pl = t.closest('[data-paylate]'); if (pl){ const x = state.transfers.find(y => y.id === pl.dataset.paylate); if (!x) return; pl.disabled = true;
+    // Logged at the start of its day: before the balance typed that day, so the balance is taken to include it.
+    try { await setDoc(doc(fs, 'transfers', x.id), { ...docOf(x), createdAt: x.date + 'T00:00:00.000Z', updatedBy: me }); toast('Counted as part of that balance', { label: 'Undo', fn: () => restoreDocs('transfers', [x]) }); } catch (er){ toast(writeError(er)); pl.disabled = false; } return; }
+  const po = t.closest('[data-payok]'); if (po){ lsSet('payOk', [...lsGet('payOk', []), po.dataset.payok]); render(); return; }
+});
 function openCcFix(){
-  const xs = ccSuspects(), cards = state.accounts.filter(a => a.type === 'card');
+  const xs = ccSuspects(), cards = state.accounts.filter(a => a.type === 'card'), dup = state.ccDup = billTransfers(xs);
   // Each bill gets the card its text names (AMEX, Kotak, IDFC, DB…), else the one picked below.
   const { billCard } = makeBudget({ accounts: cards.map(a => a.name) }, accOf), guess = i => { const k = billCard(i); const c = cards.find(a => ccKey(a.name) === k); return c ? c.name : ''; };
-  $('#ccList').innerHTML = xs.map(i => { const g = guess(i); return `<div class="ccrow"><input type="checkbox" data-ccid="${esc(i.id)}" checked aria-label="Convert"><span>${shortDate(i.date, true)} · ${esc(i.store)} <span class="muted">${esc(i.account)}</span></span><strong style="font-family:var(--f-mono)">${eur.format(i.amount)}</strong>
-    <select data-cccard="${esc(i.id)}" aria-label="Card">${cards.map(a => `<option value="${esc(a.name)}" ${a.name === g ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>`; }).join('');
+  $('#ccList').innerHTML = xs.map(i => { const g = guess(i), t = dup.get(i.id); return `<div class="ccrow"><input type="checkbox" data-ccid="${esc(i.id)}" checked aria-label="Convert"><span>${shortDate(i.date, true)} · ${esc(i.store)} <span class="muted">${esc(i.account)}</span></span><strong style="font-family:var(--f-mono)">${eur.format(i.amount)}</strong>
+    ${t ? `<span class="ccdup">Already a transfer to ${esc(t.to)} on ${shortDate(t.date)}: only this entry is removed</span>` : `<select data-cccard="${esc(i.id)}" aria-label="Card">${cards.map(a => `<option value="${esc(a.name)}" ${a.name === g ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`}</div>`; }).join('');
   $('#ccErr').hidden = true; $('#ccDlg').showModal();
 }
 // The envelope's place in your categories, to change whose money it is from its own dialog.
@@ -4075,8 +4139,19 @@ $('#ccForm').addEventListener('submit', async e => {
   const xs = ids.map(id => state.items.find(i => i.id === id)).filter(Boolean), me = usernameOf(state.user), now = new Date().toISOString();
   try {
     const b = writeBatch(fs);
-    xs.forEach(i => { b.set(doc(collection(fs, 'transfers')), { amount: i.amount, date: i.date, from: i.account, to: cardOf(i.id), comment: 'Card payment' + (i.store ? ' · ' + i.store : ''), createdAt: now, createdBy: me }); b.delete(doc(fs, 'expenses', i.id)); });
-    await b.commit(); $('#ccDlg').close(); toast(`${xs.length} turned into card payment${xs.length === 1 ? '' : 's'}`);
+    // A bill that is already logged as a transfer is only removed (a second transfer would pay the card twice). The
+    // others become transfers that keep the entry's own time (so a balance checked that day still counts it the same
+    // way) and its currency.
+    const dup = state.ccDup || new Map(); let n = 0, gone = 0;
+    xs.forEach(i => {
+      if (!dup.has(i.id)){
+        const fx = i.currency && i.currency !== 'EUR' && i.origAmount ? { currency: i.currency, origAmount: i.origAmount, ...(i.fxRate ? { fxRate: i.fxRate } : {}) } : {};
+        b.set(doc(collection(fs, 'transfers')), { amount: i.amount, date: i.date, from: i.account, to: cardOf(i.id), comment: 'Card payment' + (i.store ? ' · ' + i.store : ''), createdAt: i.createdAt || now, createdBy: i.createdBy || me, updatedBy: me, ...fx }); n++;
+      } else gone++;
+      b.delete(doc(fs, 'expenses', i.id));
+    });
+    await b.commit(); $('#ccDlg').close();
+    toast([n ? `${n} turned into card payment${n === 1 ? '' : 's'}` : '', gone ? `${gone} already logged as transfer${gone === 1 ? '' : 's'}, removed` : ''].filter(Boolean).join(' · '));
   } catch (x){ err(writeError(x)); }
 });
 $('#envAsgForm').addEventListener('submit', async e => {
@@ -4621,7 +4696,7 @@ function accRow(a){
   const when = !est ? 'no check-in yet' : est.base.virtual ? 'no check-in yet, from entries' : age <= 0 ? 'checked in today' : age < 0 ? 'checked in' : `checked in ${age} day${age === 1 ? '' : 's'} ago`;
   const fx = shown !== null && a.currency && a.currency !== 'EUR' ? (state.fxLatest[a.currency] ? `<small>≈ ${eur0.format(toEur(a, shown))}</small>` : '<small>rate loading</small>') : '';
   return `<button type="button" class="r" data-acc="${esc(a.id)}"><span class="dot" style="background:${ACC_DOT[a.type]}"></span>
-    <span><span class="nm">${esc(a.name)}</span><br><span class="meta">${esc(a.owner)}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''} · <span style="${!ck || age > 35 ? 'color:var(--warn)' : ''}">${when}</span></span></span>
+    <span><span class="nm">${esc(a.name)}</span><br><span class="meta">${esc(a.owner)}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''} · <span style="${!ck || age > 35 ? 'color:var(--warn)' : ''}">${when}</span>${isCard && shown !== null && toEur(a, shown) < -5 ? ' · <span style="color:var(--warn)">in credit: a payment counted twice?</span>' : ''}</span></span>
     <span class="v ${shown !== null && !isCard && shown < 0 ? 'neg' : ''}">${shown === null ? '—' : fmtAcc(a, shown)}${fx}</span></button>`;
 }
 
@@ -5826,7 +5901,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-27g';
+const APP_VERSION = '2026-10-27h';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

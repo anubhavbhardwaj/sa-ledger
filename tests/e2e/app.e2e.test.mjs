@@ -986,3 +986,64 @@ test('envelopes: Ready to Assign shows where each of you stands and what is left
   assert.equal(await page.isHidden('#eaOwn'), true, 'savings go by the account, nothing to pick'); await page.click('#eaCancel');
   await clean(app);
 });
+
+// ---------- card payments counted once ----------
+const PAY = () => { const at = '2026-10-01T08:00:00.000Z', A = (name, type) => ({ name, type, currency: 'EUR', owner: 'Anubhav', createdAt: '2026-09-01' });
+  return { accounts: { db: A('Deutsche Bank', 'bank'), amex: A('AMEX', 'card') },
+    checkins: { k1: { accountId: 'db', date: '2026-10-01', balance: 5000, createdAt: at }, k2: { accountId: 'amex', date: '2026-10-01', balance: -1000, createdAt: at } },
+    expenses: { p1: { amount: 300, date: '2026-10-05', store: 'Rewe', category: 'Groceries', account: 'AMEX', spender: 'Anubhav', createdAt: at } }, transfers: {} }; };
+const BILL = { amount: 1000, date: '2026-10-20', store: 'AMEX', category: 'Credit Card', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: '2026-10-20T09:00:00.000Z' };
+const cashRows = async app => { await app.go('wealth'); await app.page.evaluate(() => document.querySelector('[data-wv="cash"]').click()); await app.page.waitForTimeout(200);
+  return app.page.$$eval('#accList .ilist .r', els => Object.fromEntries(els.map(e => [e.querySelector('.nm').textContent, e.querySelector('.v').textContent.trim()]))); };
+
+test('card bills → payments: a bill already logged as a transfer is only removed; the others keep their own time (a balance checked that day stays right)', async () => {
+  const app = await openApp(), { page } = app, d = PAY();
+  d.expenses.b1 = { ...BILL };                                                                                   // also a transfer
+  d.transfers.t1 = { amount: 1000, date: '2026-10-21', from: 'Deutsche Bank', to: 'AMEX', createdAt: '2026-10-21T10:00:00.000Z' };
+  d.expenses.b2 = { ...BILL, amount: 400, date: '2026-10-25', store: 'AMEX extra', createdAt: '2026-10-25T09:00:00.000Z' };   // only spending, on a check-in day
+  d.checkins.k3 = { accountId: 'amex', date: '2026-10-25', balance: -300, createdAt: '2026-10-25T20:00:00.000Z' };         // the AMEX app, after both payments
+  d.checkins.k4 = { accountId: 'db', date: '2026-10-25', balance: 3600, createdAt: '2026-10-25T20:00:00.000Z' };
+  await app.seed(d); await page.waitForTimeout(300);
+  assert.match(await app.text('#page-overview [data-paybar]'), /Logged twice\? €1,000\.00 AMEX as spending on 20 Oct and as a transfer to AMEX on 21 Oct/);
+  await page.click('#page-overview [data-ccfix]'); await page.waitForSelector('#ccDlg[open]');
+  assert.match(await app.text('#ccList'), /Already a transfer to AMEX on 21 Oct: only this entry is removed/);
+  await page.click('#ccForm [type=submit]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#toast'), /1 turned into card payment · 1 already logged as transfer, removed/);
+  const tr = await dbDocs(app, 'transfers');
+  assert.equal(tr.length, 2, 'the existing transfer + one new one, not two new ones');
+  const nw = tr.find(t => t.amount === 400); assert.equal(nw.createdAt, '2026-10-25T09:00:00.000Z', 'keeps the time the bill was logged');
+  assert.deepEqual(await cashRows(app), { 'Deutsche Bank': '€3,600.00', AMEX: '€300.00' }, 'both balances are what was typed on the 25th (AMEX owes 300)');
+  assert.equal(await page.isHidden('#wv-cash [data-paybar]'), true, 'nothing left to check');
+  await clean(app);
+});
+
+test('card payments: checks find what the old conversion counted twice, and one tap puts it right (with Undo)', async () => {
+  const app = await openApp(), { page } = app, d = PAY();
+  // A: the same payment twice (the bill had been logged as a transfer too).
+  d.transfers.t1 = { amount: 1000, date: '2026-10-20', from: 'Deutsche Bank', to: 'AMEX', createdAt: '2026-10-20T09:00:00.000Z' };
+  d.transfers.t2 = { amount: 1000, date: '2026-10-20', from: 'Deutsche Bank', to: 'AMEX', comment: 'Card payment · AMEX', createdAt: '2026-10-27T08:00:00.000Z' };
+  // B: a converted payment on a day the balance was checked in, logged (by the conversion) after that check.
+  d.transfers.t3 = { amount: 200, date: '2026-10-24', from: 'Deutsche Bank', to: 'AMEX', comment: 'Card payment · AMEX 2', createdAt: '2026-10-27T08:00:00.000Z' };
+  d.checkins.k3 = { accountId: 'amex', date: '2026-10-24', balance: -100, createdAt: '2026-10-24T20:00:00.000Z' };
+  d.checkins.k4 = { accountId: 'db', date: '2026-10-24', balance: 3800, createdAt: '2026-10-24T20:00:00.000Z' };
+  await app.seed(d); await page.waitForTimeout(300);
+  let rows = await cashRows(app);
+  assert.deepEqual(rows, { 'Deutsche Bank': '€3,600.00', AMEX: '-€100.00' }, 'before: the 200 counted on top of the balances typed on the 24th (the bank too low, the card in credit)');
+  assert.match(await app.text('#accList'), /AMEX.*in credit: a payment counted twice\?/);
+  const t = await app.text('#wv-cash [data-paybar]');
+  assert.match(t, /Paid twice\? €1,000\.00 Deutsche Bank → AMEX on 20 Oct and €1,000\.00 on 20 Oct/);
+  assert.match(t, /Counted on top of a balance\? €200\.00 Deutsche Bank → AMEX on 24 Oct, the day you checked in Deutsche Bank/);
+  await page.click('#wv-cash [data-paydel="t2"]'); await page.waitForTimeout(300);
+  assert.deepEqual((await dbDocs(app, 'transfers')).map(x => x.id).sort(), ['t1', 't3'], 'the converted copy goes, the original stays');
+  await page.click('#wv-cash [data-paylate="t3"]'); await page.waitForTimeout(300);
+  assert.equal((await dbDocs(app, 'transfers')).find(x => x.id === 't3').createdAt, '2026-10-24T00:00:00.000Z');
+  rows = await cashRows(app);
+  assert.deepEqual(rows, { 'Deutsche Bank': '€3,800.00', AMEX: '€100.00' }, 'after: exactly the balances typed on the 24th');
+  assert.equal(await page.isHidden('#wv-cash [data-paybar]'), true);
+  // Undo brings the copy back (and the check with it); "Two payments" makes it go away for good.
+  await page.click('#toast .toastact'); await page.waitForTimeout(300);
+  assert.match(await app.text('#wv-cash [data-paybar]'), /Counted on top of a balance\?/, 'the change to t3 undone');
+  await page.click('#wv-cash [data-payok^="l:"]'); await page.waitForTimeout(200);
+  assert.equal(await page.isHidden('#wv-cash [data-paybar]'), true, '"It wasn’t" puts it away for good');
+  await clean(app);
+});
