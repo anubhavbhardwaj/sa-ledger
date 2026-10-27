@@ -962,7 +962,7 @@ test('envelopes: Ready to Assign shows where each of you stands and what is left
   assert.deepEqual(await page.$$eval('.rwt > span', els => els.map(e => e.textContent.trim())), ['', 'Anubhav', 'Sulekha', 'Common', 'Balance', '€3,818', '€2,850', '€1,340',
     'bank − cards', '€4,120 − €302', '€2,850', '€1,340', 'In envelopes', '−€2,060', '−€900', '−€300', 'Left', '€1,758', '€1,950', '€1,040']);
   assert.equal(await page.getAttribute('[data-envkey="rent"] .ob', 'title'), 'Split: Anubhav €860, Sulekha €900');
-  assert.deepEqual(await Promise.all(['rent', 'wed', 'food', 'cc_amex', 's_save_sulekha'].map(k => page.textContent(`[data-envkey="${k}"] .ob`))), ['A·S', 'A', 'C', 'A', 'S'], 'every envelope shows whose money it is: cards and savings by account owner');
+  assert.deepEqual(await Promise.all(['rent', 'wed', 'food', 'cc_amex'].map(k => page.textContent(`[data-envkey="${k}"] .ob`))), ['A·S', 'A', 'C', 'A'], 'every envelope shows whose money it is: cards by account owner');
   // Groceries becomes Sulekha's in Categories (in the ⋯ menu).
   await page.click('[data-envmore]'); await page.click('#budgetPanel [data-envcats]'); await page.waitForSelector('#envCatDlg[open]');
   await page.selectOption('[data-ecown="1.0"]', 'Sulekha'); await page.click('#envCatForm [type=submit]'); await page.waitForTimeout(300);
@@ -982,8 +982,6 @@ test('envelopes: Ready to Assign shows where each of you stands and what is left
   await page.click('[data-envkey="rent"]'); await page.waitForSelector('#envAsgDlg[open]');
   assert.equal(await page.inputValue('#ea-own'), 'split'); assert.equal(await page.inputValue('[data-easplit="Sulekha"]'), '900');
   await page.click('#eaCancel');
-  await page.evaluate(() => document.querySelector('[data-envkey="s_save_anubhav"]').click()); await page.waitForSelector('#envAsgDlg[open]');
-  assert.equal(await page.isHidden('#eaOwn'), true, 'savings go by the account, nothing to pick'); await page.click('#eaCancel');
   await clean(app);
 });
 
@@ -1103,5 +1101,60 @@ test('envelopes: from the made-for-you Savings envelope, "+ Envelope for T212" g
   assert.equal(await page.textContent('#budgetPanel .ybr.env:has-text("T212") .ob'), 'A', 'yours, like the envelope it came from');
   await page.click('[data-envmore]'); await page.click('#budgetPanel [data-envcats]'); await page.waitForSelector('#envCatDlg[open]');
   assert.match(await app.text('#ecSave'), /Money sent out of the budget.*Transfers to HDFC NRE/);
+  await clean(app);
+});
+
+test('envelopes: the made-for-you Savings hides when empty and comes back when money goes to an account no envelope takes', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString(), td = d(0);
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    transfers: { t1: { amount: 500, date: td, from: 'Deutsche Bank', to: 'T212', createdAt: now } },
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 3000, updatedAt: now, groups: [], assigned: { [m]: { s_save_anubhav: 500 } } } } });
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(250);
+  await page.click('[data-envkey="s_save_anubhav"]'); await page.waitForSelector('#envAsgDlg[open]');
+  await page.click('[data-envfor="T212"]'); await page.waitForTimeout(300);
+  let t = await envText(app);
+  assert.match(t, /T212\s*€500\s*−€500\s*€0/); assert.doesNotMatch(t, /made for you|Investing & India/, 'nothing left in it: hidden');
+  await app.seed({ transfers: { t2: { amount: 150, date: td, from: 'Deutsche Bank', to: 'HDFC NRE', createdAt: now } } }); await page.waitForTimeout(300);
+  t = await envText(app);
+  assert.match(t, /Savings · made for you.*Investing & India\s*–\s*−€150\s*−€150/, 'back as soon as something lands in it');
+  await clean(app);
+});
+
+test('investing goal linked to Savings & investing: the category shows the goal, one tap fills it (up to each target first), the Overview shows what the budget plans', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString(), td = d(0);
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, t: { name: 'T212', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
+    transfers: { t1: { amount: 300, date: td, from: 'Deutsche Bank', to: 'T212', createdAt: now } },
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 5000, updatedAt: now, targets: { t212: 600, scal: 400 },
+      groups: [{ id: 'gs', name: 'Savings & investing', envs: [{ id: 't212', name: 'T212', src: ['→T212'], owner: 'Anubhav' }, { id: 'scal', name: 'Scalable', src: ['→Scalable'], owner: 'Anubhav' }] }],
+      assigned: { [m]: { t212: 300 } } } } });
+  await page.waitForTimeout(300);
+  // Set the goal from the Overview; the Savings & investing category is picked for it.
+  await page.evaluate(() => document.querySelector('[data-goalnew], #setupLine [data-setup="goals"], #setupLine button')?.click()); await page.waitForSelector('#goalDlg[open]');
+  assert.equal(await page.inputValue('#g-cat'), 'gs', 'linked to the category named like savings / investing');
+  await page.fill('#g-amount', '1000'); await page.click('#goalForm [type=submit]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#goalsP'), /In the budget: €300 of €1,000 assigned in Savings & investing · assign €700 →/);
+  await app.go('budget'); await page.waitForTimeout(250);
+  assert.match(await envText(app), /Savings & investing\s*goal €1,000.*Investing goal: €300 of €1,000 assigned in \w+ · €700 short · €300 sent\s*Assign €700/);
+  await page.click('[data-goalfill]'); await page.waitForTimeout(300);
+  const t = await envText(app);
+  assert.match(t, /T212\s*€600\s*−€300\s*€300/); assert.match(t, /Scalable\s*€400\s*–\s*€400/, 'each up to its target');
+  assert.match(t, /Investing goal: €1,000 of €1,000 assigned in \w+ · ✓ covered/);
+  await app.go('overview'); await page.waitForTimeout(200);
+  assert.match(await app.text('#goalsP'), /In the budget: €1,000 of €1,000 assigned in Savings & investing · covered/);
+  await clean(app);
+});
+
+test('investing goal set before the budget: linked to the savings category on its own; "Not linked" keeps it apart', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    settings: { goals: { items: [{ type: 'invest', owner: 'Both', amount: 800 }], updatedAt: now },
+      envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 5000, updatedAt: now, groups: [{ id: 'gi', name: 'Investments', envs: [{ id: 'e1', name: 'T212', src: ['→T212'] }] }], assigned: { [m]: { e1: 500 } } } } });
+  await page.waitForTimeout(300);
+  assert.match(await app.text('#goalsP'), /In the budget: €500 of €800 assigned in Investments · assign €300 →/);
+  await page.click('#goalsP [data-goaledit="0"]'); await page.waitForSelector('#goalDlg[open]');
+  assert.equal(await page.inputValue('#g-cat'), 'gi');
+  await page.selectOption('#g-cat', ''); await page.click('#goalForm [type=submit]'); await page.waitForTimeout(300);
+  assert.doesNotMatch(await app.text('#goalsP'), /In the budget/);
+  await app.go('budget'); await page.waitForTimeout(200); assert.doesNotMatch(await envText(app), /Investing goal/);
   await clean(app);
 });
