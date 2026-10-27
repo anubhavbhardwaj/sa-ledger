@@ -1175,3 +1175,60 @@ test('investing goal linked to the budget counts what was sent to the accounts i
   assert.match(t, /€688 to go/); assert.match(t, /In the budget: €2,500 of €2,500 assigned in Savings & investing · covered/);
   await clean(app);
 });
+
+test('add: switching to Transfer fills From with your last real account, never the text "undefined"; "undefined" typed in counts as empty', async () => {
+  const app = await openApp(), { page } = app, now = new Date().toISOString(), td = d(0);
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, w: { name: 'Wise', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, t: { name: 'T212', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
+    expenses: { e1: { amount: 12, date: td, store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now, createdBy: 'anubhav' } },
+    transfers: { bad: { amount: 463, date: td, from: 'undefined', to: 'T212', createdAt: now, createdBy: 'anubhav' }, ok: { amount: 50, date: d(-1), from: 'Wise', to: 'T212', createdAt: now, createdBy: 'anubhav' } } });
+  await page.waitForTimeout(300);
+  await page.click('#addBtn'); await page.waitForSelector('#dlg[open]');
+  assert.equal(await page.inputValue('#f-account'), 'Deutsche Bank');
+  await page.click('#kindSeg [data-kind="transfer"]');
+  assert.equal(await page.inputValue('#f-account'), 'Wise', 'the last transfer with a real From, skipping the broken one');
+  await page.click('#kindSeg [data-kind="expense"]');
+  assert.equal(await page.inputValue('#f-account'), 'Deutsche Bank');
+  await page.click('#kindSeg [data-kind="transfer"]');
+  await page.fill('#f-account', 'undefined'); await page.fill('#f-to', 'T212'); await page.fill('#f-amount', '100');
+  await page.click('#saveBtn'); await page.waitForTimeout(150);
+  assert.match(await app.text('#formErr'), /Fill in from account/);
+  await page.fill('#f-account', 'Deutsche Bank'); await page.click('#saveBtn'); await page.waitForTimeout(300);
+  assert.ok((await dbDocs(app, 'transfers')).some(t => t.from === 'Deutsche Bank' && t.to === 'T212' && t.amount === 100));
+  await clean(app);
+});
+
+test('backup keeps the envelope budget and the other settings; restoring it puts them back, within the rules', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString();
+  const env = { start: m + '-01', accounts: ['Deutsche Bank'], opening: 3000, openingBy: { 'Deutsche Bank': 3000 }, trips: true, updatedAt: now, updatedBy: 'anubhav',
+    groups: [{ id: 'g', name: 'Fixed', envs: [{ id: 'rent', name: 'Rent', src: ['Rent'], owner: 'Both' }] }], assigned: { [m]: { rent: 1760 } }, targets: { rent: 1760 } };
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    settings: { envelopes: env, goals: { items: [{ type: 'invest', owner: 'Both', amount: 1000 }], updatedAt: now, updatedBy: 'anubhav' } } });
+  await page.waitForTimeout(300);
+  await page.click('#profBtn'); await page.click('[data-pm="data"]'); await page.waitForSelector('#dataDlg[open]');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-dx="backup"]')]);
+  const file = JSON.parse(readFileSync(await dl.path(), 'utf8'));
+  const set = Object.fromEntries(file.collections.settings.map(s => [s.id, s]));
+  assert.deepEqual(set.envelopes.openingBy, { 'Deutsche Bank': 3000 }); assert.deepEqual(set.envelopes.assigned, { [m]: { rent: 1760 } });
+  assert.equal(set.envelopes.groups[0].envs[0].name, 'Rent'); assert.equal(set.goals.items[0].amount, 1000);
+  // Restore after the budget was changed: the backup's version comes back.
+  await app.seed({ settings: { envelopes: { ...env, assigned: {}, openingBy: { 'Deutsche Bank': 1 }, opening: 1 } } }); await page.waitForTimeout(200);
+  await page.setInputFiles('#rsFile', { name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(file)) });
+  await page.waitForSelector('#rsDlg[open]');
+  assert.match(await app.text('#rsBody'), /Settings: goals, the envelope budget\s*replaces current/);
+  await page.click('#rsSave'); await page.waitForTimeout(300);
+  const back = (await dbDocs(app, 'settings')).find(s => s.id === 'envelopes');
+  assert.deepEqual(back.openingBy, { 'Deutsche Bank': 3000 }); assert.deepEqual(back.assigned, { [m]: { rent: 1760 } });
+  await clean(app);
+});
+
+test('restoring an old backup without the envelope budget says the budget stays as it is', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString();
+  await app.seed({ settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 3000, openingBy: { 'Deutsche Bank': 3000 }, trips: true, updatedAt: now, groups: [], assigned: {}, targets: {} } } });
+  await page.waitForTimeout(300);
+  const old = { app: 'S&A Ledger', version: 1, exportedAt: now, collections: { expenses: [], settings: [{ id: 'fx', months: {} }] } };
+  await page.setInputFiles('#rsFile', { name: 'old.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(old)) });
+  await page.waitForSelector('#rsDlg[open]');
+  assert.match(await app.text('#rsBody'), /from before backups kept the envelope budget, so your budget stays as it is now/);
+  await page.click('#rsCancel');
+  await clean(app);
+});

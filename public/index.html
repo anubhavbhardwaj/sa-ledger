@@ -1761,6 +1761,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const monthLabel = m => { const [y,mm] = m.split('-'); return MON[+mm-1] + ' ' + y; };
 const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+// An account name as typed or saved; a missing value that slipped through as the text "undefined" or "null" counts as empty.
+const realName = v => { const s = String(v ?? '').trim(); return /^(undefined|null)$/i.test(s) ? '' : s; };
 
 const state = { people:[], ppView:'list', workdays:{}, tax:{}, payslips:[], psDraft:[], psProject:true, taxYear:null, taxMonth:null, home: (() => { try { return localStorage.getItem('homeCur') === 'INR' ? 'INR' : 'EUR'; } catch { return 'EUR'; } })(), fireInr:{}, snaps:[], fxMonths:{}, fxMonthsLocal:{}, fire:{}, wv:'inv', im:'profit', showPred:false, transfers:[], accounts:[], checkins:[], accByName:{}, openAcc:null, fxLatest:{}, inbox:[], fromInbox:null, bookings:[], toBook:[], bkInbox:[], bkSettings:{}, flightStatus:{}, health:{}, budgets:{ items:[] }, trips:[], tripMap:{}, openTrip:null, attachOpen:false, attachAll:false, attachQ:'', items:[], income:[], txKind:'expense', kind:'expense', period:null, filters:{category:null, spender:null, account:null, country:null, tripKind:null, tripName:null, store:null}, q:'', editing:null, ready:false, page:'overview', user:null, pendingImport:null };
 let unsubs = [];
@@ -1816,6 +1818,7 @@ onAuthStateChanged(auth, user => {
     renderInbox(); render();
   }, () => {}));
   unsubs.push(onSnapshot(settingsCol, snap => {
+    state.settingsRaw = Object.fromEntries(snap.docs.filter(x => x.id !== 'backup').map(x => [x.id, x.data()]));   // as saved, for backups
     const d = snap.docs.find(x => x.id === 'budgets');
     state.budgets = d ? { items:[], ...d.data() } : { items:[] };
     const fx = snap.docs.find(x => x.id === 'fx'), fire = snap.docs.find(x => x.id === 'fire'), bk = snap.docs.find(x => x.id === 'backup');
@@ -3063,10 +3066,11 @@ function openAdd(kind, tripId){
   F('country').value = lastE.country || 'Germany';
   const me = cap(usernameOf(state.user));
   F('spender').value = ['Anubhav','Sulekha'].includes(me) ? me : 'Anubhav';
-  state.lastAccount = { expense: lastE.account || '', income: lastI.account || '' };
+  // The account each kind starts with: your last expense's, income's, or transfer's From (never a broken "undefined").
+  state.lastAccount = { expense: realName(lastE.account), income: realName(lastI.account),
+    transfer: realName(state.transfers.map(t => realName(t.from)).find(Boolean)) || realName(lastE.account) };
   F('account').value = state.lastAccount[kind] || '';
   F('to').value = '';
-  if (kind === 'transfer'){ const lt = state.transfers[0]; F('account').value = lt ? lt.from : (lastE.account || ''); }
   if (kind === 'income') F('category').value = 'Salary';
   fillTripSelect(tripId || '');
   const tr = tripId && state.tripMap[tripId];
@@ -3103,10 +3107,9 @@ $('#kindSeg').addEventListener('click', e => {
   const b = e.target.closest('[data-kind]'); if (!b || b.disabled) return;
   const k = b.dataset.kind; if (k === state.kind) return;
   // Swap in sensible defaults when switching while adding.
-  if (!state.editing && state.lastAccount && (!F('account').value || F('account').value === state.lastAccount[state.kind])) F('account').value = state.lastAccount[k];
+  if (!state.editing && state.lastAccount && (!realName(F('account').value) || F('account').value === state.lastAccount[state.kind])) F('account').value = state.lastAccount[k] || '';
   if (k === 'income' && !F('category').value) F('category').value = 'Salary';
   else if (k !== 'income' && F('category').value === 'Salary') F('category').value = '';
-  if (k === 'transfer' && !F('account').value){ const lt = state.transfers[0]; if (lt) F('account').value = lt.from; }
   setKind(k, false);
 });
 // Editing can change an entry's type (say an expense that was really a transfer): it then moves collection.
@@ -3140,7 +3143,7 @@ $('#form').addEventListener('submit', async e => {
   if (cur !== 'EUR' && !(rate > 0)){ err.textContent = 'Enter the exchange rate, or wait for it to load.'; err.hidden = false; return; }
   const amount = cur === 'EUR' ? entered : Math.round(entered * rate * 100) / 100;
   const fx = cur === 'EUR' ? {} : { currency:cur, origAmount:entered, fxRate:rate };
-  const need = state.kind === 'transfer' ? { from:F('account').value.trim(), to:F('to').value.trim() } : {store:F('store').value.trim(), category:F('category').value.trim(), account:F('account').value.trim()};
+  const need = state.kind === 'transfer' ? { from:realName(F('account').value), to:realName(F('to').value) } : {store:F('store').value.trim(), category:F('category').value.trim(), account:realName(F('account').value)};
   if (!(entered > 0) || !(amount > 0)) { err.textContent = 'Enter an amount above zero.'; err.hidden = false; return; }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { err.textContent = 'Pick a date.'; err.hidden = false; return; }
   const miss = Object.entries(need).filter(([,v]) => !v).map(([k]) => k);
@@ -8395,15 +8398,17 @@ document.addEventListener('click', async e => {
 const BK_COLS = { expenses:() => state.items, income:() => state.income, transfers:() => state.transfers, accounts:() => state.accounts,
   checkins:() => state.checkins, invSnapshots:() => state.snaps, trips:() => state.trips, bookings:() => state.bookings, toBook:() => state.toBook };
 const DERIVED = ['tripKind','tripName','kind','place'];
+// Every shared setting goes in the backup, the envelope budget included (starting money, envelopes, money assigned).
+const BK_SETTINGS = ['budgets','fire','fireInr','fx','bookings','leave','goals','tax','people','envelopes'];
+const BK_SET_LABEL = { envelopes:'the envelope budget', goals:'goals', budgets:'category budgets', leave:'leave', tax:'tax settings', fire:'FIRE plan', fireInr:'FIRE plan in rupees', fx:'exchange rates', people:'people', bookings:'booking email' };
 function backupData(){
   const collections = {};
   for (const [c, get] of Object.entries(BK_COLS)) collections[c] = get().map(d => { const o = { ...d }; DERIVED.forEach(k => delete o[k]); return o; });
-  const settings = [];
-  if ((state.budgets.items || []).length || state.budgets.total) settings.push({ id:'budgets', ...state.budgets });
-  if (state.fire && Object.keys(state.fire).length) settings.push({ id:'fire', ...state.fire });
-  if (state.fireInr && Object.keys(state.fireInr).length) settings.push({ id:'fireInr', ...state.fireInr });
-  if (Object.keys(state.fxMonths).length) settings.push({ id:'fx', months: state.fxMonths });
-  if (state.bkSettings?.email) settings.push({ id:'bookings', ...state.bkSettings });
+  const settings = [], raw = state.settingsRaw || {};
+  for (const id of BK_SETTINGS){
+    if (id === 'fx'){ if (Object.keys(state.fxMonths).length) settings.push({ id:'fx', months: state.fxMonths }); continue; }
+    const v = raw[id]; if (v && Object.keys(v).length) settings.push({ id, ...v });
+  }
   collections.settings = settings;
   return { app:'S&A Ledger', version:1, exportedAt: new Date().toISOString(), collections };
 }
@@ -8423,10 +8428,12 @@ $('#rsFile').addEventListener('change', async e => {
   const have = { expenses:state.items, income:state.income, transfers:state.transfers, accounts:state.accounts, checkins:state.checkins, invSnapshots:state.snaps, trips:state.trips, bookings:state.bookings, toBook:state.toBook };
   const rows = Object.entries(data.collections).filter(([c, v]) => RS_LABEL[c] && Array.isArray(v) && v.length).map(([c, v]) => {
     const ids = new Set((have[c] || []).map(x => x.id)), missing = c === 'settings' ? null : v.filter(x => !ids.has(x.id)).length;
-    return `<li><span class="ok">•</span><span>${v.length} ${RS_LABEL[c]}</span><span class="n">${missing === null ? 'replaces current' : missing ? missing + ' not here now' : 'all already here'}</span></li>`; });
+    const what = c === 'settings' ? v.filter(x => BK_SETTINGS.includes(x?.id)).map(x => BK_SET_LABEL[x.id]) : [];
+    return `<li><span class="ok">•</span><span>${c === 'settings' ? `Settings: ${esc(what.join(', '))}` : `${v.length} ${RS_LABEL[c]}`}</span><span class="n">${missing === null ? 'replaces current' : missing ? missing + ' not here now' : 'all already here'}</span></li>`; });
+  const noEnv = state.envCfg && !(data.collections.settings || []).some(x => x?.id === 'envelopes');
   $('#rsBody').innerHTML = `<div style="display:grid;gap:10px"><p style="margin:0">Backup from <strong>${esc(new Date(data.exportedAt).toLocaleString('en-IE', { dateStyle:'medium', timeStyle:'short' }))}</strong>:</p>
     <ul class="checks">${rows.join('')}</ul>
-    <p class="muted" style="margin:0;font-size:12.5px">Entries come back exactly as they were in the backup. Anything added since stays; nothing is deleted. An entry you changed since the backup goes back to the backup’s version.</p></div>`;
+    <p class="muted" style="margin:0;font-size:12.5px">Entries come back exactly as they were in the backup. Anything added since stays; nothing is deleted. An entry you changed since the backup goes back to the backup’s version.${noEnv ? ' This backup is from before backups kept the envelope budget, so your budget stays as it is now.' : ''}</p></div>`;
   state.rsData = data; $('#rsErr').hidden = true; $('#rsDlg').showModal();
 });
 $('#rsCancel').addEventListener('click', () => { $('#rsDlg').close(); state.rsData = null; });
@@ -8435,7 +8442,7 @@ $('#rsForm').addEventListener('submit', async e => {
   const writes = [];
   for (const [c, v] of Object.entries(data.collections)){
     if (!RS_LABEL[c] || !Array.isArray(v)) continue;
-    for (const d of v){ if (!d || !d.id) continue; if (c === 'settings' && !['budgets','fire','fireInr','fx','bookings'].includes(d.id)) continue;
+    for (const d of v){ if (!d || !d.id) continue; if (c === 'settings' && !BK_SETTINGS.includes(d.id)) continue;
       const { id, ...rest } = d; DERIVED.forEach(k => delete rest[k]); writes.push([c, id, rest]); }
   }
   $('#rsSave').disabled = true; $('#rsSave').textContent = 'Restoring…';
