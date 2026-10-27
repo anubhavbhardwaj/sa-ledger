@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ccKey, CC_UNKNOWN, norm, spendingStats, budgetMonth, committedBy, SAVE_A, SAVE_S, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
+import { ccKey, CC_UNKNOWN, norm, spendingStats, budgetMonth, committedBy, SAVE_A, SAVE_S, transferSources, TO, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
 
 const cfg = () => ({ start: '2026-10-10', accounts: ['Deutsche Bank', 'Wise Common', 'Wise Sulekha', 'DB Card', 'IDFC Card'], opening: 2000, trips: true,
   groups: [
@@ -174,4 +174,17 @@ test('envelopes: inside each group the biggest come first (assigned, then spent,
   assert.deepEqual(G.find(g => g.group === 'Flexible').rows.map(r => r.key), ['food', 'bakery'], 'Bakery: nothing assigned, spent 15');
   const none = { '2026-10': {} }; c.assigned = none;
   assert.deepEqual(groupRows(c, budgetMonth(c, '2026-10', { ...data, now: '2026-10' }).rows).find(g => g.group === 'Flexible').rows.map(r => r.key), ['food', 'bakery'], 'nothing assigned: by spending (190 vs 15)');
+});
+
+test('envelopes: an envelope can take the transfers to an account (Transfers to T212); the rest still goes to Savings by owner', () => {
+  const c = cfg(); c.groups.push({ id: 'g4', name: 'Goals', envs: [{ id: 'inv', name: 'Investments', src: [TO + 'Scalable'], owner: 'Anubhav' }] });
+  const acc = n => ({ 'Deutsche Bank': { owner: 'Anubhav', type: 'bank' }, 'Wise Sulekha': { owner: 'Sulekha', type: 'bank' }, 'DB Card': { owner: 'Anubhav', type: 'card' } })[n] || null;
+  const transfers = [...data.transfers, { date: '2026-10-18', amount: 100, from: 'Wise Sulekha', to: 'India' }];
+  const by = Object.fromEntries(budgetMonth(c, '2026-10', { ...data, transfers, acc, now: '2026-10' }).rows.map(r => [r.key, r]));
+  assert.equal(by.inv.activity, -500, 'Deutsche Bank → Scalable lands in Investments');
+  assert.equal(by[SAVE_A]?.activity || 0, 0); assert.equal(by[SAVE_S].activity, -100, 'the rest still by owner');
+  assert.equal(srcLabel(TO + 'T212'), 'Transfers to T212');
+  assert.deepEqual(transferSources(c, transfers), [TO + 'India', TO + 'Scalable'], 'only money leaving the budget; the card payment is inside it');
+  const S = spendingStats(c, data.items, '2026-10', transfers);
+  assert.deepEqual(S.src[norm(TO + 'Scalable')], { cur: 500, last: 0, avg: 0 }); assert.deepEqual(S.env.inv, { cur: 500, last: 0, avg: 0 });
 });

@@ -1066,3 +1066,24 @@ test('envelope bars: grey spent, then what is left in the amount’s colour (gre
   assert.match(await app.text('.oblegend'), /spent\s*left\s*short of its target, or of what a card owes\s*overspent/);
   await clean(app);
 });
+
+test('envelopes: money sent to T212 lands in your own envelope once it takes "Transfers to T212" (else in Savings)', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString(), td = d(0);
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, t: { name: 'T212', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
+    transfers: { t1: { amount: 500, date: td, from: 'Deutsche Bank', to: 'T212', createdAt: now } },
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 3000, updatedAt: now, groups: [{ id: 'g', name: 'Goals', envs: [{ id: 'inv', name: 'Investments', src: ['Investment'], owner: 'Anubhav' }] }], assigned: { [m]: { inv: 500 } } } } });
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(250);
+  let t = await envText(app);
+  assert.match(t, /Investments\s*€500\s*–\s*€500/); assert.match(t, /Investing & India\s*–\s*−€500\s*−€500/, 'before: in Savings, overspent');
+  await page.click('[data-envmore]'); await page.click('#budgetPanel [data-envcats]'); await page.waitForSelector('#envCatDlg[open]');
+  assert.match(await page.$eval('[data-ecsrc="0.0"] option[value="→T212"]', o => o.textContent), /Transfers to T212 · €500 in /);
+  await page.selectOption('[data-ecsrc="0.0"]', '→T212');
+  assert.match(await app.text('#ecList .ece:has([data-ece="0.0"]) .ecsrc'), /Transfers to T212/);
+  await page.click('#envCatForm [type=submit]'); await page.waitForTimeout(300);
+  t = await envText(app);
+  assert.match(t, /Investments\s*€500\s*−€500\s*€0/, 'now it comes out of Investments'); assert.doesNotMatch(t, /Investing & India\s*–\s*−€500/);
+  await page.click('[data-envkey="inv"]'); await page.waitForSelector('#envAsgDlg[open]');
+  assert.match(await app.text('#eaNums'), /Gets: Investment \(all\), Transfers to T212/);
+  assert.match(await app.text('#eaActs'), /To T212\s*from Deutsche Bank\s*€500\.00/);
+  await clean(app);
+});

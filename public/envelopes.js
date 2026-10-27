@@ -11,7 +11,8 @@
 //   its category and moves into the card's envelope, so the money to pay the card is set aside; a payment to the card
 //   (a transfer, or a bill logged as spending in a category like "Credit Card") comes out of the card's envelope.
 //   Debt from before the start isn't taken off Ready to Assign: it shows on the card's envelope, to be given money;
-// - money moved from a budget account to any other account (investing, sending to India) is Activity in
+// - money moved from a budget account to any other account (investing, sending to India) is Activity in the
+//   envelope that takes transfers to that account ("Transfers to T212", a source like '→T212'), else in
 //   Savings › Investing & India, one envelope per owner of the account it leaves (Anubhav, Sulekha, Common);
 //   moves between budget cash accounts change nothing;
 // - with trips on, spending on a trip goes to that trip's envelope under Travel;
@@ -45,7 +46,9 @@ export const tripKey = id => 't_' + String(id).replace(/[^A-Za-z0-9_-]/g, '');
 export const srcOf = (cat, sub) => { const c = String(cat || '').trim(), u = String(sub || '').trim(); return u ? `${c}${SEP}${u}` : c; };
 // Sources match without regard to case or extra spaces ("Eating Out" and "eating out " are the same spending).
 export const norm = s => String(s || '').trim().toLowerCase();
-export const srcLabel = s => s.includes(SEP) ? s.split(SEP).join(' › ') : `${s} (all)`;
+// A source starting with '→' takes the transfers to that account out of the budget ('→T212': money sent to T212).
+export const TO = '→';
+export const srcLabel = s => s.startsWith(TO) ? `Transfers to ${s.slice(TO.length)}` : s.includes(SEP) ? s.split(SEP).join(' › ') : `${s} (all)`;
 export const newId = () => 'e_' + Math.random().toString(36).slice(2, 10);
 export const monthsBetween = (a, b) => { const out = []; let [y, m] = a.split('-').map(Number); const [Y, M] = b.split('-').map(Number);
   while (y < Y || (y === Y && m <= M)){ out.push(`${y}-${String(m).padStart(2, '0')}`); m++; if (m > 12){ m = 1; y++; } } return out; };
@@ -70,13 +73,15 @@ export function makeBudget(cfg, acc = () => null){
   const isBill = e => !isCard(e.account) && (CC_RE.test(e.category || '') || CC_RE.test(e.subcategory || ''));
   const keyFor = e => cfg.trips !== false && e.tripId ? tripKey(e.tripId)
     : idx.get(norm(srcOf(e.category, e.subcategory))) || idx.get(norm(srcOf(e.category))) || NONE_KEY;
+  // Where money sent out of the budget goes: the envelope that takes transfers to that account, else Savings by owner.
+  const outKey = t => idx.get(norm(TO + t.to)) || saveKeyOf(acc(t.from)?.owner);
   const describe = k => isSaveKey(k) ? { group: 'Savings', name: { [SAVE_A]: 'Investing & India · Anubhav', [SAVE_S]: 'Investing & India · Sulekha' }[k] || 'Investing & India · Common', save: true, owner: saveOwner(k) }
     : k === CC_UNKNOWN ? { group: 'Credit Card Payments', name: 'Card payments (card not recognised)', card: true }
     : k.startsWith('cc_') ? (cardName.has(k) ? { group: 'Credit Card Payments', name: cardName.get(k), card: true, account: cardName.get(k) } : null)
     : k === NONE_KEY ? { group: 'Not assigned', name: 'Spending in no envelope', none: true }
     : k.startsWith('t_') ? { group: 'Travel', tripId: k.slice(2) }
     : info.get(k) || null;
-  return { isB, isCard, isBill, billCard, keyFor, describe, info, cards };
+  return { isB, isCard, isBill, billCard, keyFor, outKey, describe, info, cards };
 }
 
 // The month's numbers. data = { items, income, transfers, acc, now } (acc(name) → the account, to know which are cards;
@@ -84,7 +89,7 @@ export function makeBudget(cfg, acc = () => null){
 export function budgetMonth(cfg, month, { items = [], income = [], transfers = [], acc = () => null, now = new Date().toISOString().slice(0, 7) } = {}){
   const start = cfg.start, sm = start.slice(0, 7);
   if (month < sm) return { before: true, ready: 0, rows: [] };
-  const { isB, isCard, isBill, billCard, keyFor, describe, cards } = makeBudget(cfg, acc), after = d => d >= start;
+  const { isB, isCard, isBill, billCard, keyFor, outKey, describe, cards } = makeBudget(cfg, acc), after = d => d >= start;
   const act = {}, inflow = {}, outside = {}, ex = new Set((cfg.excluded || []).map(a => String(a).toLowerCase()));
   const add = (m, k, v) => { (act[m] ||= {}); act[m][k] = (act[m][k] || 0) + v; };
   items.forEach(e => {
@@ -106,7 +111,7 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
     const f = isB(t.from), to = isB(t.to), m = t.date.slice(0, 7), v = +t.amount || 0;
     if (f && isCard(t.from)) add(m, ccKey(t.from), v);       // money taken from a card (cash advance, balance transfer)
     if (to && isCard(t.to)) add(m, ccKey(t.to), -v);         // a payment to a card
-    if (f && !to) add(m, saveKeyOf(acc(t.from)?.owner), -v); else if (!f && to) inflow[m] = (inflow[m] || 0) + v;
+    if (f && !to) add(m, outKey(t), -v); else if (!f && to) inflow[m] = (inflow[m] || 0) + v;
   });
   // Money assigned to an envelope that has since been deleted goes back to Ready to Assign.
   const known = k => !!describe(k);
@@ -182,6 +187,12 @@ export function unassignedSources(cfg, items, since){
     .forEach(i => { const s = srcOf(i.category, i.subcategory), k = norm(s); (tot[k] ||= { src: s, amount: 0 }).amount += +i.amount || 0; });
   return Object.values(tot).map(x => ({ src: x.src, amount: r2(x.amount) })).sort((a, b) => b.amount - a.amount);
 }
+// Accounts money was sent to from the budget accounts, as sources ('→T212'), most used first.
+export function transferSources(cfg, transfers){
+  const { isB } = makeBudget(cfg), n = {};
+  transfers.forEach(t => { if (isB(t.from) && !isB(t.to) && String(t.to || '').trim()) { const k = String(t.to).trim(); n[k] = (n[k] || 0) + 1; } });
+  return Object.entries(n).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([k]) => TO + k);
+}
 // Every source in the data, for picking: each category (all of it) followed by its subcategories.
 export function allSources(items){
   // One entry per category and subcategory whatever its case, shown as most often written.
@@ -197,8 +208,8 @@ export function allSources(items){
 // the average of the last three full months. Same rules as the budget (budget accounts only; trips apart when on).
 // Source figures are keyed by norm(source) and count everything in that category or subcategory; the envelope figures count what would
 // actually land in it (the most specific source wins).
-export function spendingStats(cfg, items, month){
-  const { keyFor, isB } = makeBudget(cfg), prev = [1, 2, 3].map(k => monthsBetween(shift(month, -k), shift(month, -k))[0]);
+export function spendingStats(cfg, items, month, transfers = []){
+  const { keyFor, isB, outKey } = makeBudget(cfg), prev = [1, 2, 3].map(k => monthsBetween(shift(month, -k), shift(month, -k))[0]);
   const want = new Set([month, ...prev]), src = {}, env = {};
   const bump = (o, k, m, v) => { const x = (o[k] ||= { cur: 0, last: 0, sum3: 0 }); if (m === month) x.cur += v; else { x.sum3 += v; if (m === prev[0]) x.last += v; } };
   items.forEach(i => {
@@ -207,6 +218,10 @@ export function spendingStats(cfg, items, month){
     const v = +i.amount || 0;
     bump(src, norm(srcOf(i.category)), m, v); if (String(i.subcategory || '').trim()) bump(src, norm(srcOf(i.category, i.subcategory)), m, v);
     const k = keyFor(i); if (k !== NONE_KEY) bump(env, k, m, v);
+  });
+  transfers.forEach(t => {
+    const m = String(t.date).slice(0, 7); if (!want.has(m) || !isB(t.from) || isB(t.to)) return;
+    const v = +t.amount || 0; bump(src, norm(TO + t.to), m, v); const k = outKey(t); if (k && !isSaveKey(k)) bump(env, k, m, v);
   });
   const fin = o => Object.fromEntries(Object.entries(o).map(([k, x]) => [k, { cur: r2(x.cur), last: r2(x.last), avg: r2(x.sum3 / 3) }]));
   return { src: fin(src), env: fin(env) };
