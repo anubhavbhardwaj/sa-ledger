@@ -181,6 +181,7 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .rta .rw strong{font-size:18px;color:var(--ink)}.rta .rw strong.neg{color:var(--danger)}
 .rta .rw small{font-size:11.5px;color:var(--muted)}
 .rta .rw .left{font-size:13px;color:var(--ink-2);margin-top:4px}.rta .rw .left b{font-family:var(--f-mono);font-weight:700;color:var(--ink)}.rta .rw .left.neg b{color:var(--danger)}
+.owntag.com{background:transparent;border:1px solid var(--line)}
 .owntag{font-size:11px;font-weight:500;color:var(--muted);background:var(--sunk);border-radius:999px;padding:1px 7px;margin-left:6px;white-space:nowrap}
 .rta{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:var(--sunk)}.rta strong{font-family:var(--f-mono);font-size:22px}
 .rta.pos{background:color-mix(in srgb,var(--good) 16%,var(--surface))}.rta.neg{background:color-mix(in srgb,var(--danger) 14%,var(--surface))}.rta .sub{flex-basis:100%;font-size:12px;color:var(--muted)}
@@ -1231,6 +1232,8 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
       <label class="f"><span id="eaLbl">Assigned this month (€)</span><input id="ea-amt" type="number" step="0.01" inputmode="decimal"></label>
       <label class="f">Monthly target (€)<input id="ea-target" type="number" step="1" min="0" inputmode="decimal" placeholder="none"></label>
     </div>
+    <div id="eaOwn" class="ecown" hidden></div>
+    <p class="err" id="eaErr" hidden></p>
     <div class="esq" id="eaQuick"></div>
     <div id="eaActs" class="recent" style="font-size:13px"></div>
     <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="eaCancel">Cancel</button><button class="btn primary" type="submit">Save</button></div></div>
@@ -3781,9 +3784,10 @@ function envKpi(){
 // Where each of you stands: the balance of your own accounts in the budget (bank minus what your cards owe), and of the
 // shared ones (Wise Common) as Common, at the end of the month shown, or today for this month and months ahead.
 // Whose money an envelope is, next to its name: nothing for the common money (the default).
-const ownTag = r => { if (r.card || r.save) return ''; const sp = r.split;
-  const t = sp ? `${eur0.format(sp.Anubhav)} / ${eur0.format(sp.Sulekha)}` : PEOPLE.includes(r.owner) ? r.owner : '';
-  return t ? ` <span class="owntag" title="${sp ? 'Split: Anubhav ' + eur0.format(sp.Anubhav) + ', Sulekha ' + eur0.format(sp.Sulekha) : 'Whose money'}">${esc(t)}</span>` : ''; };
+const ownTag = r => { if (r.card || r.save || r.none) return '';
+  const sp = r.split, o = r.tripId ? (PEOPLE.includes(state.tripMap[r.tripId]?.traveller) ? state.tripMap[r.tripId].traveller : 'Both') : r.owner;
+  const t = sp ? `${eur0.format(sp.Anubhav)} / ${eur0.format(sp.Sulekha)}` : PEOPLE.includes(o) ? o : 'Common';
+  return ` <span class="owntag ${t === 'Common' ? 'com' : ''}" title="${sp ? 'Split: Anubhav ' + eur0.format(sp.Anubhav) + ', Sulekha ' + eur0.format(sp.Sulekha) : r.tripId ? 'Whose money: follows who travels' : 'Whose money'}">${esc(t)}</span>`; };
 function envWho(m, B0){
   const cm = thisMonth(), [y, mo] = m.split('-').map(Number), asOf = m < cm ? new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10) : today(), out = {};
   for (const name of state.envCfg.accounts || []){
@@ -3871,9 +3875,19 @@ function openCcFix(){
     <select data-cccard="${esc(i.id)}" aria-label="Card">${cards.map(a => `<option value="${esc(a.name)}" ${a.name === g ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>`; }).join('');
   $('#ccErr').hidden = true; $('#ccDlg').showModal();
 }
+// The envelope's place in your categories, to change whose money it is from its own dialog.
+const envOf = key => { for (const g of state.envCfg?.groups || []) for (const e of g.envs || []) if (e.id === key) return e; return null; };
+function drawEaOwn(){
+  const box = $('#eaOwn'), d = state.eaOwn; box.hidden = !d; if (!d) return;
+  box.innerHTML = `<label>Whose money <select id="ea-own" aria-label="Whose money">${[['Both', 'Both (common)'], ['Anubhav', 'Anubhav'], ['Sulekha', 'Sulekha'], ['split', 'Split by amount']].map(([k, l]) => `<option value="${k}" ${k === d.v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    ${d.v === 'split' ? PEOPLE.map(p => `<label>${p} €<input data-easplit="${p}" type="number" step="1" min="0" inputmode="decimal" value="${+d.split[p] || ''}" aria-label="${p}’s part"></label>`).join('') : ''}`;
+}
+$('#eaOwn').addEventListener('change', e => { if (e.target.id !== 'ea-own') return; const d = state.eaOwn; d.v = e.target.value; if (d.v === 'split') d.split ||= { Anubhav: 0, Sulekha: 0 }; drawEaOwn(); if (d.v === 'split') $('[data-easplit="Anubhav"]')?.focus(); });
+$('#eaOwn').addEventListener('input', e => { const p = e.target.dataset.easplit; if (p) state.eaOwn.split = { ...state.eaOwn.split, [p]: Math.max(0, Math.round((+e.target.value || 0) * 100) / 100) }; });
 function openEnvAssign(key){
   const m = envMonthSel(), B = envRows(m), r = B.rows.find(x => x.key === key); if (!r) return;
   state.envKey = key; const cfg = state.envCfg, tgt = (cfg.targets || {})[key];
+  { const e = envOf(key); state.eaOwn = e ? { v: e.split ? 'split' : PEOPLE.includes(e.owner) ? e.owner : 'Both', split: e.split ? { ...e.split } : null } : null; drawEaOwn(); $('#eaErr').hidden = true; }
   $('#eaTitle').textContent = (r.group ? r.group + ' › ' : '') + envName(r);
   $('#eaLbl').textContent = `Assigned in ${monthLabel(m)} (€)`;
   $('#eaNums').innerHTML = `Ready to Assign ${signedEur(B.ready)} · this envelope: carried ${signedEur(r.carry)}, ${r.card ? (r.activity >= 0 ? 'moved in ' : 'paid out ') + eur.format(Math.abs(r.activity)) + ' net' : 'spent ' + eur.format(Math.abs(r.activity))}, available <strong>${signedEur(r.available)}</strong>`;
@@ -4006,7 +4020,13 @@ $('#envAsgForm').addEventListener('submit', async e => {
   e.preventDefault();
   const key = state.envKey, v = parseFloat($('#ea-amt').value) || 0, tg = Math.max(0, parseFloat($('#ea-target').value) || 0);
   const targets = { ...(state.envCfg.targets || {}) }; if (tg) targets[key] = tg; else delete targets[key];
-  if (await saveEnv({ assigned: setAssigned(state.envCfg, envMonthSel(), key, v), targets })) $('#envAsgDlg').close();
+  const patch = { assigned: setAssigned(state.envCfg, envMonthSel(), key, v), targets }, d = state.eaOwn;
+  if (d){
+    if (d.v === 'split' && !splitOf(d)){ $('#eaErr').textContent = 'Enter the amounts to split, or pick whose money it is.'; $('#eaErr').hidden = false; return; }
+    patch.groups = (state.envCfg.groups || []).map(g => ({ ...g, envs: (g.envs || []).map(x => { if (x.id !== key) return x;
+      const { owner, split, ...rest } = x; return d.v === 'split' ? { ...rest, split: splitOf(d) } : PEOPLE.includes(d.v) ? { ...rest, owner: d.v } : rest; }) }));
+  }
+  if (await saveEnv(patch)) $('#envAsgDlg').close();
 });
 $('#emCancel').addEventListener('click', () => $('#envMoveDlg').close());
 $('#envMoveForm').addEventListener('submit', async e => {
@@ -5741,7 +5761,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-27d';
+const APP_VERSION = '2026-10-27e';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
