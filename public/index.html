@@ -170,28 +170,68 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .avatar[aria-expanded="true"]{box-shadow:0 0 0 3px var(--accent-soft)}
 .pmenu{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:250px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:grid}
 .pmenu[hidden]{display:none!important}
-.envnav{display:flex;align-items:center;gap:6px;margin:0}
-.envnav .navb{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
+/* Budget page: a calm top (month, Ready to Assign, what's left for each of you), one-line alerts, then the envelopes */
+.envhead{align-items:center!important}
+.envnav{display:flex;align-items:center;gap:8px;margin:0;font-size:18px}
+.envnav .navb{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;width:30px;height:30px;font-size:16px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
 .envnav .navb[disabled]{opacity:.35;cursor:default}
+.morewrap.envmore .pmenu{left:auto;right:0}
+.rta{display:flex;justify-content:space-between;align-items:baseline;gap:4px 10px;flex-wrap:wrap;padding:14px 16px;border-radius:12px;background:var(--sunk)}
+.rta>span:first-child{font-weight:600}
+.rta>strong{font-family:var(--f-mono);font-size:24px}
+.rta.pos{background:color-mix(in srgb,var(--good) 14%,var(--surface))}.rta.neg{background:color-mix(in srgb,var(--danger) 14%,var(--surface))}
+.rta .sub{flex-basis:100%;font-size:12.5px;color:var(--muted)}
 .rta .sub strong.fut{font:inherit;font-weight:600;color:var(--ink-2)}
-.rta .rwho{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px 14px;border-top:1px solid color-mix(in srgb,var(--ink) 12%,transparent);padding-top:8px;margin-top:2px}
-.rta .rwl{flex-basis:100%;font-size:11.5px;color:var(--muted)}
-.rta .rw{display:grid;gap:1px;min-width:0;flex:1 1 80px;max-width:260px;align-content:start}
-.rta .rw .nm{font-size:12px;color:var(--ink-2);font-weight:600}
-.rta .rw strong{font-size:18px;color:var(--ink)}.rta .rw strong.neg{color:var(--danger)}
-.rta .rw small{font-size:11.5px;color:var(--muted)}
-.rta .rw .left{font-size:13px;color:var(--ink-2);margin-top:4px}.rta .rw .left b{font-family:var(--f-mono);font-weight:700;color:var(--ink)}.rta .rw .left.neg b{color:var(--danger)}
-.owntag.com{background:transparent;border:1px solid var(--line)}
-.owntag{font-size:11px;font-weight:500;color:var(--muted);background:var(--sunk);border-radius:999px;padding:1px 7px;margin-left:6px;white-space:nowrap}
-.rta{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:var(--sunk)}.rta strong{font-family:var(--f-mono);font-size:22px}
-.rta.pos{background:color-mix(in srgb,var(--good) 16%,var(--surface))}.rta.neg{background:color-mix(in srgb,var(--danger) 14%,var(--surface))}.rta .sub{flex-basis:100%;font-size:12px;color:var(--muted)}
-.ybud{display:grid}.ybh,.ybr{display:grid;grid-template-columns:minmax(0,1fr) 84px 84px 96px;gap:8px;align-items:center;padding:7px 4px}.ybh{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line)}
-.ybh span:not(:first-child),.ybr .n{text-align:right;font-family:var(--f-mono);font-size:13px}.ybg>summary{list-style:none;cursor:pointer}.ybg>summary::-webkit-details-marker{display:none}
-.ybg>summary .ybr{font-weight:600;background:var(--sunk);border-radius:8px;margin-top:6px}.ybg>summary .nm::before{content:'▸ ';color:var(--muted)}.ybg[open]>summary .nm::before{content:'▾ '}
-.ybr.env{cursor:pointer;border-bottom:1px solid var(--line)}.ybr.env:hover{background:var(--sunk)}.ybr .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pill.av{justify-self:end;font-family:var(--f-mono);font-size:12.5px;padding:2px 9px;border-radius:999px;background:var(--sunk);color:var(--ink)}.pill.av.pos{background:color-mix(in srgb,var(--good) 22%,var(--surface))}.pill.av.neg{background:color-mix(in srgb,var(--danger) 20%,var(--surface));color:var(--danger)}.pill.av.short{background:var(--warn-soft);color:var(--warn)}
-@media (max-width:560px){.ybh,.ybr{grid-template-columns:minmax(0,1fr) auto}.ybh span:nth-child(2),.ybh span:nth-child(3),.ybr .n.a,.ybr .n.c{display:none}.ybr .sm{grid-column:1/-1;font-size:11.5px;color:var(--muted);margin-top:-4px}}
-@media (min-width:561px){.ybr .sm{display:none}}
+.rwho{flex-basis:100%;border-top:1px solid color-mix(in srgb,var(--ink) 12%,transparent);margin-top:8px;padding-top:8px}
+.rwho>summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 18px}
+.rwho>summary::-webkit-details-marker{display:none}
+.rwho .rwl{flex-basis:100%;font-size:11.5px;color:var(--muted)}
+.rwho .rw{display:flex;align-items:baseline;gap:6px;min-width:0}
+.rwho .rw .nm{font-size:12.5px;color:var(--ink-2)}
+.rwho .rw b{font-family:var(--f-mono);font-size:15px;color:var(--ink)}.rwho .rw b.neg,.rwt .neg{color:var(--danger)!important}
+.rwho[open] .rw{display:none}
+.rwho .chev{margin-left:auto;color:var(--muted);font-size:12px;transition:transform .15s}.rwho[open] .chev{transform:rotate(180deg)}
+.rwt{display:grid;grid-template-columns:minmax(84px,auto) repeat(var(--n),minmax(0,1fr));gap:4px 12px;margin-top:10px;font-size:13px}
+.rwt>span{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+.rwt>.k{text-align:left;font-family:var(--f-body);color:var(--ink-2)}
+.rwt>.h{font-family:var(--f-body);font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.rwt>.sm{font-size:11.5px;color:var(--muted);margin-top:-3px}
+.rwt>.tot{font-weight:700;border-top:1px solid color-mix(in srgb,var(--ink) 15%,transparent);padding-top:4px}
+.rwnote{margin:8px 0 0;font-size:11.5px;color:var(--muted)}
+.envalerts{display:grid;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.envalerts .al{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;padding:9px 12px;font-size:13px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--warn) 7%,var(--surface))}
+.envalerts .al:last-child{border-bottom:0}.envalerts .al.info{background:var(--surface)}
+.envalerts .al>span:first-child{flex:1 1 220px;min-width:0}.envalerts .al .acts{display:flex;gap:6px;flex-wrap:wrap}
+.ybud{display:grid}
+.ybh,.ybr{display:grid;grid-template-columns:minmax(0,1fr) 78px 84px 92px;gap:8px;align-items:center;padding:8px 6px}
+.ybh{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line)}
+.ybh span:not(:first-child),.ybr .n{text-align:right;font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.ybr .n .z{color:var(--muted);opacity:.6}
+.ybg>summary{list-style:none;cursor:pointer}.ybg>summary::-webkit-details-marker{display:none}
+.ybg>summary .ybr{font-weight:600;font-size:13.5px;border-bottom:1px solid var(--line);margin-top:14px;padding-top:6px;padding-bottom:6px;color:var(--ink-2)}
+.ybg>summary .ybr .n{color:var(--ink-2)}
+.ybg>summary .nm::before{content:'▾';display:inline-block;width:14px;color:var(--muted);font-size:11px;transition:transform .15s}.ybg:not([open])>summary .nm::before{transform:rotate(-90deg)}
+.ybg .ginfo{margin:6px 6px 4px 26px;font-size:12.5px;color:var(--muted)}
+.ib{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:50%;width:18px;height:18px;font-size:11px;line-height:1;padding:0;margin-left:6px;cursor:pointer;vertical-align:1px}
+.ybr.env{cursor:pointer;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}.ybr.env:hover{background:var(--sunk)}
+.ybr.env.empty .tx,.ybr.env.empty .pill.av{opacity:.5}
+.ybr .nm{min-width:0;display:flex;align-items:center;gap:8px;overflow:hidden}.ybr .nm .tx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ybr .xnote{font-size:12px;color:var(--muted);font-weight:400;white-space:nowrap}
+.ob{flex:none;display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;font:600 10.5px/1 var(--f-body);letter-spacing:.02em}
+.ob-a{background:color-mix(in srgb,var(--s1) 22%,var(--surface));color:color-mix(in srgb,var(--s1) 80%,var(--ink))}
+.ob-s{background:color-mix(in srgb,var(--s5) 22%,var(--surface));color:color-mix(in srgb,var(--s5) 80%,var(--ink))}
+.ob-c{border:1px solid var(--line);color:var(--muted)}
+.ob-split{background:linear-gradient(90deg,color-mix(in srgb,var(--s1) 22%,var(--surface)) 50%,color-mix(in srgb,var(--s5) 22%,var(--surface)) 50%);color:var(--ink-2)}
+.oblegend{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 6px 0;font-size:11.5px;color:var(--muted)}.oblegend .ob{margin-left:6px}.oblegend .ob:first-child{margin-left:0}
+.pill.av{justify-self:end;font-family:var(--f-mono);font-size:12.5px;padding:2px 9px;border-radius:999px;color:var(--muted)}.pill.av.pos{background:color-mix(in srgb,var(--good) 20%,var(--surface));color:var(--ink)}.pill.av.neg{background:color-mix(in srgb,var(--danger) 20%,var(--surface));color:var(--danger)}.pill.av.short{background:var(--warn-soft);color:var(--warn)}
+.ybr .bar{display:none}
+@media (max-width:560px){
+  .ybh,.ybr{grid-template-columns:minmax(0,1fr) auto}.ybh span:nth-child(2),.ybh span:nth-child(3),.ybr .n.a,.ybr .n.c{display:none}
+  .ybr .bar{display:block;grid-column:1/-1;height:3px;border-radius:2px;background:var(--sunk);margin:2px 0 0 28px;overflow:hidden}
+  .ybr .bar i{display:block;height:100%;background:color-mix(in srgb,var(--ink) 35%,transparent);border-radius:2px}
+  .ybr .bar.neg i{background:var(--danger)}.ybr .bar.short i{background:var(--warn)}
+  .envnav{font-size:16px}.rta>strong{font-size:21px}
+}
 .ecown{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--muted)}.ecown label{display:flex;gap:6px;align-items:center}
 .ecown select,.ecown input{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 8px;font-size:13px;color:var(--ink);min-width:0}.ecown input{width:84px}
 .ecg{border:1px solid var(--line);border-radius:12px;padding:10px;display:grid;gap:8px}.ecgh,.eceh{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}.eceh{grid-template-columns:minmax(0,1fr) 86px auto}
@@ -3783,11 +3823,6 @@ function envKpi(){
 }
 // Where each of you stands: the balance of your own accounts in the budget (bank minus what your cards owe), and of the
 // shared ones (Wise Common) as Common, at the end of the month shown, or today for this month and months ahead.
-// Whose money an envelope is, next to its name: nothing for the common money (the default).
-const ownTag = r => { if (r.card || r.save || r.none) return '';
-  const sp = r.split, o = r.tripId ? (PEOPLE.includes(state.tripMap[r.tripId]?.traveller) ? state.tripMap[r.tripId].traveller : 'Both') : r.owner;
-  const t = sp ? `${eur0.format(sp.Anubhav)} / ${eur0.format(sp.Sulekha)}` : PEOPLE.includes(o) ? o : 'Common';
-  return ` <span class="owntag ${t === 'Common' ? 'com' : ''}" title="${sp ? 'Split: Anubhav ' + eur0.format(sp.Anubhav) + ', Sulekha ' + eur0.format(sp.Sulekha) : r.tripId ? 'Whose money: follows who travels' : 'Whose money'}">${esc(t)}</span>`; };
 function envWho(m, B0){
   const cm = thisMonth(), [y, mo] = m.split('-').map(Number), asOf = m < cm ? new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10) : today(), out = {};
   for (const name of state.envCfg.accounts || []){
@@ -3806,10 +3841,16 @@ function envWho(m, B0){
 }
 function envWhoHtml(m, B){
   const W = envWho(m, B), ppl = ['Anubhav', 'Sulekha', 'Shared'].filter(p => W.who[p]); if (!ppl.length) return '';
-  const m0 = v => (v < -0.5 ? '−' : '') + eur0.format(Math.abs(v));
-  return `<div class="rwho"><span class="rwl">Where you stand ${W.past ? 'on ' + shortDate(W.asOf) : 'today'}: accounts in the budget, bank minus cards; left is after what’s still in the envelopes each one owns</span>
-    ${ppl.map(p => { const o = W.who[p], net = o.cash - o.cards, left = net - (o.set || 0);
-      return `<span class="rw" data-envwho="${p}"><span class="nm">${p === 'Shared' ? 'Common' : p}</span><strong class="${net < -0.5 ? 'neg' : ''}">${m0(net)}</strong><small>${o.cards > 0.5 || o.cards < -0.5 ? `bank ${eur0.format(o.cash)} − cards ${eur0.format(o.cards)}` : `bank ${eur0.format(o.cash)}`}${o.noRate ? ' · rupee rate loading' : ''}</small><span class="left ${left < -0.5 ? 'neg' : ''}">≈ <b>${m0(left)}</b> left</span><small>after ${eur0.format(o.set || 0)} in envelopes</small></span>`; }).join('')}</div>`;
+  const m0 = v => (v < -0.5 ? '−' : '') + eur0.format(Math.abs(v)), nm = p => p === 'Shared' ? 'Common' : p;
+  const bal = p => W.who[p].cash - W.who[p].cards, left = p => bal(p) - (W.who[p].set || 0), rate = ppl.some(p => W.who[p].noRate);
+  return `<details class="rwho" ${state.rwOpen ? 'open' : ''}><summary><span class="rwl">Left after envelopes${W.past ? ' on ' + shortDate(W.asOf) : ''}</span>
+      ${ppl.map(p => `<span class="rw" data-envwho="${p}"><span class="nm">${nm(p)}</span><b class="${left(p) < -0.5 ? 'neg' : ''}">${m0(left(p))}</b></span>`).join('')}<span class="chev" aria-hidden="true">▾</span></summary>
+    <div class="rwt" style="--n:${ppl.length}"><span></span>${ppl.map(p => `<span class="h">${nm(p)}</span>`).join('')}
+      <span class="k">Balance${rate ? '*' : ''}</span>${ppl.map(p => `<span>${m0(bal(p))}</span>`).join('')}
+      <span class="k sm">bank − cards</span>${ppl.map(p => `<span class="sm">${eur0.format(W.who[p].cash)}${Math.abs(W.who[p].cards) > 0.5 ? ' − ' + eur0.format(W.who[p].cards) : ''}</span>`).join('')}
+      <span class="k">In envelopes</span>${ppl.map(p => `<span>${(W.who[p].set || 0) > 0.5 ? '−' + eur0.format(W.who[p].set) : '–'}</span>`).join('')}
+      <span class="k tot">Left</span>${ppl.map(p => `<span class="tot ${left(p) < -0.5 ? 'neg' : ''}">${m0(left(p))}</span>`).join('')}
+    </div><p class="rwnote">Accounts in the budget, ${W.past ? 'at the end of the month' : 'today'}; envelopes count for whoever owns them${rate ? ' · *rupee rate loading' : ''}.</p></details>`;
 }
 function renderEnvelopes(el){
   const m = envMonthSel(), cfg = state.envCfg;
@@ -3824,39 +3865,59 @@ function renderEnvelopes(el){
   const G = groupRows(cfg, B.rows), targets = cfg.targets || {};
   if (!(cfg.groups || []).length) G.unshift({ group: 'Your categories', rows: [], assigned: 0, activity: 0, available: 0, empty: true });
   const toFill = Object.entries(targets).filter(([k, v]) => +v > 0 && !(k in ((cfg.assigned || {})[m] || {}))).length;
-  const O = B.outside || { total: 0, byAcc: [], byKey: {} }, outNote = r => O.byKey[r.key] ? ` <span class="muted" style="font-weight:400;font-size:12px" title="Spent from accounts outside the budget, not counted">+ ${eur0.format(O.byKey[r.key])} outside</span>` : '';
-  const known = new Set(state.accounts.map(a => a.name.toLowerCase()));
-  const outBanner = O.total > 0.004 ? `<div class="banner" style="margin:0;font-size:13px;display:grid;gap:8px"><span><strong>${eur0.format(O.total)} not counted:</strong> spent in your envelope categories from accounts that aren’t in the budget.</span>
-      ${O.byAcc.map(x => `<span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:140px">${esc(x.acc)} <strong>${eur0.format(x.amount)}</strong>${known.has(x.acc.toLowerCase()) ? '' : ' <span class="muted">(not set up as an account)</span>'}</span>
-        ${known.has(x.acc.toLowerCase()) ? `<button class="btn small primary" type="button" data-envaddacc="${esc(JSON.stringify([x.acc]))}">Add to the budget</button>` : ''}<button class="btn small" type="button" data-envexclude="${esc(JSON.stringify([x.acc]))}">Keep out</button></span>`).join('')}</div>` : '';
-  const row = r => `<div class="ybr env" data-envkey="${esc(r.key)}" role="button" tabindex="0"><span class="nm">${esc(envName(r))}${ownTag(r)}${outNote(r)}${r.card && r.owes != null ? ` <span class="muted" style="font-weight:400;font-size:12px">owes ${eur0.format(r.owes)}</span>` : ''}</span><span class="n a">${eur0.format(r.assigned)}</span><span class="n c">${r.activity ? signedEur(r.activity) : '€0'}</span><span class="pill av ${avCls(r, cfg)}" ${r.card && r.owes != null ? `title="Set aside ${eur.format(r.available)} of the ${eur.format(r.owes)} the card owes"` : ''}>${signedEur(r.available)}</span>
-      <span class="sm">${r.card ? (r.owes != null ? `card owes ${eur0.format(r.owes)} · ` : '') + `assigned ${eur0.format(r.assigned)} · net ${r.activity >= 0 ? 'moved in' : 'paid'} ${eur0.format(Math.abs(r.activity))}` : `assigned ${eur0.format(r.assigned)} · spent ${eur0.format(Math.abs(r.activity))}`}${targets[r.key] ? ` · target ${eur0.format(targets[r.key])}` : ''}</span></div>`;
-  const noneRow = r => `<div class="ybr env" data-envcats role="button" tabindex="0"><span class="nm">${esc(r.name)}</span><span class="n a">—</span><span class="n c">${signedEur(r.activity)}</span><span class="pill av neg">${signedEur(r.available)}</span>
-      <span class="sm">spent ${eur0.format(Math.abs(r.activity))} · tap to put it in an envelope</span></div>`;
-  const grp = g => { if (g.cards) return `<details class="ybg" open><summary><div class="ybr"><span class="nm">Credit Card Payments</span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>
-      <p class="muted" style="margin:6px 4px;font-size:12.5px">Money set aside to pay each card. Buying with a card moves the money here from its category (+); paying the card takes it out (−). Amber: less set aside than the card owes.</p>${g.rows.map(row).join('')}</details>`;
+  const O = B.outside || { total: 0, byAcc: [], byKey: {} }, outNote = r => O.byKey[r.key] ? ` <span class="xnote" title="Spent from accounts outside the budget, not counted">+${eur0.format(O.byKey[r.key])} outside</span>` : '';
+  const known = new Set(state.accounts.map(a => a.name.toLowerCase())), cm = thisMonth(), ahead = m > cm, MM = k => MON[+k.slice(5, 7) - 1];
+  // Whole euros in the table (cents are in each envelope's dialog); nothing shown for nothing.
+  const m0 = v => (v < -0.5 ? '−' : '') + eur0.format(Math.abs(v)), cell = v => Math.abs(v) < 0.5 ? '<span class="z">–</span>' : m0(v);
+  // One short line per thing to look at; the longer story is in each line's tooltip and in the dialog it opens.
+  const al = [];
+  if (ahead) al.push(`<div class="al info"><span><b>Planning ahead.</b> Money assigned here comes out of Ready to Assign now.</span><span class="acts"><button class="btn small" type="button" data-envnow>Back to ${MM(cm)}</button></span></div>`);
+  { const cc = ccLine(m); if (cc) al.push(cc); }
+  O.byAcc.forEach(x => { const k = known.has(x.acc.toLowerCase());
+    al.push(`<div class="al" title="Spent in your envelope categories from an account that isn’t in the budget, so the envelopes don’t count it."><span><b>${eur0.format(x.amount)}</b> spent from ${esc(x.acc)}${k ? '' : ' (not an account yet)'}, outside the budget</span><span class="acts">${k ? `<button class="btn small primary" type="button" data-envaddacc="${esc(JSON.stringify([x.acc]))}">Add to budget</button>` : ''}<button class="btn small" type="button" data-envexclude="${esc(JSON.stringify([x.acc]))}">Keep out</button></span></div>`); });
+  if (cfg.start.startsWith(m) && cfg.start.slice(8) !== '01') al.push(`<div class="al" title="${MM(m)} spending before your start day is in the starting money, not in the envelopes."><span>Counting from ${shortDate(cfg.start)}, your start day</span><span class="acts"><button class="btn small" type="button" data-envwhole="${m}-01">Count all of ${MM(m)}</button></span></div>`);
+  // Whose money: a letter in front of each envelope (A, S, C for common, A·S split), the details in its tooltip.
+  const tripWho = id => { const t = state.tripMap[id]; return t && PEOPLE.includes(t.traveller) ? t.traveller : 'Both'; };
+  const ownerOf = r => r.none ? null : r.card ? (PEOPLE.includes(accOf(r.account)?.owner) ? accOf(r.account).owner : 'Both') : r.tripId ? tripWho(r.tripId) : r.split ? 'split' : PEOPLE.includes(r.owner) ? r.owner : 'Both';
+  const badge = r => { const o = ownerOf(r); if (!o) return '';
+    const [t, c, tip] = o === 'split' ? ['A·S', 'split', `Split: Anubhav ${eur0.format(r.split.Anubhav)}, Sulekha ${eur0.format(r.split.Sulekha)}`] : o === 'Anubhav' ? ['A', 'a', 'Anubhav’s money'] : o === 'Sulekha' ? ['S', 's', 'Sulekha’s money'] : ['C', 'c', 'Common money'];
+    return `<span class="ob ob-${c}" title="${tip}" aria-label="${tip}">${t}</span>`; };
+  // On a phone a thin bar under each envelope takes the place of the numbers line: how much of what it had is spent
+  // (red when overspent); for a card, how much of what it owes is set aside.
+  const bar = r => {
+    if (r.card) return r.owes > 0.5 ? `<span class="bar ${r.available + 0.5 < r.owes ? 'short' : ''}"><i style="width:${Math.round(Math.max(0, Math.min(1, r.available / r.owes)) * 100)}%"></i></span>` : '';
+    if (r.available < -0.004) return '<span class="bar neg"><i style="width:100%"></i></span>';
+    const have = r.carry + r.assigned; return have > 0.5 ? `<span class="bar"><i style="width:${Math.round(Math.min(1, Math.max(0, -r.activity) / have) * 100)}%"></i></span>` : '';
+  };
+  const nameOf = r => r.save ? 'Investing & India' : envName(r);
+  const row = r => { const empty = Math.abs(r.assigned) < 0.5 && Math.abs(r.activity) < 0.5 && Math.abs(r.available) < 0.5;
+    // Colour follows what's shown in whole euros: €0.02 left is "€0", not a green pill.
+    const cls = Math.abs(r.available) < 0.5 && !(r.card && r.owes > 0.5) && !((cfg.targets || {})[r.key] > 0 && avCls(r, cfg) === 'short') ? '' : avCls(r, cfg);
+    return `<div class="ybr env ${empty ? 'empty' : ''}" data-envkey="${esc(r.key)}" role="button" tabindex="0" title="Tap to assign money"><span class="nm">${badge(r)}<span class="tx">${esc(nameOf(r))}</span>${r.card && r.owes > 0.5 ? `<span class="xnote">owes ${eur0.format(r.owes)}</span>` : ''}${outNote(r)}</span><span class="n a">${cell(r.assigned)}</span><span class="n c">${cell(r.activity)}</span><span class="pill av ${cls}" ${r.card && r.owes != null ? `title="Set aside ${eur.format(r.available)} of the ${eur.format(r.owes)} the card owes"` : ''}>${m0(r.available)}</span>${bar(r)}</div>`; };
+  const noneRow = r => `<div class="ybr env" data-envcats role="button" tabindex="0" title="Spending in no envelope: tap to put it in one"><span class="nm"><span class="tx">${esc(r.name)}</span></span><span class="n a"><span class="z">–</span></span><span class="n c">${cell(r.activity)}</span><span class="pill av neg">${m0(r.available)}</span></div>`;
+  const head = (g, label, info) => `<summary><div class="ybr"><span class="nm">${label}${info ? `<button class="ib" type="button" data-envinfo aria-label="What is this?" title="${esc(info)}">?</button>` : ''}</span><span class="n a">${cell(g.assigned)}</span><span class="n c">${cell(g.activity)}</span><span class="n">${m0(g.available)}</span></div></summary>${info ? `<p class="ginfo" hidden>${info}</p>` : ''}`;
+  const grp = g => {
+    if (g.cards) return `<details class="ybg" open>${head(g, 'Credit Card Payments', 'Money set aside to pay each card. Buying with a card moves the money here from its category; paying the card takes it out. Amber: less set aside than the card owes.')}${g.rows.map(row).join('')}</details>`;
     if (g.empty) return `<p class="muted" style="margin:10px 0 0;font-size:13px">No categories yet. <button class="linkbtn" type="button" data-envcats>Create your categories</button></p>`;
-    if (g.group === 'Travel' && !g.gid) return `<details class="ybg" ${g.rows.some(r => r.activity) ? 'open' : ''}><summary><div class="ybr"><span class="nm">Travel <span class="muted" style="font-weight:400">(one per trip)</span></span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>
-      <p class="muted" style="margin:6px 4px;font-size:12.5px">Trip spending is kept per trip here. <button class="linkbtn" type="button" data-envnotrips>Use my categories instead</button></p>${g.rows.map(row).join('')}</details>`;
-    if (g.none) return `<details class="ybg" open><summary><div class="ybr"><span class="nm" style="color:var(--danger)">Not assigned</span><span class="n a"></span><span class="n c">${signedEur(g.activity)}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(noneRow).join('')}</details>`;
-    const hot = g.rows.some(r => Math.abs(r.available) > 0.004 || r.activity || r.assigned) || !g.rows.length || m > thisMonth();
-    return `<details class="ybg" ${hot ? 'open' : ''}><summary><div class="ybr"><span class="nm">${esc(g.group)}</span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(row).join('')}</details>`; };
-  const cm = thisMonth(), ahead = m > cm, canNext = m < addMonth(cm, ENV_AHEAD), canPrev = m > cfg.start.slice(0, 7);
-  el.innerHTML = `<header><h2 class="envnav"><button class="navb" type="button" data-envnav="-1" aria-label="Previous month" ${canPrev ? '' : 'disabled'}>‹</button><span>Envelopes · ${monthLabel(m)}</span><button class="navb" type="button" data-envnav="1" aria-label="Next month" ${canNext ? '' : 'disabled'}>›</button></h2><span class="right">${toFill ? `<button class="btn primary small" type="button" data-envtargets>Assign ${toFill} target${toFill === 1 ? '' : 's'}</button>` : ''}<button class="btn small" type="button" data-envmove>Move</button><button class="btn ghost small" type="button" data-envcats>Categories</button><button class="btn ghost small" type="button" data-envsetup>Settings</button></span></header>
-    <div class="rta ${B.ready > 0.004 ? 'pos' : B.ready < -0.004 ? 'neg' : ''}"><span>Ready to Assign</span><strong>${signedEur(B.ready)}</strong><span class="sub">${monthLabel(m)}: ${eur0.format(B.inflow)} came in · ${eur0.format(B.assigned)} assigned${B.overspentLast ? ` · ${eur0.format(B.overspentLast)} overspent last month` : ''}${B.future ? ` · <strong class="fut">${eur0.format(B.future)} assigned in later months</strong>` : ''}. Tap an envelope to assign money.</span>${envWhoHtml(m, B)}</div>
-    ${ahead ? `<p class="banner" style="margin:0;font-size:13px"><span><strong>Planning ahead.</strong> ${monthLabel(m)} hasn’t started: each envelope starts with what it has left at the end of ${monthLabel(addMonth(m, -1))}, plus what you assign here. Money assigned here comes out of Ready to Assign now, so it can’t be assigned twice.${B.overspentLast ? ` Ready to Assign here is already after ${MON[+addMonth(m, -1).slice(5, 7) - 1]}’s overspending (${eur0.format(B.overspentLast)}); cover it in ${MON[+addMonth(m, -1).slice(5, 7) - 1]} to take it from an envelope instead.` : ''}</span><button class="btn small" type="button" data-envnow>Back to ${MON[+cm.slice(5, 7) - 1]}</button></p>` : ''}
-    ${outBanner}
-    ${ccBanner(m)}
-    ${cfg.start.startsWith(m) && cfg.start.slice(8) !== '01' ? `<p class="banner" style="margin:0;font-size:13px"><span>Counting from ${shortDate(cfg.start)}, your start day: ${monthLabel(m)} spending before it isn’t in the envelopes (it’s in the starting money).</span><button class="btn small" type="button" data-envwhole="${m}-01">Count all of ${MON[+m.slice(5, 7) - 1]}</button></p>` : ''}
-    <div class="ybud"><div class="ybh"><span>Envelope</span><span>Assigned</span><span>Activity</span><span>Available</span></div>${G.map(grp).join('')}</div>`;
+    if (g.group === 'Travel' && !g.gid) return `<details class="ybg" ${g.rows.some(r => r.activity) ? 'open' : ''}>${head(g, 'Travel <span class="muted" style="font-weight:400">· one per trip</span>', 'Trip spending is kept per trip here.')}<p class="ginfo" hidden><button class="linkbtn" type="button" data-envnotrips>Use my categories instead</button></p>${g.rows.map(row).join('')}</details>`;
+    if (g.none) return `<details class="ybg" open>${head(g, '<span style="color:var(--danger)">Not assigned</span>')}${g.rows.map(noneRow).join('')}</details>`;
+    const hot = g.rows.some(r => Math.abs(r.available) > 0.004 || r.activity || r.assigned) || !g.rows.length || ahead;
+    return `<details class="ybg" ${hot ? 'open' : ''}>${head(g, esc(g.group))}${g.rows.map(row).join('')}</details>`; };
+  const canNext = m < addMonth(cm, ENV_AHEAD), canPrev = m > cfg.start.slice(0, 7);
+  const more = `<div class="morewrap envmore"><button class="btn small" type="button" data-envmore aria-haspopup="menu" aria-expanded="false" aria-label="More: categories, settings">⋯</button>
+    <div class="pmenu" role="menu" hidden><button class="pm-item" role="menuitem" type="button" data-envcats><span>Categories</span><small>envelopes, what feeds them, whose money</small></button><button class="pm-item" role="menuitem" type="button" data-envsetup><span>Settings</span><small>start day, budget accounts</small></button></div></div>`;
+  el.innerHTML = `<header class="envhead"><h2 class="envnav"><button class="navb" type="button" data-envnav="-1" aria-label="Previous month" ${canPrev ? '' : 'disabled'}>‹</button><span>${monthLabel(m)}</span><button class="navb" type="button" data-envnav="1" aria-label="Next month" ${canNext ? '' : 'disabled'}>›</button></h2><span class="right">${toFill ? `<button class="btn primary small" type="button" data-envtargets>Assign ${toFill} target${toFill === 1 ? '' : 's'}</button>` : ''}<button class="btn small" type="button" data-envmove>Move</button>${more}</span></header>
+    <div class="rta ${B.ready > 0.004 ? 'pos' : B.ready < -0.004 ? 'neg' : ''}"><span>Ready to Assign</span><strong>${signedEur(B.ready)}</strong><span class="sub">${eur0.format(B.inflow)} came in · ${eur0.format(B.assigned)} assigned${B.overspentLast ? ` · ${eur0.format(B.overspentLast)} overspent last month` : ''}${B.future ? ` · <strong class="fut">${eur0.format(B.future)} assigned in later months</strong>` : ''}</span>${envWhoHtml(m, B)}</div>
+    ${al.length ? `<div class="envalerts">${al.join('')}</div>` : ''}
+    <div class="ybud"><div class="ybh"><span>Envelope</span><span>Assigned</span><span>Activity</span><span>Available</span></div>${G.map(grp).join('')}
+      <p class="oblegend"><span class="ob ob-a">A</span>Anubhav <span class="ob ob-s">S</span>Sulekha <span class="ob ob-c">C</span>Common <span class="ob ob-split">A·S</span>split · tap an envelope to assign money or change whose it is</p></div>`;
 }
 // Card bills logged as spending: if the card's purchases are logged too, the same money counts twice.
 function ccSuspects(){ return state.items.filter(i => (CC_RE.test(i.category || '') || CC_RE.test(i.subcategory || '')) && accOf(i.account)?.type !== 'card').sort((a, b) => b.date.localeCompare(a.date)); }
-function ccBanner(m){
+function ccLine(m){
   if (lsGet('ccFixKept', '') === '1') return '';
   const xs = ccSuspects(), now = xs.filter(i => i.date.startsWith(m)); if (!now.length) return '';
-  return `<div class="banner" style="margin:0;font-size:13px"><span><strong>${eur0.format(sum(now))} in ${MON[+m.slice(5, 7) - 1]} are credit card payments</strong> logged as spending (category ${esc(now[0].category)}). The envelopes count them as payments to the card (Credit Card Payments), but your monthly spending still counts them, twice if the card purchases are logged too. Turning them into transfers to the card fixes that.</span>
-    <span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small primary" type="button" data-ccfix>Review ${xs.length}</button><button class="btn small" type="button" data-cckeep>They’re real spending</button></span></div>`;
+  return `<div class="al" title="Paying a card isn’t spending: the purchases on it are. The envelopes already treat these as card payments, but your monthly spending counts them, twice if the card purchases are logged too. Turning them into transfers to the card fixes that."><span><b>${eur0.format(sum(now))}</b> of card bills logged as spending in ${MON[+m.slice(5, 7) - 1]}</span><span class="acts"><button class="btn small primary" type="button" data-ccfix>Review ${xs.length}</button><button class="btn small" type="button" data-cckeep>They’re real spending</button></span></div>`;
 }
 // The same bills, all months: on the Overview and Transactions, since they inflate Spent and Saved there.
 function renderCcBars(){
@@ -3979,6 +4040,8 @@ document.addEventListener('click', async e => {
     return;
   }
   if (t.closest('[data-envmove]')) return openEnvMove();
+  const mb = t.closest('[data-envmore]'); if (mb){ const mn = mb.nextElementSibling; mn.hidden = !mn.hidden; mb.setAttribute('aria-expanded', !mn.hidden); return; }
+  const ib = t.closest('[data-envinfo]'); if (ib){ e.preventDefault(); const d = ib.closest('details'); d.querySelectorAll(':scope > .ginfo').forEach(p => p.hidden = !p.hidden); return; }
   const nav = t.closest('[data-envnav]'); if (nav){ state.period = addMonth(envMonthSel(), +nav.dataset.envnav); render(); return; }
   if (t.closest('[data-envnow]')){ state.period = thisMonth(); render(); return; }
   if (t.closest('[data-ccfix]')) return openCcFix();
@@ -4230,6 +4293,8 @@ $('#tripTypeSeg').addEventListener('click', e => { const b = e.target.closest('[
 $('#tripCancel').addEventListener('click', () => tdlg.close());
 $('#newTrip').addEventListener('click', () => openTripDlg(null));
 // Travel's More menu: opens and closes, and closes after a choice or a click elsewhere.
+document.addEventListener('click', e => { if (e.target.closest('[data-envmore]')) return; document.querySelectorAll('.envmore .pmenu:not([hidden])').forEach(mn => { if (!mn.contains(e.target) || e.target.closest('.pm-item')){ mn.hidden = true; mn.previousElementSibling.setAttribute('aria-expanded', 'false'); } }); });
+document.addEventListener('toggle', e => { if (e.target.classList?.contains('rwho')) state.rwOpen = e.target.open; }, true);
 $('#tripMore').addEventListener('click', e => { e.stopPropagation(); const m = $('#tripMoreMenu'); m.hidden = !m.hidden; $('#tripMore').setAttribute('aria-expanded', !m.hidden); });
 document.addEventListener('click', e => { const m = $('#tripMoreMenu'); if (m && !m.hidden && (!e.target.closest('#tripMoreMenu') || e.target.closest('.pm-item'))){ m.hidden = true; $('#tripMore').setAttribute('aria-expanded', 'false'); } });
 $('#repeatVisit').addEventListener('click', () => {
@@ -5761,7 +5826,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-27f';
+const APP_VERSION = '2026-10-27g';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
