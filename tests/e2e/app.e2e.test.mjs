@@ -1232,3 +1232,33 @@ test('restoring an old backup without the envelope budget says the budget stays 
   await page.click('#rsCancel');
   await clean(app);
 });
+
+test('phones as narrow as 360px: no page is wider than the screen, the Transactions bar included', async () => {
+  const app = await openApp({ mobile: true }), { page } = app, td = d(0), now = new Date().toISOString();
+  await page.setViewportSize({ width: 360, height: 780 });
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    expenses: { e1: { amount: 1234.56, date: td, store: 'A store with a rather long name for a phone', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now } },
+    trips: { t1: { name: 'Rome visit with a long name - Anubhav', type: 'visit', traveller: 'Anubhav', start: d(1), end: d(5), createdAt: now } } });
+  await page.waitForTimeout(300);
+  for (const p of ['overview', 'transactions', 'budget', 'wealth', 'trips']){
+    await app.go(p); await page.waitForTimeout(250);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 360, p + ' fits the screen');
+  }
+  await clean(app);
+});
+
+test('Coming up: a flight with its pass shows once, with the route, arrival and "seat 22C" (not "seat Seat 22C"); the title stays on top', async () => {
+  const app = await openApp({ mobile: true }), { page } = app, now = new Date().toISOString();
+  await app.seed({ trips: { tr: { name: 'Rome visit', type: 'visit', traveller: 'Anubhav', start: d(1), end: d(5), createdAt: now } },
+    bookings: { b1: { tripId: 'tr', type: 'flight', number: 'EJU2976', title: 'EJU2976 Munich (MUC) → Rome Fiumicino (FCO)', from: 'Munich (MUC)', to: 'Rome Fiumicino (FCO)', start: d(1), end: d(1) + 'T19:05', seat: 'Seat 22C', travellers: ['Anubhav Bhardwaj'], codes: [{ text: 'M1BHARDWAJ/ANUBHAV', format: 'aztec' }], createdAt: now },
+      b2: { tripId: 'tr', type: 'hotel', title: 'AMINA Guest House', start: d(1) + 'T15:00', end: d(5), createdAt: now } } });
+  await page.waitForTimeout(400);
+  const t = await app.text('#nextUp');
+  assert.match(t, /EJU2976 tomorrow · MUC → FCO · arr 19:05 · seat 22C/); assert.doesNotMatch(t, /seat Seat/i);
+  assert.equal((t.match(/Boarding pass/gi) || []).length, 1, 'one boarding pass button, no second row for the same flight');
+  assert.match(t, /Check in · AMINA Guest House/, 'the rest is still listed');
+  const [h, n] = await Promise.all(['#page-overview .pagehead', '#nextUp'].map(s => page.$eval(s, e => e.getBoundingClientRect().top)));
+  assert.ok(h < n, 'Overview title above Coming up');
+  assert.match(await app.text('#kpis'), /INCOME|Income/);
+  await clean(app);
+});

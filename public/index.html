@@ -281,7 +281,7 @@ tr.row.picked td.date::before{content:'✓ ';color:var(--accent);font-weight:700
 #selBtn[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
 body.selecting .fab{display:none}
 @media (max-width:640px){.selbar{bottom:calc(80px + env(safe-area-inset-bottom,0px))}}
-.txbar input{flex:1 1 auto;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px}
+.txbar input{flex:1 1 0;width:0;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px}
 #filterBtn .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:11px;line-height:18px;text-align:center;font-weight:700}
 /* + form: more details */
 .morebtn{all:unset;box-sizing:border-box;grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border:1px dashed var(--line);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2)}
@@ -332,6 +332,7 @@ label.f .combo > input{padding-right:30px!important;background-image:linear-grad
 .bk .ti{font-weight:600;overflow:hidden;text-overflow:ellipsis}
 .bk .sub{display:block;font-size:12.5px;color:var(--muted);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bk.past{opacity:.62}
+@media (max-width:640px){.bk{grid-template-columns:40px 22px minmax(0,1fr);row-gap:4px}.bk > .chip{grid-column:3;justify-self:start}.bk > span:empty:last-child{display:none}}
 .bk.co .ti{font-weight:500}
 .chip{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600;white-space:nowrap}
 .bkdlg{width:min(640px,calc(100vw - 20px))}
@@ -761,7 +762,7 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
 
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.kpi{padding:16px 18px;border-right:1px solid var(--line);display:grid;gap:4px;align-content:start}.kpi[hidden]{display:none}
+.kpi{padding:16px 18px;border-right:1px solid var(--line);display:grid;gap:4px;align-content:start;min-width:0}.kpi[hidden]{display:none}
 .kpi:last-child{border-right:0}
 .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
 .kpi .val{white-space:nowrap}
@@ -941,8 +942,8 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
   <!-- OVERVIEW -->
   <section class="page" id="page-overview" data-page="overview">
     <div style="display:grid;gap:18px">
-      <div class="install" id="installBar" hidden></div>
-      <div class="pagehead"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
+      <div class="install" id="installBar" style="order:-3" hidden></div>
+      <div class="pagehead" style="order:-2"><div><h1 id="ovTitle">Overview</h1><p>Shared spending across Italy and Germany, in euros</p></div></div>
       <section class="kpis" id="kpis" aria-label="Summary"></section>
       <div class="banner" id="inboxBar" hidden></div>
       <div class="banner" id="ppBar" data-ppbar hidden></div>
@@ -981,7 +982,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
 
   <!-- TRANSACTIONS -->
   <section class="page" id="page-transactions" data-page="transactions" hidden>
-    <div style="display:grid;gap:14px">
+    <div style="display:grid;gap:14px;grid-template-columns:minmax(0,1fr)">
       <div class="pagehead">
         <div style="display:grid;gap:8px"><h1 id="txTitle">Transactions</h1><p id="txSub" style="margin:0"></p>
           <div class="txsegs"><div class="seg" role="radiogroup" aria-label="View" id="txView"><button type="button" role="radio" data-txview="list" aria-checked="true">List</button><button type="button" role="radio" data-txview="charts" aria-checked="false">Charts</button></div><div class="seg" role="radiogroup" aria-label="Show" id="txKind"><button type="button" role="radio" data-txkind="expense" aria-checked="true">Expenses</button><button type="button" role="radio" data-txkind="income" aria-checked="false">Income</button><button type="button" role="radio" data-txkind="transfer" aria-checked="false">Transfers</button></div></div>
@@ -1001,7 +1002,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
         <label><span class="lbl">Trip</span><select id="fl-tripName"></select></label>
       </div>
       <div class="filterline" id="txFilters"></div>
-      <div id="txCharts" hidden style="display:grid;gap:14px">
+      <div id="txCharts" hidden style="display:grid;gap:14px;grid-template-columns:minmax(0,1fr)">
         <div class="banner" id="vzBanner"></div>
         <section class="kpis" id="vzKpis" aria-label="Highlights"></section>
         <div class="grid">
@@ -2065,7 +2066,7 @@ function renderOverview(ms){
       const f = forecastMonth(); if (!f.reliable && !f.recLeft) return '';
       const tip = `So far ${eur0.format(f.soFar)} + bills and repeats still due ${eur0.format(f.recLeft)}${f.upcoming.length ? ' (' + f.upcoming.map(r => r.name).join(', ') + ')' : ''} + usual spending ${f.rate === null ? '' : eur0.format(f.rate) + '/day × ' + f.left + ' days = ' + eur0.format(f.varLeft)}${f.tripLeft ? ' + trip budgets ' + eur0.format(f.tripLeft) : ''}. Pace from ${f.basis}.`;
       return `<button type="button" class="sub fc linkish" data-fcopen title="${esc(tip)}">Heading for <strong>~${eur0.format(f.total)}</strong> by ${f.D} ${MON[+f.month.slice(5,7)-1]}${f.left > 0 && f.varLeft > 0 ? ` (${eur0.format(f.low)} to ${eur0.format(f.high)})` : ''} <span class="more">· how?</span></button>`; })()}</div>
-    <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
+    <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length === 1 ? 'All from ' + esc(earners[0].key) : earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
     <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' + (invWho.length > 1 ? ' (' + invWho.map(([k, v]) => esc(k) + ' ' + eur0.format(v)).join(' · ') + ')' : invWho.length === 1 ? ' by ' + esc(invWho[0][0]) : '') : ''}</span></div>
     ${ENVELOPES ? envKpi() : ''}<div class="kpi" ${ENVELOPES ? 'hidden' : ''}><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
     + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${hm0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : `<span class="${nw.delta >= 0 ? 'pos' : 'neg'}">${signed(nw.delta)}</span> since end of ${MON[+nw.prevM.slice(5,7)-1]}`} · Wealth →</span></a>` : ''; })();
@@ -2099,9 +2100,12 @@ function renderIncomeVsSpend(el){
   const [ey, em] = endM.split('-').map(Number);
   const win = [];
   for (let k=11; k>=0; k--){ const d = new Date(ey, em-1-k, 1); win.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
-  const inc = win.map(m => sum(state.income.filter(i => i.date.startsWith(m))));
-  const exp = win.map(m => sum(state.items.filter(i => i.date.startsWith(m))));
+  let inc = win.map(m => sum(state.income.filter(i => i.date.startsWith(m))));
+  let exp = win.map(m => sum(state.items.filter(i => i.date.startsWith(m))));
   if (![...inc, ...exp].some(v => v > 0)){ el.innerHTML = `<div class="empty">${state.ready ? 'Nothing to chart yet.' : 'Loading…'}</div>`; return; }
+  // Start where your entries start (at least six months shown), not with empty months.
+  { const first = win.findIndex((m, k) => inc[k] > 0 || exp[k] > 0), cut = Math.max(0, Math.min(first, win.length - 6));
+    if (cut){ win.splice(0, cut); inc = inc.slice(cut); exp = exp.slice(cut); } }
   const narrow = innerWidth <= 640;
   const W = 640, H = 220, L = narrow ? 88 : 62, R = 8, T = 12, B = 26;
   const max = niceMax(Math.max(...inc, ...exp));
@@ -3422,7 +3426,7 @@ function renderTrips(){
     <div class="kpi"><span class="lbl">All trips</span><span class="val">${eur.format(state.trips.reduce((a,t)=>a+tot(t),0))}</span><span class="sub">${state.trips.length} trip${state.trips.length===1?'':'s'}</span></div>
     <div class="kpi"><span class="lbl">Visits</span><span class="val">${eur.format(byKind('visit'))}</span><span class="sub">${visits.length} visit${visits.length===1?'':'s'}${vPast.length ? ' · avg ' + eur0.format(vPast.reduce((a,t)=>a+tot(t),0)/vPast.length) + ' each' : ''}</span></div>
     <div class="kpi"><span class="lbl">Holidays</span><span class="val">${eur.format(byKind('holiday'))}</span><span class="sub">Other ${eur0.format(byKind('other'))} · Office ${eur0.format(byKind('office'))}</span></div>
-    <div class="kpi"><span class="lbl">${g.ongoing[0] ? 'On a trip now' : 'Next trip'}</span><span class="val" style="font-size:18px">${next ? esc(next.name) : '—'}</span><span class="sub">${next ? (g.ongoing[0] ? 'until ' + shortDate(next.end || next.start) : 'in ' + days + ' day' + (days===1?'':'s') + ' · ' + fmtRange(next.start, next.end)) : 'Nothing planned'}</span></div>` : '';
+    <div class="kpi"><span class="lbl">${g.ongoing[0] ? 'On a trip now' : 'Next trip'}</span><span class="val" style="font-size:18px;white-space:normal;overflow-wrap:anywhere">${next ? esc(next.name) : '—'}</span><span class="sub">${next ? (g.ongoing[0] ? 'until ' + shortDate(next.end || next.start) : 'in ' + days + ' day' + (days===1?'':'s') + ' · ' + fmtRange(next.start, next.end)) : 'Nothing planned'}</span></div>` : '';
   $('#tripKpis').hidden = !state.trips.length;
   const sec = (title, arr) => arr.length ? `<section class="tgroup"><h2>${title}</h2><div class="tgrid">${arr.map(tripCard).join('')}</div></section>` : '';
   // Finished trips fold away; opening the section is remembered on this phone.
@@ -7697,6 +7701,10 @@ function bkWhen(b){
   return wday(b.start) + ' ' + fmtDT(b.start) + ' → ' + wday(b.end) + ' ' + fmtDT(b.end);
 }
 // Each booking on its day; stays and rentals also on their last day.
+// A seat as typed or read from a ticket ("Seat 22C", "22C", "Auto allocated"), shown once as "seat 22C".
+const seatTxt = v => { const x = String(v || '').trim().replace(/^seats?\s*:?\s*/i, ''); return !x ? '' : /\d/.test(x) && x.length <= 12 ? 'seat ' + x : x; };
+// The airport code in "Munich (MUC)", else the city.
+const placeCode = v => (String(v || '').match(/\(([A-Z]{3})\)/) || [])[1] || bkCity(v || '');
 function bkItinerary(list, { dayLabels = true, from = '', to = '9999' } = {}){
   const ev = [];
   for (const b of list){
@@ -7712,7 +7720,7 @@ function bkItinerary(list, { dayLabels = true, from = '', to = '9999' } = {}){
     const tm = e.at.length > 10 ? e.at.slice(11, 16) : '';
     const title = e.co ? (b.type === 'hotel' ? 'Check out · ' : 'Return car · ') + esc(b.title) : (b.type === 'hotel' ? 'Check in · ' : '') + esc(b.title);
     const route = b.from && b.to && !b.title.includes(bkCity(b.to)) ? esc(b.from) + ' → ' + esc(b.to) : '';
-    const sub = e.co ? esc(b.address || b.ref || '') : [route, !['hotel','car'].includes(b.type) && b.end && b.end.length > 10 ? 'arr ' + b.end.slice(11, 16) : '', b.seat ? esc(b.seat) : '', b.type === 'hotel' ? esc(b.address || '') : '', b.ref ? esc(b.ref) : ''].filter(Boolean).join(' · ');
+    const sub = e.co ? esc(b.address || b.ref || '') : [route, !['hotel','car'].includes(b.type) && b.end && b.end.length > 10 ? 'arr ' + b.end.slice(11, 16) : '', b.seat ? esc(seatTxt(b.seat)) : '', b.type === 'hotel' ? esc(b.address || '') : '', b.ref ? esc(b.ref) : ''].filter(Boolean).join(' · ');
     out += `<button type="button" class="bk ${d < td ? 'past' : ''} ${e.co ? 'co' : ''}" data-bkopen="${esc(b.id)}"><span class="tm">${dayLabels ? tm : (d === td ? 'Today' : d === addDays(td, 1) ? 'Tmrw' : shortDate(d)) + (tm ? '<br>' + tm : '')}</span><span class="ic" aria-hidden="true">${(BK_TYPES[b.type] || BK_TYPES.other)[0]}</span><span class="ti">${title}<span class="sub">${sub || '&nbsp;'}</span></span>${!e.co && (b.codes || []).length ? `<span class="chip">${b.type === 'flight' ? 'Boarding pass' : 'Ticket'}</span>` : !e.co && b.fileId ? '<span class="chip">PDF</span>' : '<span></span>'}</button>`;
   }
   return out;
@@ -8261,12 +8269,16 @@ function renderNextUp(){
   const when = b => (b.start.slice(0, 10) === td ? 'today' : b.start.slice(0, 10) === addDays(td, 1) ? 'tomorrow' : wday(b.start)) + (b.start.length > 10 ? ' ' + b.start.slice(11, 16) : '');
   // A flight today or tomorrow (boarding pass, check-in) goes above the numbers.
   el.style.order = flights.some(b => b.start.slice(0, 10) <= addDays(td, 1)) ? '-1' : '';
+  const shown = new Set();
   const acts = flights.map(b => {
     const who = bkWho(b), mine = !who.size || who.has(me), st = flightLine(b), codes = myCodes(b);
-    const label = `<strong>${esc(b.number || b.title)}</strong> ${when(b)}`;
+    const route = b.from && b.to ? ` · ${esc(placeCode(b.from))} → ${esc(placeCode(b.to))}` : '', arr = b.end && b.end.length > 10 ? ' · arr ' + b.end.slice(11, 16) : '';
+    const label = `<strong>${esc(b.number || b.title)}</strong> ${when(b)}${route}${arr}`;
+    shown.add(b.id);
     if (!mine) return `<div class="bkact"><span>${esc([...who].join(' & '))}’s flight ${label}${st ? '<br>' + st : ''}</span><button class="btn small" type="button" data-bkopen="${esc(b.id)}">Details</button></div>`;
-    if (codes.length) return `<div class="bkact"><span>${label}${b.seat ? ' · seat ' + esc(b.seat) : ''}${st ? '<br>' + st : ''}</span><button class="btn primary" type="button" data-bkpass="${esc(b.id)}">Show boarding pass</button></div>`;
-    return done.includes(b.id) ? (st ? `<div class="bkact"><span>${label}<br>${st}</span></div>` : '') : `<div class="bkact warn"><span>${label}: no boarding pass yet. Check in online, then forward or add the pass.${st ? '<br>' + st : ''}</span>
+    if (codes.length) return `<div class="bkact"><span data-bkopen="${esc(b.id)}" role="button" tabindex="0" style="cursor:pointer" title="Details">${label}${b.seat ? ' · ' + esc(seatTxt(b.seat)) : ''}${st ? '<br>' + st : ''}</span><button class="btn primary" type="button" data-bkpass="${esc(b.id)}">Show boarding pass</button></div>`;
+    if (done.includes(b.id) && !st){ shown.delete(b.id); return ''; }
+    return done.includes(b.id) ? `<div class="bkact"><span>${label}<br>${st}</span></div>` : `<div class="bkact warn"><span>${label}: no boarding pass yet. Check in online, then forward or add the pass.${st ? '<br>' + st : ''}</span>
         <span class="row"><a class="btn small primary" href="${esc(checkinUrl(b))}" target="_blank" rel="noopener">Check in${b.provider ? ' with ' + esc(b.provider) : ''}</a><button class="btn small" type="button" data-addbk="${esc(b.tripId || '')}">Add pass</button><button class="btn small ghost" type="button" data-bkckdone="${esc(b.id)}">Hide</button></span></div>`;
   }).join('') + (flights.length && !alertsOn() && alertsPossible() ? `<div class="bkact"><span>Get delay and landing alerts on this phone.</span><button class="btn small" type="button" data-alerts>Turn on alerts</button></div>` : '');
   // Trips starting soon with nothing booked yet.
@@ -8275,8 +8287,10 @@ function renderNextUp(){
   // Things to book that are overdue or due within a week.
   const due = state.toBook.filter(x => !x.done && x.byDate && x.byDate <= addDays(td, 7) && state.tripMap[x.tripId]).sort((a, b) => a.byDate.localeCompare(b.byDate));
   const tbNudge = due.map(x => `<div class="bkact ${x.byDate < td ? 'warn' : ''}"><span><strong>Book ${esc(x.what)}</strong> for ${esc(state.tripMap[x.tripId].name)}${x.forDate ? ' (' + shortDate(x.forDate) + ')' : ''} · ${tbDue(x)}</span><button class="btn small" type="button" data-tbopen="${esc(x.tripId)}">Open trip</button></div>`).join('');
+  // A flight already shown above with its pass isn't listed again below.
+  const rest = soon.filter(b => !shown.has(b.id));
   el.hidden = !soon.length && !bare.length && !due.length;
-  if (!el.hidden) el.innerHTML = `<header><h2>Coming up</h2><span class="hint">${soon.length ? 'Tap for details' : ''}</span></header>${tbNudge}${acts}${tripNudge}${soon.length ? `<div class="itin">${bkItinerary(soon, { dayLabels: false, from: td, to: lim })}</div>` : ''}`;
+  if (!el.hidden) el.innerHTML = `<header><h2>Coming up</h2><span class="hint">${rest.length ? 'Tap for details' : ''}</span></header>${tbNudge}${acts}${tripNudge}${rest.length ? `<div class="itin">${bkItinerary(rest, { dayLabels: false, from: td, to: lim })}</div>` : ''}`;
 }
 function openBooking(id){
   const b = state.bookings.find(x => x.id === id); if (!b) return;
