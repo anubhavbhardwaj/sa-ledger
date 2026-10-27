@@ -1262,3 +1262,44 @@ test('Coming up: a flight with its pass shows once, with the route, arrival and 
   assert.match(await app.text('#kpis'), /INCOME|Income/);
   await clean(app);
 });
+
+test('invested: the money sent counts (Overview agrees with Goals and Transfers); the account says when its monthly value misses a transfer', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, t: { name: 'T212', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
+    income: { i1: { amount: 5000, date: m + '-01', source: 'Salary', category: 'Salary', account: 'Deutsche Bank', earner: 'Anubhav', createdAt: now } },
+    transfers: { t1: { amount: 500, date: m + '-01', from: 'Deutsche Bank', to: 'T212', createdAt: now }, t2: { amount: 463, date: m + '-01', from: 'Deutsche Bank', to: 'T212', createdAt: now } },
+    invSnapshots: { ['t_' + addDaysT(m + '-01', -1).slice(0, 7)]: { accountId: 't', month: addDaysT(m + '-01', -1).slice(0, 7), value: 10000, investment: 0, opening: true, createdAt: now }, ['t_' + m]: { accountId: 't', month: m, value: 10600, investment: 500, createdAt: now } } });
+  await page.waitForTimeout(400);
+  assert.match(await app.text('#kpis'), /€963 invested/, 'transfers, not the €500 the month’s value says');
+  await app.go('wealth'); await page.waitForTimeout(300); await page.click('[data-acc="t"]'); await page.waitForTimeout(300);
+  assert.match(await app.text('[data-putgap]'), /€963 went in by transfer in .*monthly value says €500 put in/);
+  await clean(app);
+});
+
+test('net worth: an account first tracked this month is shown apart, not as growth', async () => {
+  const app = await openApp(), { page } = app, m = month(0), pm = month(-1), now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: pm + '-01T08:00:00Z' }, fd: { name: 'FD', type: 'investment', invType: 'deposit', currency: 'EUR', owner: 'Sulekha' } },
+    checkins: { c1: { accountId: 'db', date: pm + '-01', balance: 1000, createdAt: pm + '-01T08:00:00Z' } },
+    invSnapshots: { fd_m: { accountId: 'fd', month: m, value: 7000, investment: 7000, opening: true, createdAt: now } } });
+  await page.waitForTimeout(400);
+  assert.match(await app.text('#kpis'), /Net worth today\s*€8,000\s*\+€0 since end of \w+ · plus €7,000 in accounts added in \w+/);
+  await clean(app);
+});
+
+test('Ask AI is given the envelope budget (Ready to Assign, envelopes, overspent, per person), not the old hidden budgets', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    expenses: { e1: { amount: 80, date: m + '-02', store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now } },
+    settings: { budgets: { items: [{ c: 'Groceries', a: 500, f: false }], updatedAt: now },
+      envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 1000, openingBy: { 'Deutsche Bank': 1000 }, updatedAt: now, trips: false,
+        groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'groc', name: 'Groceries', src: ['Groceries'], owner: 'Both' }] }], assigned: { [m]: { groc: 50 } }, targets: { groc: 300 } } } });
+  await page.waitForTimeout(400);
+  let body = null;
+  await page.route('**/api/ask', async r => { body = JSON.parse(r.request().postData()); await r.fulfill({ status: 200, contentType: 'text/plain', body: 'ok' }); });
+  await page.click('#aiBtn'); await page.fill('#aiInput', 'How are the envelopes?'); await page.click('#aiSend'); await page.waitForTimeout(400);
+  assert.ok(body, 'asked');
+  assert.match(body.context, /## Envelope budget for /); assert.match(body.context, /Ready to Assign 950: came in this month 0, assigned this month 50/);
+  assert.match(body.context, /Groceries \| Flexible \| Both \| 50 \| -80 \| -30 \| 300 \| -/);
+  assert.match(body.context, /Overspent: Groceries/); assert.doesNotMatch(body.context, /## Budgets for/);
+  await clean(app);
+});

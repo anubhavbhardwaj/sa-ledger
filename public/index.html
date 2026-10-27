@@ -2069,7 +2069,7 @@ function renderOverview(ms){
     <div class="kpi"><span class="lbl">Income</span><span class="val">${eur.format(incTotal)}</span><span class="sub">${earners.length === 1 ? 'All from ' + esc(earners[0].key) : earners.length ? earners.map(w => esc(w.key)+' '+eur0.format(w.total)).join(' · ') : 'No income recorded'}</span></div>
     <div class="kpi"><span class="lbl">Saved</span><span class="val ${net<0 && incTotal>0?'neg':''}">${incTotal>0 ? (net<0?'−':'') + eur.format(Math.abs(net)) : '—'}</span><span class="sub">${incTotal>0 ? (net>=0 ? (net/incTotal*100).toFixed(0)+'% of income' : 'Spent more than earned') : 'Add income to see savings'}${invested > 0 ? ' · ' + eur0.format(invested) + ' invested' + (invWho.length > 1 ? ' (' + invWho.map(([k, v]) => esc(k) + ' ' + eur0.format(v)).join(' · ') + ')' : invWho.length === 1 ? ' by ' + esc(invWho[0][0]) : '') : ''}</span></div>
     ${ENVELOPES ? envKpi() : ''}<div class="kpi" ${ENVELOPES ? 'hidden' : ''}><span class="lbl">Budget left</span><span class="val ${left !== null && left < 0 ? 'neg' : ''}">${left === null ? '—' : (left < 0 ? '−' : '') + eur.format(Math.abs(left))}</span><span class="sub">${state.period === 'all' ? 'Pick a month' : !bud ? '<a href="#" data-editbudgets="suggest">Set budgets</a>' : issues[0] || issues[1] ? [issues[0] ? issues[0] + ' over' : '', issues[1] ? issues[1] + ' at risk' : ''].filter(Boolean).join(' · ') : 'All on track'}</span></div>`
-    + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${hm0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : `<span class="${nw.delta >= 0 ? 'pos' : 'neg'}">${signed(nw.delta)}</span> since end of ${MON[+nw.prevM.slice(5,7)-1]}`} · Wealth →</span></a>` : ''; })();
+    + (() => { const nw = netWorthNow(); return nw ? `<a class="kpi kpilink" href="#wealth"><span class="lbl">Net worth today</span><span class="val">${hm0.format(nw.total)}</span><span class="sub">${nw.delta === null ? 'Investments and cash' : nwChange(nw.a, nw.b)} · Wealth →</span></a>` : ''; })();
   renderSetupLine();
   renderIncomeVsSpend($('#ovTrend'));
   renderBars('category', $('#ovCats'), {max:6, filtered:false, goto:'transactions'});
@@ -5203,10 +5203,11 @@ function investedBy(period){
     }
     for (const m of months){
       const x = snaps[m];
-      // An opening entry is the starting balance, not new money, but transfers in that same month are. An entry
-      // saved before the month's transfer was logged (put in 0) shouldn't hide that transfer either.
-      const put = x && !x.opening ? (+x.investment || 0) * monthRate(cur, m) : 0;
-      const v = put || tr[m] || 0;
+      // An opening entry is the starting balance, not new money, but transfers in that same month are. The money sent
+      // (transfers) counts, so Overview, Goals and Transfers agree; a month's "put in" only adds money that came in
+      // another way (more than the transfers), or stands in when nothing was logged as a transfer.
+      const put = x && !x.opening ? (+x.investment || 0) * monthRate(cur, m) : 0, t = tr[m] || 0;
+      const v = put ? Math.max(put, t) : t;
       any = true; by[own] = (by[own] || 0) + v;
     }
   }
@@ -5214,6 +5215,12 @@ function investedBy(period){
   return { total: Object.values(by).reduce((s, v) => s + v, 0), by };
 }
 const investedIn = period => investedBy(period)?.total ?? null;
+// Net transfers into an investment account in one month, in its currency.
+function trInMonth(a, m){
+  const n = a.name.toLowerCase(); let v = 0;
+  for (const t of state.transfers){ if (t.date.slice(0, 7) !== m) continue; if (String(t.to).toLowerCase() === n) v += inAccCur(a, t); else if (String(t.from).toLowerCase() === n) v -= inAccCur(a, t); }
+  return Math.round(v * 100) / 100;
+}
 function pendingByMonth(a, afterMonth){
   const n = a.name.toLowerCase(), td = today(), out = {};
   for (const t of state.transfers){
@@ -5252,14 +5259,18 @@ function netWorthSeries(){
   const months = monthsBetween(first, cm).slice(-24);
   return months.map(m => {
     const cur = m === cm, d = cur ? today() : lastDayOf(m);
-    let inv = 0;
+    let inv = 0, added = 0;
     for (const x of pf.withData){
       const r = x.rows.filter(r => r.month <= m).pop(); if (!r) continue;
-      inv += (r.value + (cur ? x.pending : 0)) * (cur ? lRH(x.cur) : mRH(x.cur, addMonth(m, 1)));
+      const rate = cur ? lRH(x.cur) : mRH(x.cur, addMonth(m, 1));
+      inv += (r.value + (cur ? x.pending : 0)) * rate;
+      // An account first tracked this month brings in its starting value: that isn't growth. Money sent to it from
+      // your other accounts that month is (it only moved), so that part stays in.
+      if (x.rows[0].month === m && m !== months[0]) added += Math.max(0, x.rows[0].value - trInMonth(x.a, m)) * rate;
     }
     let cash = 0;
     for (const a of cashAccs){ const e = estimate(a, d); if (e) cash += eurToHome(toEur(a, e.balance)); }
-    return { m, inv, cash, total: inv + cash };
+    return { m, inv, cash, total: inv + cash, added };
   }).filter((p, i, arr) => p.inv || p.cash || arr.slice(0, i).some(q => q.inv || q.cash));
 }
 function renderNetWorthAll(){
@@ -5285,13 +5296,18 @@ function renderNetWorthAll(){
   });
   s += `<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/></svg>`;
   $('#nwAll').innerHTML = s;
-  const a = pts[n-1], b = pts[n-2], dlt = a.total - b.total;
-  $('#nwAllHint').innerHTML = `${hm0.format(a.total)} today · <span class="${dlt >= 0 ? 'pos' : 'neg'}">${signed(dlt)}</span> since end of ${MON[+b.m.slice(5,7)-1]}`;
+  const a = pts[n-1], b = pts[n-2];
+  $('#nwAllHint').innerHTML = `${hm0.format(a.total)} today · ${nwChange(a, b)}`;
 }
 function netWorthNow(){
   const pts = netWorthSeries(); if (!pts.length) return null;
   const a = pts[pts.length-1], b = pts.length > 1 ? pts[pts.length-2] : null;
-  return { total: a.total, delta: b ? a.total - b.total : null, prevM: b?.m };
+  return { total: a.total, delta: b ? a.total - b.total : null, prevM: b?.m, a, b };
+}
+// "+€1,200 since end of Sep · plus €39,300 in accounts added in Oct": accounts you start tracking aren't growth.
+function nwChange(a, b){
+  const dlt = a.total - b.total - (a.added || 0);
+  return `<span class="${dlt >= 0 ? 'pos' : 'neg'}">${signed(dlt)}</span> since end of ${MON[+b.m.slice(5,7)-1]}${a.added >= 1 ? ` · plus ${hm0.format(a.added)} in accounts added in ${MON[+a.m.slice(5,7)-1]}` : ''}`;
 }
 
 // ---------- wealth page ----------
@@ -5429,6 +5445,9 @@ function renderInvDetail(a){
       <div class="kpi"><span class="lbl">In since tracking</span><span class="val">${fmtW(a, invested)}</span><span class="sub">its ${monthLabel(rows[0].month)} value plus money added since${Math.abs(before) >= 1 && rows[0].inv > 0 ? ` · before that: paid ${fmtW(a, rows[0].inv)}, worth ${fmtW(a, rows[0].value)} (${pct(before / rows[0].inv)})` : ''}</span></div>
       <div class="kpi"><span class="lbl">Gain since tracking</span><span class="val ${value - invested < 0 ? 'neg' : ''}">${value - invested >= 0 ? '+' : '−'}${fmtW(a, Math.abs(value - invested))}</span><span class="sub">${g === null ? '' : pct(g) + ' in ' + cur}</span></div>
     </section>
+    ${(() => { const r = rows.slice().reverse().find(r => !r.opening && trInMonth(a, r.month) - (r.inv || 0) > 1); if (!r) return '';
+      const t = trInMonth(a, r.month);
+      return `<div class="banner" data-putgap><span class="left"><span>${fmtW(a, t)} went in by transfer in ${monthLabel(r.month)}, but its monthly value says ${fmtW(a, r.inv || 0)} put in. Overview and Goals count the transfers; update the month so its gain is right too.</span></span><button class="btn small" type="button" data-editsnap="${esc(r.s.id)}">Update ${monthLabel(r.month)}</button></div>`; })()}
     ${pend ? `<div class="banner"><span class="left"><span>${pend > 0 ? '+' : '−'}${fmtW(a, Math.abs(pend))} moved ${pend > 0 ? 'in' : 'out'} after ${monthLabel(last.month)}. It counts at face value for now; add the month’s value once it ends to include how it grew.</span></span><button class="btn small" type="button" data-addsnap="${esc(a.id)}">+ Add month</button></div>` : ''}
     <section class="panel"><header><h2>Value and money put in</h2><button class="btn ghost" type="button" data-pred aria-pressed="${state.showPred}">${state.showPred ? 'Hide' : 'Show'} 5-year projection</button></header>
       <div id="accChart"></div>
@@ -6811,7 +6830,19 @@ function aiContext(){
   }
   { const f = forecastMonth(); if (f.reliable || f.recLeft) L.push(`Month-end forecast for ${cm}: ~${f0(f.total)} (range ${f0(f.low)} to ${f0(f.high)}) = so far ${f0(f.soFar)} + bills and repeats still due ${f0(f.recLeft)}${f.upcoming.length ? ' (' + f.upcoming.map(r => r.name + ' ' + f0(r.amount)).join(', ') + ')' : ''} + usual day-to-day ${f.rate === null ? '-' : f0(f.rate) + '/day'} for ${f.left} days${f.tripLeft ? ' + trip budgets left ' + f0(f.tripLeft) : ''}; pace from ${f.basis}.`); }
   const bm = budgetMap();
-  if (Object.keys(bm).length){
+  if (ENVELOPES && envOn() && cm >= state.envCfg.start.slice(0, 7)){
+    // The envelope budget is the budget now; the old category budgets are hidden and left out.
+    const cfg = state.envCfg, B = envRows(cm), W = envWho(cm, B), tg = cfg.targets || {}, nm = p => p === 'Shared' ? 'Common' : p;
+    L.push(`\n## Envelope budget for ${cm} (like YNAB; started ${cfg.start}; accounts in it: ${(cfg.accounts || []).join(', ')}. Money is given to envelopes from Ready to Assign; what's left in an envelope carries to next month; overspending comes out of next month's Ready to Assign)`);
+    L.push(`Ready to Assign ${f0(B.ready)}: came in this month ${f0(B.inflow)}, assigned this month ${f0(B.assigned)}${B.future ? `, already assigned in later months ${f0(B.future)}` : ''}.`);
+    L.push('Envelope | category | whose money | assigned this month | activity this month | available | monthly target | card owes');
+    B.rows.filter(r => Math.abs(r.assigned) + Math.abs(r.activity) + Math.abs(r.available) > 0.5 || tg[r.key])
+      .forEach(r => L.push(`${envName(r)} | ${r.group || '-'} | ${r.card ? 'card' : r.split ? Object.entries(r.split).map(([p, v]) => p + ' ' + f0(v)).join(' + ') : r.owner || 'Both'} | ${f0(r.assigned)} | ${f0(r.activity)} | ${f0(r.available)} | ${tg[r.key] ? f0(tg[r.key]) : '-'} | ${r.card && r.owes != null ? f0(r.owes) : '-'}`));
+    const over = B.rows.filter(r => r.available < -0.5);
+    L.push(over.length ? 'Overspent: ' + over.map(r => `${envName(r)} ${f0(r.available)}`).join(', ') : 'No envelope is overspent.');
+    const ppl = Object.entries(W.who || {});
+    if (ppl.length) L.push('Left after envelopes, per person (their budget accounts today, bank minus cards, minus what their envelopes hold): ' + ppl.map(([p, w]) => `${nm(p)} ${f0(w.cash - w.cards - (w.set || 0))} (balance ${f0(w.cash - w.cards)}, in envelopes ${f0(w.set || 0)})`).join('; ') + '. Ready to Assign is shared, so one person can be below zero while another is above.');
+  } else if (Object.keys(bm).length){
     const b = budgetStatus(cm);
     L.push(`\n## Budgets for ${cm} (daily life only; status as of today)`);
     b.rows.forEach(r => L.push(`${r.cat}: budget ${f0(r.budget)}, spent ${f0(r.spent)}, projected ${f0(r.projected)}${r.fixed ? ', fixed bill' : ''}, ${r.status}`));
@@ -6890,14 +6921,14 @@ function aiMd(src){
   flush();
   return out.join('');
 }
-const AI_SUGGEST = ['How did we do this month, and where did the money go?', 'Where can we realistically cut spending?', 'Are we on track for FIRE? What would change the outcome most?', 'Review my investments: what stands out?', 'What should I think about before moving money to India?'];
+const AI_SUGGEST = ['How did we do this month, and where did the money go?', 'Which envelopes need money, and where can it come from?', 'Where can we realistically cut spending?', 'Are we on track for FIRE? What would change the outcome most?', 'Review my investments: what stands out?', 'What should I think about before moving money to India?'];
 state.ai = [];
 const aidlg = $('#aiDlg');
 function aiRender(){
   const box = $('#aiMsgs');
   box.innerHTML = state.ai.length ? state.ai.map(m => m.role === 'user' ? `<div class="aim u">${esc(m.content)}</div>`
     : m.error ? `<div class="aim err">${esc(m.error)}</div>` : `<div class="aim a ${m.typing ? 'typing' : ''}">${m.content ? aiMd(m.content) : ''}</div>`).join('')
-    : `<div class="aisug"><p>Ask anything about your money. I see your ledger, budgets, accounts, investments and FIRE plans.</p>${AI_SUGGEST.map(q => `<button type="button" data-aiq="${esc(q)}">${esc(q)}</button>`).join('')}</div>`;
+    : `<div class="aisug"><p>Ask anything about your money. I see your ledger, envelope budget, accounts, investments and FIRE plans.</p>${AI_SUGGEST.map(q => `<button type="button" data-aiq="${esc(q)}">${esc(q)}</button>`).join('')}</div>`;
   box.scrollTop = box.scrollHeight;
 }
 async function aiAsk(q){
