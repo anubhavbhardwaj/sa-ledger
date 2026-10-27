@@ -683,7 +683,7 @@ test('envelopes: trip spending can go to your own Trips category instead of one 
       groups: [{ id: 'g', name: 'Trips & Travel', envs: [{ id: 'tr', name: 'Transportation', src: ['Travel›Flights'] }, { id: 'ac', name: 'Accommodation', src: ['Travel›Hotels'] }] }] } } });
   await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(150);
   let t = await envText(app);
-  assert.match(t, /Transportation\s*–\s*–/); assert.match(t, /Travel · one per trip.*Wedding in India\s*–\s*−€900/);
+  assert.match(t, /Transportation\s*–\s*–/); assert.match(t, /Travel · one per trip.*Wedding in India · \w+ '\d\d\s*–\s*−€900/);
   await page.click('details:has([data-envnotrips]) [data-envinfo]'); await page.click('[data-envnotrips]'); await page.waitForTimeout(250);
   t = await envText(app);
   assert.match(t, /Transportation\s*–\s*−€600/); assert.match(t, /Accommodation\s*–\s*−€300/); assert.doesNotMatch(t, /one per trip/);
@@ -1380,5 +1380,78 @@ test('checking in a balance lists that day’s entries on the account; untick wh
   assert.deepEqual(ex.find(e => e.id === 'e2').inBal, { 'deutsche bank': false }); assert.equal(ex.find(e => e.id === 'e1').inBal, undefined, 'unchanged ones are left alone');
   await page.click('[data-acc="db"]'); await page.waitForTimeout(300);
   assert.match(await app.text('#accDetail'), /Balance now \(estimate\)\s*€988\.00/, '1000 minus the coffee that came after');
+  await clean(app);
+});
+
+test('budget: when Common is short and Sulekha has money to spare, one tap prepares the transfer that puts it right', async () => {
+  const app = await openApp({ mobile: true }), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString();
+  await app.seed({ accounts: { ws: { name: 'Wise Sulekha', type: 'bank', currency: 'EUR', owner: 'Sulekha' }, wc: { name: 'Wise Common', type: 'bank', currency: 'EUR', owner: 'Shared' } },
+    checkins: { c1: { accountId: 'ws', date: s, balance: 3000, createdAt: s + 'T06:00:00Z' }, c2: { accountId: 'wc', date: s, balance: 200, createdAt: s + 'T06:00:00Z' } },
+    settings: { envelopes: { start: s, accounts: ['Wise Sulekha', 'Wise Common'], opening: 3200, openingBy: { 'Wise Sulekha': 3000, 'Wise Common': 200 }, trips: false, updatedAt: now,
+      groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'groc', name: 'Groceries', src: ['Groceries'], owner: 'Both' }, { id: 'su', name: 'Sulekha stuff', src: ['Shopping'], owner: 'Sulekha' }] }], assigned: { [m]: { groc: 800, su: 1000 } } } } });
+  await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
+  assert.match(await app.text('.rwmove'), /Common is €600 short for the common envelopes; Sulekha has it to spare\.\s*Move €600 from Wise Sulekha to Wise Common/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, 'the suggestion wraps on a phone');
+  await page.click('[data-whomove]'); await page.waitForSelector('#dlg[open]');
+  assert.deepEqual(await Promise.all(['#f-account', '#f-to', '#f-amount'].map(sl => page.inputValue(sl))), ['Wise Sulekha', 'Wise Common', '600']);
+  assert.match(await app.text('#dlg h2, #dlg h3, #dlgTitle'), /transfer/i);
+  await clean(app);
+});
+
+test('budget: trips carry their month and empty ones fold away; a trip can count in an envelope of yours (with what was assigned for it)', async () => {
+  const app = await openApp(), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString(), td = d(0);
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    trips: { w: { name: 'Wedding in India', type: 'other', traveller: 'Both', start: d(10), end: d(30), budget: 3000, createdAt: now },
+      a: { name: 'Munich visit', type: 'visit', traveller: 'Sulekha', start: d(40), end: d(42), createdAt: now }, b: { name: 'Munich visit', type: 'visit', traveller: 'Sulekha', start: d(100), end: d(102), createdAt: now },
+      c: { name: 'Athens', type: 'holiday', traveller: 'Both', start: d(150), end: d(155), createdAt: now } },
+    expenses: { e1: { amount: 400, date: td, store: 'Jeweller', category: 'Wedding', account: 'Deutsche Bank', spender: 'Anubhav', tripId: 'w', createdAt: now } },
+    settings: { envelopes: { start: s, accounts: ['Deutsche Bank'], opening: 5000, trips: true, updatedAt: now,
+      groups: [{ id: 'g', name: 'Wedding', envs: [{ id: 'wed', name: 'Wedding', src: ['Wedding'], owner: 'Anubhav' }] }], assigned: { [m]: { wed: 2000, t_w: 100 } } } } });
+  await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
+  let t = await envText(app);
+  const mo = k => new Date(d(k) + 'T12:00:00Z').toLocaleString('en-GB', { month: 'short' });
+  assert.match(t, new RegExp(`Wedding in India · ${mo(10)} '\\d\\d\\s*€100\\s*−€400\\s*−€300`));
+  assert.match(t, /3 more trips with nothing in them/);
+  const html = await page.$eval('#budgetPanel', e => e.innerHTML);
+  assert.ok(html.includes(`Munich visit · ${mo(40)}`) && html.includes(`Munich visit · ${mo(100)}`), 'the two Munich visits tell apart');
+  await page.click('[data-envkey="t_w"]'); await page.waitForSelector('#envAsgDlg[open]');
+  assert.match(await app.text('#eaQuick'), /Cover the overspending: €400/); assert.match(await app.text('#eaQuick'), /Up to the trip budget \(€3,000\): €2,700/);
+  await page.selectOption('#eaTripEnv', 'wed'); await page.waitForTimeout(300);
+  t = await envText(app);
+  assert.match(t, /Wedding\s*€2,100\s*−€400\s*€1,700/, 'the trip’s spending and its €100 are in Wedding now'); assert.doesNotMatch(t, /Wedding in India/);
+  await page.click('[data-envkey="wed"]'); await page.waitForSelector('#envAsgDlg[open]');
+  assert.match(await app.text('#eaTrip'), /Also gets the spending of Wedding in India/);
+  await page.keyboard.press('Escape');
+  await app.go('trips'); await page.waitForTimeout(200); await page.click('[data-trip="w"]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#tripDetail'), /In the budget: €1,700\.00 in Wedding · Assign/);
+  await clean(app);
+});
+
+test('envelope dialog: last month and the 3-month average from before the budget began; no button for the amount already there', async () => {
+  const app = await openApp(), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString();
+  const ex = {}; [1, 2, 3].forEach(k => { ex['p' + k] = { amount: 100 * k, date: month(-k) + '-05', store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now }; });
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } }, expenses: ex,
+    settings: { envelopes: { start: s, accounts: ['Deutsche Bank'], opening: 1000, trips: false, updatedAt: now, targets: { groc: 250 },
+      groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'groc', name: 'Groceries', src: ['Groceries'] }] }], assigned: { [m]: { groc: 250 } } } } });
+  await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
+  await page.click('[data-envkey="groc"]'); await page.waitForSelector('#envAsgDlg[open]');
+  const q = await app.text('#eaQuick');
+  assert.match(q, /Spent last month: €100/); assert.match(q, /3-month average: €200/); assert.doesNotMatch(q, /Target/, 'already assigned the target');
+  await clean(app);
+});
+
+test('investing: the goal says when its envelopes’ targets add up to something else (one tap to match); an account shows its envelope’s target', async () => {
+  const app = await openApp(), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, t: { name: 'T212', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav', target: 2000, returnPct: 7 } },
+    invSnapshots: { t_m: { accountId: 't', month: m, value: 5000, investment: 0, opening: true, createdAt: now } },
+    settings: { goals: { items: [{ type: 'invest', owner: 'Both', amount: 1500 }], updatedAt: now },
+      envelopes: { start: s, accounts: ['Deutsche Bank'], opening: 3000, trips: false, updatedAt: now, targets: { t212: 1000, ulip: 300 },
+        groups: [{ id: 'gs', name: 'Savings & investing', envs: [{ id: 't212', name: 'T212', src: ['→T212'], owner: 'Anubhav' }, { id: 'ulip', name: 'ULIPs', src: ['→ULIP'], owner: 'Anubhav' }] }], assigned: {} } } });
+  await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
+  assert.match(await app.text('.goalline'), /its envelopes’ targets add up to €1,300 Make the goal €1,300/);
+  await page.click('[data-goalset]'); await page.waitForTimeout(300);
+  assert.equal((await dbDocs(app, 'settings')).find(x => x.id === 'goals').items[0].amount, 1300);
+  await app.go('wealth'); await page.waitForTimeout(300); await page.click('[data-acc="t"]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#accDetail .tdhead'), /target €1,000 a month \(its envelope’s; the account said €2,000\)/);
   await clean(app);
 });

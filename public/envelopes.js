@@ -26,7 +26,7 @@
 // split by fixed amounts (Rent: { Anubhav: 860, Sulekha: 900 }). It doesn't change the budget; it tells each of you
 // how much of your balance is still set aside (committedBy).
 //
-// cfg = { start, accounts: [names], excluded: [names], opening, trips, adjust: [{ id, date, amount, note }],
+// cfg = { start, accounts: [names], excluded: [names], opening, trips, adjust: [{ id, date, amount, note }], tripEnv: { tripId: envId },
 //         groups: [{ id, name, envs: [{ id, name, src: ['Cat', 'Cat›Sub'], owner?: 'Anubhav'|'Sulekha'|'Both', split?: { Anubhav: €, Sulekha: € } }] }],
 //         assigned: { 'YYYY-MM': { envId: € } }, targets: { envId: € } }
 
@@ -71,7 +71,10 @@ export function makeBudget(cfg, acc = () => null){
     return hits.length === 1 ? ccKey(hits[0]) : cards.length === 1 ? ccKey(cards[0]) : CC_UNKNOWN;
   };
   const isBill = e => !isCard(e.account) && (CC_RE.test(e.category || '') || CC_RE.test(e.subcategory || ''));
-  const keyFor = e => cfg.trips !== false && e.tripId ? tripKey(e.tripId)
+  // A trip's spending goes to its own envelope under Travel, or to an envelope of yours you chose for it (tripEnv:
+  // the wedding trip counted in Wedding).
+  const tripTo = cfg.tripEnv || {}, tripKeyOf = id => tripTo[id] && info.has(tripTo[id]) ? tripTo[id] : tripKey(id);
+  const keyFor = e => cfg.trips !== false && e.tripId ? tripKeyOf(e.tripId)
     : idx.get(norm(srcOf(e.category, e.subcategory))) || idx.get(norm(srcOf(e.category))) || NONE_KEY;
   // Where money sent out of the budget goes: the envelope that takes transfers to that account, else Savings by owner.
   const outKey = t => idx.get(norm(TO + t.to)) || saveKeyOf(acc(t.from)?.owner);
