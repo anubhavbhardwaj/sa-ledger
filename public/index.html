@@ -864,6 +864,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
 .dlg-actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
 .dlg-actions .right{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
 .err{color:var(--danger);font-size:13px;margin:0}
+.eaown{display:grid;gap:8px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px}.eaownb{display:flex;gap:6px;flex-wrap:wrap}
 .ccdup{grid-column:1/-1;font-size:12px;color:var(--warn)}
 .billask{display:grid;gap:8px;background:var(--warn-soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
 .billask .billrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -1294,6 +1295,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
     <p class="err" id="eaErr" hidden></p>
     <div class="esq" id="eaQuick"></div>
     <div id="eaActs" class="recent" style="font-size:13px"></div>
+    <div id="eaOwnEnv" class="eaown" hidden></div>
     <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="eaCancel">Cancel</button><button class="btn primary" type="submit">Save</button></div></div>
   </form>
 </dialog>
@@ -1314,6 +1316,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
     <div id="ecList" style="display:grid;gap:10px"></div>
     <div><button class="btn small" type="button" id="ecNewGroup">+ Category</button></div>
     <p class="muted" id="ecUn" style="margin:0;font-size:12.5px"></p>
+    <p class="muted" id="ecSave" style="margin:0;font-size:12.5px"></p>
     <p class="err" id="ecErr" hidden></p>
     <div class="dlg-actions"><div class="right"><button class="btn" type="button" id="ecCancel">Cancel</button><button class="btn primary" type="submit">Save</button></div></div>
   </form>
@@ -3929,6 +3932,7 @@ function renderEnvelopes(el){
     if (g.empty) return `<p class="muted" style="margin:10px 0 0;font-size:13px">No categories yet. <button class="linkbtn" type="button" data-envcats>Create your categories</button></p>`;
     if (g.group === 'Travel' && !g.gid) return `<details class="ybg" ${g.rows.some(r => r.activity) ? 'open' : ''}>${head(g, 'Travel <span class="muted" style="font-weight:400">· one per trip</span>', 'Trip spending is kept per trip here.')}<p class="ginfo" hidden><button class="linkbtn" type="button" data-envnotrips>Use my categories instead</button></p>${g.rows.map(row).join('')}</details>`;
     if (g.none) return `<details class="ybg" open>${head(g, '<span style="color:var(--danger)">Not assigned</span>')}${g.rows.map(noneRow).join('')}</details>`;
+    if (g.group === 'Savings' && !g.gid) return `<details class="ybg" ${g.rows.some(r => Math.abs(r.available) > 0.004 || r.activity || r.assigned) || ahead ? 'open' : ''}>${head(g, 'Savings <span class="muted" style="font-weight:400">· made for you</span>', 'Money sent out of the budget (investing, sending to India) that no envelope of yours takes, one per owner of the account it left. Tap one to give an account like T212 its own envelope.')}${g.rows.map(row).join('')}</details>`;
     const hot = g.rows.some(r => Math.abs(r.available) > 0.004 || r.activity || r.assigned) || !g.rows.length || ahead;
     return `<details class="ybg" ${hot ? 'open' : ''}>${head(g, esc(g.group))}${g.rows.map(row).join('')}</details>`; };
   const canNext = m < addMonth(cm, ENV_AHEAD), canPrev = m > cfg.start.slice(0, 7);
@@ -4071,8 +4075,28 @@ function openEnvAssign(key){
   $('#eaActs').innerHTML = moves.map(t => `<div class="r"><span class="d">${shortDate(t.date)}</span><span><span class="store">To ${esc(t.to)}</span><br><span class="meta">from ${esc(t.from)}${t.comment ? ' · ' + esc(t.comment) : ''}</span></span><span class="a">${eur.format(t.amount)}</span></div>`).join('')
     + (acts.length ? acts.map(i => `<div class="r"><span class="d">${shortDate(i.date)}</span><span><span class="store">${esc(i.store)}</span><br><span class="meta">${esc(i.account)}</span></span><span class="a">${eur.format(i.amount)}</span></div>`).join('') : '')
       + (outs.length ? `<p class="muted" style="margin:8px 0 2px;font-size:12.5px">Not counted, paid from an account outside the budget:</p>` + outs.map(i => `<div class="r" style="opacity:.65"><span class="d">${shortDate(i.date)}</span><span><span class="store">${esc(i.store)}</span><br><span class="meta">${esc(i.account)}</span></span><span class="a">${eur.format(i.amount)}</span></div>`).join('') : '');
+  // Savings is made for you; to budget an account like T212 yourself, it gets an envelope of its own in one tap.
+  { const box = $('#eaOwnEnv'), since = addMonth(m, -2) + '-01';
+    const dests = isSaveKey(key) ? [...new Set(state.transfers.filter(t => t.date >= since && t.date >= cfg.start && isB(t.from) && !isB(t.to) && outKey(t) === key).map(t => String(t.to).trim()))] : [];
+    box.hidden = !dests.length;
+    box.innerHTML = dests.length ? `<p class="muted" style="margin:0;font-size:12.5px">This envelope is made for you: money sent out of the budget that no envelope of yours takes lands here. To budget an account yourself (rename it, set a target, choose whose it is), give it its own envelope:</p>
+      <span class="eaownb">${dests.map(dn => `<button class="btn small" type="button" data-envfor="${esc(dn)}">+ Envelope for ${esc(dn)}</button>`).join('')}</span>` : ''; }
   $('#envAsgDlg').showModal(); $('#ea-amt').focus();
 }
+// "+ Envelope for T212": an envelope named after the account, in your Savings category (made if needed), taking the
+// transfers to it, owned like the Savings envelope it came from; what was assigned here this month for it moves along.
+async function envForAccount(dest){
+  const cfg = state.envCfg, key = state.envKey, m = envMonthSel(), owner = { [SAVE_A]: 'Anubhav', [SAVE_S]: 'Sulekha' }[key];
+  const groups = JSON.parse(JSON.stringify(cfg.groups || []));
+  if (groups.some(g => (g.envs || []).some(e => (e.src || []).some(x => srcNorm(x) === srcNorm('→' + dest))))) { toast(`An envelope already takes transfers to ${dest}`); return; }
+  let g = groups.find(x => ['savings', 'savings & investing', 'investing', 'investments'].includes(srcNorm(x.name))); if (!g){ g = { id: newId(), name: 'Savings & investing', envs: [] }; groups.push(g); }
+  const env = { id: newId(), name: dest, src: ['→' + dest], ...(owner ? { owner } : {}) }; g.envs.push(env);
+  const { isB } = makeBudget(cfg, accOf), sent = sum(state.transfers.filter(t => t.date.startsWith(m) && t.date >= cfg.start && isB(t.from) && !isB(t.to) && String(t.to).trim() === dest));
+  const here = +(((cfg.assigned || {})[m] || {})[key] || 0), move = Math.max(0, Math.min(here, sent));
+  const assigned = move > 0.004 ? moveAssigned(cfg, m, key, env.id, move) : cfg.assigned;
+  if (await saveEnv({ groups, assigned })){ $('#envAsgDlg').close(); toast(`${dest} has its own envelope now, in ${g.name}${move > 0.004 ? ` (with the ${eur0.format(move)} assigned for it)` : ''}`); }
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-envfor]'); if (b){ b.disabled = true; envForAccount(b.dataset.envfor); } });
 function openEnvMove(to, amount){
   const B = envRows(); if (B.before) return;
   const label = r => `${esc((r.group ? r.group + ' › ' : '') + envName(r))} (${signedEur(r.available)})`;
@@ -4243,6 +4267,8 @@ function drawEnvCats(){
       ${g.envs.map((e, ei) => `<div class="ece"><div class="eceh"><input data-ece="${gi}.${ei}" value="${esc(e.name)}" placeholder="Envelope, e.g. Rent" aria-label="Envelope name"><input data-ect="${esc(e.id)}" type="number" step="1" min="0" inputmode="decimal" value="${+state.ecTargets[e.id] || ''}" placeholder="€/month" aria-label="Monthly target"><button class="unlink" type="button" data-ecedel="${gi}.${ei}" aria-label="Remove ${esc(e.name)}">×</button></div>${ownPick(e, gi, ei)}
         <div class="ecsrc">${(e.src || []).map((x, si) => `<span class="chipx">${esc(srcLabel(x))}${S.src[srcNorm(x)] ? ` <small>${eur0.format(S.src[srcNorm(x)].cur)} in ${mon}</small>` : ''}<button type="button" data-ecsdel="${gi}.${ei}.${si}" aria-label="Remove">×</button></span>`).join('')}${pick(gi, ei)}</div>${envLine(e)}</div>`).join('')}
       <button class="btn small" type="button" data-ecenew="${gi}">+ Envelope</button></div>`).join('');
+  const outs = transferSources(state.envCfg, state.transfers).filter(x => !used.has(srcNorm(x))).slice(0, 4);
+  $('#ecSave').innerHTML = `<strong>Money sent out of the budget</strong> (investing, sending to India) that no envelope takes goes to Savings › Investing & India, made for you. To budget it yourself, add “Transfers to …” to an envelope${outs.length ? `: ${outs.map(x => esc(srcLabel(x))).join(' · ')}` : ''}.`;
   $('#ecUn').innerHTML = un.length ? `<strong>Not in an envelope yet</strong> (last 3 months on the budget accounts): ${un.slice(0, 12).map(u => `${esc(srcLabel(u.src))} ${eur0.format(u.amount)}`).join(' · ')}` : '<span class="pos">All recent spending on the budget accounts has an envelope.</span>';
 }
 document.addEventListener('click', e => {
@@ -5925,7 +5951,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-27j';
+const APP_VERSION = '2026-10-27k';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

@@ -1087,3 +1087,21 @@ test('envelopes: money sent to T212 lands in your own envelope once it takes "Tr
   assert.match(await app.text('#eaActs'), /To T212\s*from Deutsche Bank\s*€500\.00/);
   await clean(app);
 });
+
+test('envelopes: from the made-for-you Savings envelope, "+ Envelope for T212" gives T212 its own envelope (with what was assigned for it)', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString(), td = d(0);
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, t: { name: 'T212', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
+    transfers: { t1: { amount: 500, date: td, from: 'Deutsche Bank', to: 'T212', createdAt: now }, t2: { amount: 200, date: td, from: 'Deutsche Bank', to: 'HDFC NRE', createdAt: now } },
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 3000, updatedAt: now, groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'food', name: 'Groceries', src: ['Groceries'] }] }], assigned: { [m]: { s_save_anubhav: 700 } } } } });
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(250);
+  await page.click('[data-envkey="s_save_anubhav"]'); await page.waitForSelector('#envAsgDlg[open]');
+  assert.match(await app.text('#eaOwnEnv'), /made for you.*\+ Envelope for T212\s*\+ Envelope for HDFC NRE/);
+  await page.click('[data-envfor="T212"]'); await page.waitForTimeout(300);
+  const t = await envText(app);
+  assert.match(t, /Savings & investing\s*€500\s*−€500\s*€0\s*T212\s*€500\s*−€500\s*€0/, 'a category of yours with T212 in it, the €500 assigned for it moved along');
+  assert.match(t, /Savings · made for you.*Investing & India\s*€200\s*−€200\s*€0/, 'HDFC NRE stays in the made-for-you envelope with the rest');
+  assert.equal(await page.textContent('#budgetPanel .ybr.env:has-text("T212") .ob'), 'A', 'yours, like the envelope it came from');
+  await page.click('[data-envmore]'); await page.click('#budgetPanel [data-envcats]'); await page.waitForSelector('#envCatDlg[open]');
+  assert.match(await app.text('#ecSave'), /Money sent out of the budget.*Transfers to HDFC NRE/);
+  await clean(app);
+});
