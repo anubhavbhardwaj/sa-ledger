@@ -202,6 +202,7 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .envalerts .al{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;padding:9px 12px;font-size:13px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--warn) 7%,var(--surface))}
 .envalerts .al:last-child{border-bottom:0}.envalerts .al.info{background:var(--surface)}
 .rwmove{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:space-between;font-size:12.5px;padding:8px 0 0;border-top:1px dashed var(--line);margin-top:8px}.rwmove > span{flex:1 1 220px;min-width:0}.rwmove .btn{white-space:normal;text-align:left;max-width:100%;height:auto;line-height:1.3;padding-top:6px;padding-bottom:6px}
+.envprev{display:flex;gap:8px;align-items:baseline;margin:0;font-size:12.5px;padding:7px 10px;border-radius:8px;background:var(--sunk);color:var(--ink-2)}.envprev .ic{opacity:.7}.envprev .neg{color:var(--danger)}.envprev .warnc{color:var(--warn)}
 .ybsub > summary{list-style:none;cursor:pointer}.ybsub > summary::-webkit-details-marker{display:none}.ybsub > summary .tx::before{content:'▸ ';}.ybsub[open] > summary .tx::before{content:'▾ ';}
 .envalerts .gapwhy{flex:1 1 100%;display:grid;gap:6px;padding-top:4px}.envalerts .gw{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--line)}.envalerts .gw>span:first-child{flex:1 1 240px;min-width:0}.envalerts .gw.muted{color:var(--muted);border-style:dashed}
 .esdrift{color:var(--warn)}.esadj{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding:4px 0;border-top:1px solid var(--line)}
@@ -1600,6 +1601,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
       <label class="f tr-only" hidden><span>To account</span><input id="f-to" data-list="dl-account" autocomplete="off"></label>
       <p class="f full tr-only muted" id="trHint" hidden style="margin:0;font-size:12.5px"></p>
       <p class="f full tr-only" hidden style="margin:0;font-size:12.5px"><button type="button" class="linkbtn" data-sendindia>Sending money to India? Log the whole chain at once →</button></p>
+      <p class="f full envprev" id="envPrev" hidden aria-live="polite"></p>
       <button type="button" class="morebtn" id="moreBtn" aria-expanded="false" aria-controls="moreBox"><span>More details <span class="chev" aria-hidden="true">▾</span></span><span class="msum" id="moreSum"></span></button>
       <div class="more" id="moreBox" hidden>
         <div class="fields">
@@ -1632,7 +1634,7 @@ import { decodeBCBP } from "./bcbp.js";
 import { detectRecurring, backtest as recurBacktest } from "./recur.js";
 import { checkPhoto, passportAlerts, human as humanDate } from "./verify.js";
 import { formPayload, peopleText, bookmarklet, FILLER_VERSION } from "./fill.js";
-import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, spendingStats, srcLabel, norm as srcNorm, newId, tripKey, ccKey, CC_RE, SAVE_KEY, NONE_KEY, SAVE_A, SAVE_S, saveKeyOf, isSaveKey, committedBy, splitOf, PEOPLE, transferSources, TO } from "./envelopes.js";
+import { budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, spendingStats, srcLabel, norm as srcNorm, newId, tripKey, ccKey, CC_RE, SAVE_KEY, NONE_KEY, SAVE_A, SAVE_S, saveKeyOf, isSaveKey, committedBy, splitOf, PEOPLE, transferSources, TO, cardShares } from "./envelopes.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -2688,6 +2690,36 @@ function setKind(kind, locked){
   F('category').dataset.list = inc ? 'dl-icategory' : 'dl-category';
   $$('#dlg .exp-only').forEach(el => el.hidden = inc || tr);
   if (typeof moreSummary === 'function' && state.user) moreSummary();
+  if (state.user) envPreview();
+}
+// While adding: which envelope this lands in and what it leaves there ("Groceries: €42 left → €30 after this"), the
+// YNAB habit of seeing it before spending. Only for dates in the budget; nothing shown when there's nothing to say.
+function envPreview(){
+  const el = $('#envPrev'); if (!el) return;
+  const hide = () => { el.hidden = true; el.innerHTML = ''; };
+  if (!ENVELOPES || !envOn()) return hide();
+  const cfg = state.envCfg, date = F('date').value, entered = parseFloat(F('amount').value), cur = F('cur').value, rate = parseFloat(F('rate').value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < cfg.start) return hide();
+  const amt = !(entered > 0) ? 0 : cur === 'EUR' ? entered : rate > 0 ? entered * rate : 0;
+  const m = date.slice(0, 7), skip = x => x.id !== state.editing;
+  const data = { ...envData(), items: state.items.filter(skip), income: state.income.filter(skip), transfers: state.transfers.filter(skip) };
+  const B = budgetMonth(cfg, m, data); if (B.before) return hide();
+  const { keyFor, isB, isCard, outKey, describe } = makeBudget(cfg, accOf), cell = v => `<b class="${v < -0.004 ? 'neg' : ''}">${signedEur(v)}</b>`;
+  const avail = k => B.rows.find(r => r.key === k)?.available || 0, name = k => { const d = describe(k); return d ? envName(d.tripId ? d : { ...d }) : 'its envelope'; };
+  const line = (k, sign = -1) => { const a = avail(k); return `${esc(name(k))}: ${cell(a)} left${amt ? ` → ${cell(a + sign * amt)} after this` : ''}`; };
+  let h = '';
+  if (state.kind === 'income'){ const acc = realName(F('account').value);
+    if (acc && isB(acc)) h = `Into Ready to Assign: ${cell(B.ready)}${amt ? ` → ${cell(B.ready + amt)}` : ''}`; }
+  else if (state.kind === 'transfer'){ const f = realName(F('account').value), t = realName(F('to').value);
+    if (f && t && isB(f) && !isB(t)) h = line(outKey({ from: f, to: t }));
+    else if (f && t && !isB(f) && isB(t)) h = `Into Ready to Assign: ${cell(B.ready)}${amt ? ` → ${cell(B.ready + amt)}` : ''}`;
+    else if (t && isB(t) && isCard(t)) h = `Pays the card: ${line(ccKey(t))}`; }
+  else { const acc = realName(F('account').value), cat = F('category').value.trim(); if (!acc || !cat) return hide();
+    if (!isB(acc)){ const known = state.accounts.some(a => a.name.toLowerCase() === acc.toLowerCase()); h = known ? `<span class="muted">${esc(acc)} isn’t in the budget, so no envelope counts this.</span>` : ''; }
+    else { const k = keyFor({ category: cat, subcategory: F('subcategory').value.trim(), tripId: F('trip').value || undefined, account: acc });
+      h = k === NONE_KEY ? `<span class="warnc">No envelope gets ${esc(cat)} yet: it will show under Not assigned.</span>` : line(k) + (isCard(acc) ? ` <span class="muted">· the money moves to ${esc(acc)}’s payment envelope</span>` : ''); } }
+  if (!h) return hide();
+  el.innerHTML = `<span class="ic" aria-hidden="true">✉</span><span>${h}</span>`; el.hidden = false;
 }
 // What a transfer means, from the account types: investing, paying a card, or moving money.
 function transferType(t){
@@ -3172,6 +3204,10 @@ $('#addBtn').addEventListener('click', () => openAdd());
 $('#fab').addEventListener('click', () => openAdd());
 $('#cancelBtn').addEventListener('click', () => dlg.close());
 
+// After the form's own handlers (a store fills in its usual category), so the preview sees the final values.
+$('#form').addEventListener('input', () => setTimeout(envPreview));
+$('#form').addEventListener('change', () => setTimeout(envPreview));
+$('#form').addEventListener('click', e => { if (e.target.closest('#catChips, [data-autoundo]')) setTimeout(envPreview); });
 $('#form').addEventListener('submit', async e => {
   e.preventDefault();
   const err = $('#formErr');
@@ -4015,16 +4051,23 @@ function envKpi(){
 // shared ones (Wise Common) as Common, at the end of the month shown, or today for this month and months ahead.
 function envWho(m, B0){
   const cm = thisMonth(), [y, mo] = m.split('-').map(Number), asOf = m < cm ? new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10) : today(), out = {};
-  for (const name of state.envCfg.accounts || []){
+  const B = B0 || envRows(m), tripOwner = id => { const t = state.tripMap[id]; return t && PEOPLE.includes(t.traveller) ? t.traveller : 'Both'; };
+  const cfg = state.envCfg, slot = p => (out[p] ||= { cash: 0, cards: 0, n: 0, noRate: false }), asP = w => w === 'Both' ? 'Shared' : w;
+  for (const name of cfg.accounts || []){
     const a = accOf(name); if (!a || !['Anubhav', 'Sulekha', 'Shared'].includes(a.owner)) continue;
     const e = estimate(a, asOf); if (!e) continue;
-    const v = toEur(a, e.balance), o = (out[a.owner] ||= { cash: 0, cards: 0, n: 0, noRate: false });
+    const v = toEur(a, e.balance), o = slot(a.owner);
     if ((a.currency || 'EUR') !== 'EUR' && !state.fxLatest[a.currency]) o.noRate = true;
-    if (a.type === 'card') o.cards -= v; else o.cash += v;
     o.n++;
+    if (a.type !== 'card'){ o.cash += v; continue; }
+    // A card's debt is shared out by whose envelopes it was spent from (common groceries on Anubhav's card are the
+    // common money's to pay), oldest paid off first; the card's owner keeps what came before the budget.
+    const debt = -v, sh = debt > 0.004 ? cardShares(cfg, a.name, { ...envData(), items: state.items.filter(i => i.date <= asOf), transfers: state.transfers.filter(t => t.date <= asOf), income: state.income.filter(i => i.date <= asOf),
+      tripOwner, debtAtStart: +((B.cardDebt || {})[ccKey(a.name)] || 0), cardOwner: a.owner === 'Shared' ? 'Both' : a.owner }) : null;
+    if (!sh){ o.cards += debt; continue; }
+    for (const [w, f] of Object.entries(sh)){ const t = slot(asP(w)); t.cards += debt * f; if (w !== (a.owner === 'Shared' ? 'Both' : a.owner)) (t.fromCards ||= []).push(a.name); }
   }
   // What's still set aside for each, from the envelopes they own: the rest of the balance is free.
-  const B = B0 || envRows(m), tripOwner = id => { const t = state.tripMap[id]; return t && PEOPLE.includes(t.traveller) ? t.traveller : 'Both'; };
   const set = B.before ? { Anubhav: 0, Sulekha: 0, Both: 0 } : committedBy(state.envCfg, B.rows, { futureBy: B.futureBy || {}, tripOwner });
   for (const [p, k] of [['Anubhav', 'Anubhav'], ['Sulekha', 'Sulekha'], ['Shared', 'Both']]) if (out[p] || set[k] > 0.5){ (out[p] ||= { cash: 0, cards: 0, n: 0, noRate: false }).set = set[k]; }
   return { asOf, past: m < cm, who: out };
@@ -4061,7 +4104,7 @@ function envWhoHtml(m, B){
       <span class="k sm">bank − cards</span>${ppl.map(p => `<span class="sm">${eur0.format(W.who[p].cash)}${Math.abs(W.who[p].cards) > 0.5 ? ' − ' + eur0.format(W.who[p].cards) : ''}</span>`).join('')}
       <span class="k">In envelopes</span>${ppl.map(p => `<span>${(W.who[p].set || 0) > 0.5 ? '−' + eur0.format(W.who[p].set) : '–'}</span>`).join('')}
       <span class="k tot">Left</span>${ppl.map(p => `<span class="tot ${left(p) < -0.5 ? 'neg' : ''}">${m0(left(p))}</span>`).join('')}
-    </div><p class="rwnote">Accounts in the budget, ${W.past ? 'at the end of the month' : 'today'}; envelopes count for whoever owns them${rate ? ' · *rupee rate loading' : ''}.</p></details>${W.past || rate ? '' : whoMoves(W, ppl, left)}`;
+    </div><p class="rwnote">Accounts in the budget, ${W.past ? 'at the end of the month' : 'today'}; envelopes count for whoever owns them, and so does what a card owes for them${rate ? ' · *rupee rate loading' : ''}.</p></details>${W.past || rate ? '' : whoMoves(W, ppl, left)}`;
 }
 function renderEnvelopes(el){
   const m = envMonthSel(), cfg = state.envCfg;

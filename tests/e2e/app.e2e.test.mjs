@@ -1455,3 +1455,42 @@ test('investing: the goal says when its envelopes’ targets add up to something
   assert.match(await app.text('#accDetail .tdhead'), /target €1,000 a month \(its envelope’s; the account said €2,000\)/);
   await clean(app);
 });
+
+test('adding: the form shows which envelope the entry lands in and what it leaves (card, no envelope, transfer out, income)', async () => {
+  const app = await openApp(), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, amex: { name: 'AMEX', type: 'card', currency: 'EUR', owner: 'Anubhav' },
+      t: { name: 'T212', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' }, rf: { name: 'Raiffeisen', type: 'bank', currency: 'EUR', owner: 'Sulekha' } },
+    expenses: { e1: { amount: 58, date: s, store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now } },
+    settings: { envelopes: { start: s, accounts: ['Deutsche Bank', 'AMEX'], opening: 1000, openingBy: { 'Deutsche Bank': 1000, AMEX: 0 }, trips: false, updatedAt: now,
+      groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'groc', name: 'Groceries', src: ['Groceries'] }, { id: 'inv', name: 'T212', src: ['→T212'] }] }], assigned: { [m]: { groc: 100, inv: 500 } } } } });
+  await page.waitForTimeout(400);
+  await page.click('#addBtn'); await page.waitForSelector('#dlg[open]');
+  await page.fill('#f-date', s); await page.fill('#f-amount', '12'); await page.fill('#f-category', 'Groceries'); await page.fill('#f-store', 'Lidl'); await page.fill('#f-account', 'Deutsche Bank'); await page.waitForTimeout(100);
+  assert.match(await app.text('#envPrev'), /Groceries: €42\.00 left → €30\.00 after this/);
+  await page.fill('#f-account', 'AMEX'); await page.waitForTimeout(100);
+  assert.match(await app.text('#envPrev'), /Groceries: €42\.00 left → €30\.00 after this · the money moves to AMEX’s payment envelope/);
+  await page.fill('#f-category', 'Shoes'); await page.waitForTimeout(100);
+  assert.match(await app.text('#envPrev'), /No envelope gets Shoes yet: it will show under Not assigned/);
+  await page.fill('#f-account', 'Raiffeisen'); await page.waitForTimeout(100);
+  assert.match(await app.text('#envPrev'), /Raiffeisen isn’t in the budget, so no envelope counts this/);
+  await page.click('#kindSeg [data-kind="transfer"]'); await page.fill('#f-account', 'Deutsche Bank'); await page.fill('#f-to', 'T212'); await page.fill('#f-amount', '500'); await page.waitForTimeout(100);
+  assert.match(await app.text('#envPrev'), /T212: €500\.00 left → €0\.00 after this/);
+  await page.click('#kindSeg [data-kind="income"]'); await page.fill('#f-account', 'Deutsche Bank'); await page.fill('#f-amount', '3000'); await page.waitForTimeout(100);
+  assert.match(await app.text('#envPrev'), /Into Ready to Assign: €400\.00 → €3,400\.00/);
+  await clean(app);
+});
+
+test('left after envelopes: common groceries bought on Anubhav’s card are the common money’s to pay, not his', async () => {
+  const app = await openApp(), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, wc: { name: 'Wise Common', type: 'bank', currency: 'EUR', owner: 'Shared' }, amex: { name: 'AMEX', type: 'card', currency: 'EUR', owner: 'Anubhav' } },
+    checkins: { c1: { accountId: 'db', date: s, balance: 1000, createdAt: s + 'T06:00:00Z' }, c2: { accountId: 'wc', date: s, balance: 500, createdAt: s + 'T06:00:00Z' }, c3: { accountId: 'amex', date: s, balance: 0, createdAt: s + 'T06:00:00Z' } },
+    expenses: { e1: { amount: 100, date: s, store: 'Rewe', category: 'Groceries', account: 'AMEX', spender: 'Anubhav', createdAt: s + 'T09:00:00Z' } },
+    settings: { envelopes: { start: s, accounts: ['Deutsche Bank', 'Wise Common', 'AMEX'], opening: 1500, openingBy: { 'Deutsche Bank': 1000, 'Wise Common': 500, AMEX: 0 }, trips: false, updatedAt: now,
+      groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'groc', name: 'Groceries', src: ['Groceries'], owner: 'Both' }] }], assigned: { [m]: { groc: 300 } } } } });
+  await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
+  const t = await app.text('.rwho summary');
+  assert.match(t, /Anubhav\s*€1,000/); assert.match(t, /Common\s*€200/);
+  await page.click('.rwho summary'); await page.waitForTimeout(100);
+  assert.match(await app.text('.rwt'), /bank − cards\s*€1,000\s*€500 − €100/);
+  await clean(app);
+});

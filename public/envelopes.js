@@ -174,6 +174,36 @@ export function splitOf(e){
 // money), plus what's assigned to them in later months (futureBy). A split envelope is shared out by its fixed
 // amounts. Card envelopes are left out (what a card owes is already taken off its owner's balance) and so is Not
 // assigned; an overspent envelope holds nothing. tripOwner(tripId) → 'Anubhav' | 'Sulekha' | 'Both'.
+// Whose a card's debt is: what it owed at the start is the card owner's; each purchase is for whoever owns the envelope
+// it came from (a split envelope by its split, a trip by its traveller); cash taken from the card is the owner's;
+// payments and refunds pay off the oldest first. Returns the shares of what's still owed, { Anubhav: 0.6, Both: 0.4 }
+// (Both: the common money), or null when nothing is left (then it's all the card owner's).
+export function cardShares(cfg, card, { items = [], income = [], transfers = [], acc = () => null, tripOwner = () => 'Both', debtAtStart = 0, cardOwner = 'Both' } = {}){
+  const { keyFor, info } = makeBudget(cfg, acc), n = norm(card), after = d => d >= cfg.start;
+  const whoOf = k => {
+    if (String(k).startsWith('t_')) return { [tripOwner(k.slice(2))]: 1 };
+    const e = info.get(k); if (!e) return { [cardOwner]: 1 };
+    if (e.split){ const t = PEOPLE.reduce((a, p) => a + (+e.split[p] || 0), 0); if (t > 0) return Object.fromEntries(PEOPLE.map(p => [p, (+e.split[p] || 0) / t])); }
+    return { [e.owner || 'Both']: 1 };
+  };
+  const ev = [];
+  items.forEach(e => { if (after(e.date) && norm(e.account) === n) ev.push({ d: e.date, c: e.createdAt || '', v: +e.amount || 0, who: whoOf(keyFor(e)) }); });
+  income.forEach(i => { if (after(i.date) && norm(i.account) === n) ev.push({ d: i.date, c: i.createdAt || '', v: -(+i.amount || 0) }); });
+  transfers.forEach(t => { if (!after(t.date)) return;
+    if (norm(t.to) === n) ev.push({ d: t.date, c: t.createdAt || '', v: -(+t.amount || 0) });
+    if (norm(t.from) === n) ev.push({ d: t.date, c: t.createdAt || '', v: +t.amount || 0, who: { [cardOwner]: 1 } }); });
+  ev.sort((a, b) => a.d.localeCompare(b.d) || String(a.c).localeCompare(String(b.c)));
+  const q = debtAtStart > 0 ? [{ who: { [cardOwner]: 1 }, v: debtAtStart }] : [];
+  for (const x of ev){
+    if (x.v > 0){ q.push({ who: x.who, v: x.v }); continue; }
+    let pay = -x.v; while (pay > 1e-9 && q.length){ const h = q[0], use = Math.min(h.v, pay); h.v -= use; pay -= use; if (h.v <= 1e-9) q.shift(); }
+  }
+  const by = {}; let tot = 0;
+  q.forEach(x => Object.entries(x.who).forEach(([p, f]) => { by[p] = (by[p] || 0) + x.v * f; tot += x.v * f; }));
+  if (tot < 0.005) return null;
+  return Object.fromEntries(Object.entries(by).map(([p, v]) => [p, v / tot]));
+}
+
 export function committedBy(cfg, rows, { futureBy = {}, tripOwner = () => 'Both' } = {}){
   const { describe } = makeBudget(cfg), out = { Anubhav: 0, Sulekha: 0, Both: 0 };
   const byKey = new Map(rows.map(r => [r.key, r]));

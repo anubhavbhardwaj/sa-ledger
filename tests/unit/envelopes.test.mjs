@@ -197,3 +197,25 @@ test('envelopes: an adjustment from reconciling goes into Ready to Assign in its
   assert.equal(nov.adjusted, -50);
   assert.equal(nov.ready, budgetMonth(cfg(), '2026-11', { ...data, acc, now: '2026-11' }).ready + 846);
 });
+
+test('cardShares: a card’s debt belongs to whoever owns the envelopes it was spent from; payments clear the oldest first', async () => {
+  const { cardShares } = await import('../../public/envelopes.js');
+  const c = { start: '2026-10-01', accounts: ['AMEX'], trips: true, groups: [{ id: 'g', name: 'G', envs: [
+    { id: 'groc', name: 'Groceries', src: ['Groceries'], owner: 'Both' }, { id: 'su', name: 'Sulekha', src: ['Clothes'], owner: 'Sulekha' },
+    { id: 'rent', name: 'Rent', src: ['Rent'], owner: 'Both', split: { Anubhav: 860, Sulekha: 900 } }] }] };
+  const items = [
+    { date: '2026-10-02', amount: 100, category: 'Groceries', account: 'AMEX' },
+    { date: '2026-10-03', amount: 50, category: 'Clothes', account: 'AMEX' },
+    { date: '2026-10-04', amount: 176, category: 'Rent', account: 'AMEX' },
+    { date: '2026-10-05', amount: 30, category: 'Flights', account: 'AMEX', tripId: 'rome' },
+    { date: '2026-09-20', amount: 999, category: 'Groceries', account: 'AMEX' }];       // before the start: in the debt at start
+  const opt = { items, cardOwner: 'Anubhav', debtAtStart: 200, tripOwner: id => id === 'rome' ? 'Anubhav' : 'Both' };
+  let s = cardShares(c, 'AMEX', opt);
+  const r = x => Math.round(x * 1000) / 1000;
+  // owed 200 (Anubhav) + 100 (Both) + 50 (Sulekha) + 176 (86 A, 90 S) + 30 (Anubhav) = 556
+  assert.equal(r(s.Anubhav), r((200 + 86 + 30) / 556)); assert.equal(r(s.Both), r(100 / 556)); assert.equal(r(s.Sulekha), r((50 + 90) / 556));
+  // Paying 250 clears the old 200 and 50 of the groceries.
+  s = cardShares(c, 'AMEX', { ...opt, transfers: [{ date: '2026-10-10', amount: 250, from: 'Deutsche Bank', to: 'AMEX' }] });
+  assert.equal(r(s.Both), r(50 / 306)); assert.equal(r(s.Anubhav), r(116 / 306));
+  assert.equal(cardShares(c, 'AMEX', { ...opt, transfers: [{ date: '2026-10-10', amount: 9999, from: 'Deutsche Bank', to: 'AMEX' }] }), null, 'paid off');
+});
