@@ -135,12 +135,14 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
   return { ready: r2(ready - future), future, futureBy, opening: r2(opening), cardDebt, ...out };
 }
 
-// Rows in your order: your categories as you arranged them, then Travel and Savings; Not assigned first when it has
-// spending, so it gets noticed.
+// Groups in your order: your categories as you arranged them, then Travel and Savings; Not assigned first when it has
+// spending, so it gets noticed. Inside each group the biggest envelopes come first: by money assigned this month, then
+// by what was spent, then by what's available (so a month with nothing assigned yet still has an order).
+const bySize = (a, b) => (b.assigned - a.assigned) || (Math.abs(b.activity) - Math.abs(a.activity)) || (b.available - a.available) || String(a.name || '').localeCompare(String(b.name || ''));
 export function groupRows(cfg, rows){
   const by = new Map(rows.map(r => [r.key, r]));
   const sum = (rs, f) => r2(rs.reduce((s, r) => s + r[f], 0));
-  const pack = (group, rs, extra = {}) => ({ group, rows: rs, assigned: sum(rs, 'assigned'), activity: sum(rs, 'activity'), available: sum(rs, 'available'), ...extra });
+  const pack = (group, rs, extra = {}) => ({ group, rows: [...rs].sort(bySize), assigned: sum(rs, 'assigned'), activity: sum(rs, 'activity'), available: sum(rs, 'available'), ...extra });
   const out = [];
   const none = by.get(NONE_KEY); if (none && (none.activity || none.available)) out.push(pack('Not assigned', [none], { none: true }));
   const cc = rows.filter(r => r.key.startsWith('cc_')); if (cc.length) out.push(pack('Credit Card Payments', cc, { cards: true }));

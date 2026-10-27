@@ -166,3 +166,12 @@ test('envelopes: whose money each envelope is; savings per account owner; what i
   // Food 210 left → Both. Bakery 30 − 15 = 15 → Sulekha. Rome trip overspent → nothing. Card envelope and Not assigned left out.
   assert.deepEqual(W, { Anubhav: 860 + 1200 + 100, Sulekha: 900 + 15, Both: 210 });
 });
+
+test('envelopes: inside each group the biggest come first (assigned, then spent, then available)', () => {
+  const c = cfg(); c.assigned = { '2026-10': { food: 400, rent: 800, net: 50 } };
+  const G = groupRows(c, budgetMonth(c, '2026-10', { ...data, now: '2026-10' }).rows);
+  assert.deepEqual(G.find(g => g.group === 'Fixed').rows.map(r => r.key), ['rent', 'net']);
+  assert.deepEqual(G.find(g => g.group === 'Flexible').rows.map(r => r.key), ['food', 'bakery'], 'Bakery: nothing assigned, spent 15');
+  const none = { '2026-10': {} }; c.assigned = none;
+  assert.deepEqual(groupRows(c, budgetMonth(c, '2026-10', { ...data, now: '2026-10' }).rows).find(g => g.group === 'Flexible').rows.map(r => r.key), ['food', 'bakery'], 'nothing assigned: by spending (190 vs 15)');
+});
