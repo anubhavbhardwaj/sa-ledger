@@ -1254,7 +1254,7 @@ test('Coming up: a flight with its pass shows once, with the route, arrival and 
       b2: { tripId: 'tr', type: 'hotel', title: 'AMINA Guest House', start: d(1) + 'T15:00', end: d(5), createdAt: now } } });
   await page.waitForTimeout(400);
   const t = await app.text('#nextUp');
-  assert.match(t, /EJU2976 tomorrow · MUC → FCO · arr 19:05 · seat 22C/); assert.doesNotMatch(t, /seat Seat/i);
+  assert.match(t, /EJU2976 tomorrow, lands 19:05 · MUC → FCO · departure time\? · seat 22C/); assert.doesNotMatch(t, /seat Seat/i);
   assert.equal((t.match(/Boarding pass/gi) || []).length, 1, 'one boarding pass button, no second row for the same flight');
   assert.match(t, /Check in · AMINA Guest House/, 'the rest is still listed');
   const [h, n] = await Promise.all(['#page-overview .pagehead', '#nextUp'].map(s => page.$eval(s, e => e.getBoundingClientRect().top)));
@@ -1527,5 +1527,35 @@ test('adding income into the budget says what there is to assign, one tap from t
   assert.match(await app.text('#toast'), /Added €4,950\.38 from PAYBACK: \+?€5,050\.38 to assign\s*Assign/);
   await page.click('#toast button'); await page.waitForTimeout(300);
   assert.match(await page.evaluate(() => location.hash), /budget/);
+  await clean(app);
+});
+
+test('a flight saved without its departure time gets it from the flight data, saved on the booking and shown everywhere', async () => {
+  const app = await openApp({ mobile: true }), { page } = app, now = new Date().toISOString(), day = d(1);
+  let asked = 0;
+  await page.route('**/api/flight-check', async r => { asked++; await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sched: day + 'T14:45:00Z', fromTz: 'Europe/Berlin', toTz: 'Europe/Rome', delay: 0 }) }); });
+  await app.seed({ trips: { tr: { name: 'Rome visit', type: 'visit', traveller: 'Anubhav', start: day, end: d(5), createdAt: now } },
+    bookings: { b1: { tripId: 'tr', type: 'flight', number: 'EJU2976', title: 'EJU2976 Munich (MUC) → Rome Fiumicino (FCO)', from: 'Munich (MUC)', to: 'Rome Fiumicino (FCO)', start: day, end: day + 'T19:05', travellers: ['Anubhav Bhardwaj'], codes: [{ text: 'M1BHARDWAJ/ANUBHAV', format: 'aztec' }], createdAt: now } } });
+  await page.waitForTimeout(800);
+  assert.equal(asked, 1, 'looked up once');
+  const hm = new Date(day + 'T14:45:00Z').toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' });
+  assert.equal((await dbDocs(app, 'bookings'))[0].start, day + 'T' + hm, 'saved in Munich time');
+  assert.match(await app.text('#nextUp'), new RegExp(`EJU2976 tomorrow, leaves ${hm}, lands 19:05 · MUC → FCO`));
+  await app.go('trips'); await page.waitForTimeout(200); await page.click('[data-trip="tr"]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#tripDetail .itin'), new RegExp(`${hm}\\s*\\S*\\s*EJU2976 Munich \\(MUC\\) → Rome Fiumicino \\(FCO\\)\\s*lands 19:05`));
+  await clean(app);
+});
+
+test('left after envelopes: common spending on Anubhav’s card is said to be paid with his card, and only the rest is a transfer', async () => {
+  const app = await openApp(), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, wc: { name: 'Wise Common', type: 'bank', currency: 'EUR', owner: 'Shared' }, amex: { name: 'AMEX', type: 'card', currency: 'EUR', owner: 'Anubhav' } },
+    checkins: { c1: { accountId: 'db', date: s, balance: 1000, createdAt: s + 'T06:00:00Z' }, c2: { accountId: 'wc', date: s, balance: 100, createdAt: s + 'T06:00:00Z' }, c3: { accountId: 'amex', date: s, balance: 0, createdAt: s + 'T06:00:00Z' } },
+    expenses: { e1: { amount: 100, date: s, store: 'Rewe', category: 'Groceries', account: 'AMEX', spender: 'Anubhav', createdAt: s + 'T09:00:00Z' } },
+    settings: { envelopes: { start: s, accounts: ['Deutsche Bank', 'Wise Common', 'AMEX'], opening: 1100, openingBy: { 'Deutsche Bank': 1000, 'Wise Common': 100, AMEX: 0 }, trips: false, updatedAt: now,
+      groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'groc', name: 'Groceries', src: ['Groceries'], owner: 'Both' }] }], assigned: { [m]: { groc: 300 } } } } });
+  await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
+  const t = (await page.$$eval('.rwmove', els => els.map(e => e.textContent.replace(/\s+/g, ' ').trim())));
+  assert.deepEqual(t, ['€100 of the common spending is on Anubhav’s cards: it’s paid when Anubhav pays them, so Anubhav’s €100 left goes there.',
+    'Common is €100 short for the common envelopes; Anubhav has it to spare.Move €100 from Deutsche Bank to Wise Common']);
   await clean(app);
 });

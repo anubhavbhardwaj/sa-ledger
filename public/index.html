@@ -215,6 +215,12 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .ybr .n .z{color:var(--muted);opacity:.6}
 .ybg>summary{list-style:none;cursor:pointer}.ybg>summary::-webkit-details-marker{display:none}
 .ybg>summary .ybr{font-weight:600;font-size:13.5px;border-bottom:1px solid var(--line);margin-top:14px;padding-top:6px;padding-bottom:6px;color:var(--ink-2)}
+/* Categories in colour: a stripe down the side of each category and a tinted header with a colour dot. */
+.ybg.gc{border-left:4px solid var(--gc);margin-top:16px;border-radius:0 8px 8px 0}
+.ybg.gc>summary .ybr{margin-top:0;border-bottom:0;border-radius:0 6px 6px 0;background:color-mix(in srgb,var(--gc) 16%,var(--surface));color:var(--ink);font-size:14px;padding-top:9px;padding-bottom:9px}
+.ybg .gdot{width:10px;height:10px;border-radius:3px;background:var(--gc);flex:none;margin-right:2px}
+.ybg.gc>summary .ybr .n{color:var(--ink)}
+.ybg.gc .ybr.env{padding-left:12px}
 .ybg>summary .ybr .n{color:var(--ink-2)}
 .ybg>summary .nm::before{content:'▾';display:inline-block;width:14px;color:var(--muted);font-size:11px;transition:transform .15s}.ybg:not([open])>summary .nm::before{transform:rotate(-90deg)}
 .gchip{font-size:11px;font-weight:500;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap}
@@ -4072,7 +4078,8 @@ function envWho(m, B0){
     const debt = -v, sh = debt > 0.004 ? cardShares(cfg, a.name, { ...envData(), items: state.items.filter(i => i.date <= asOf), transfers: state.transfers.filter(t => t.date <= asOf), income: state.income.filter(i => i.date <= asOf),
       tripOwner, debtAtStart: +((B.cardDebt || {})[ccKey(a.name)] || 0), cardOwner: a.owner === 'Shared' ? 'Both' : a.owner }) : null;
     if (!sh){ o.cards += debt; continue; }
-    for (const [w, f] of Object.entries(sh)){ const t = slot(asP(w)); t.cards += debt * f; if (w !== (a.owner === 'Shared' ? 'Both' : a.owner)) (t.fromCards ||= []).push(a.name); }
+    // What one of you owes on the other's card: paid when the card's owner pays the card (see whoMoves).
+    for (const [w, f] of Object.entries(sh)){ const t = slot(asP(w)); t.cards += debt * f; if (asP(w) !== a.owner){ t.onCards ||= {}; t.onCards[a.owner] = (t.onCards[a.owner] || 0) + debt * f; } }
   }
   // What's still set aside for each, from the envelopes they own: the rest of the balance is free.
   const set = B.before ? { Anubhav: 0, Sulekha: 0, Both: 0 } : committedBy(state.envCfg, B.rows, { futureBy: B.futureBy || {}, tripOwner });
@@ -4087,6 +4094,13 @@ function whoMoves(W, ppl, left){
     .map(a => ({ a, v: estimate(a)?.balance || 0 })).sort((x, y) => y.v - x.v);
   const short = ppl.filter(p => left(p) < -5).sort((a, b) => left(a) - left(b)), spare = ppl.filter(p => left(p) > 5).sort((a, b) => left(b) - left(a));
   const have = Object.fromEntries(ppl.map(p => [p, left(p)])), out = [];
+  // Spending of one of you on the other's card is paid when that card is paid, from the card owner's money: no transfer
+  // for that part, just say so (it is why the card owner seems to have money left over).
+  for (const p of short) for (const q of spare){
+    const owed = Math.floor(Math.min(W.who[p]?.onCards?.[q] || 0, -have[p], have[q])); if (owed < 5) continue;
+    have[p] += owed; have[q] -= owed;
+    out.push(`<div class="rwmove"><span>${eur0.format(owed)} of ${p === 'Shared' ? 'the common' : nm(p) + '’s'} spending is on ${nm(q)}’s cards: it’s paid when ${nm(q)} pays them, so ${nm(q)}’s ${eur0.format(owed)} left goes there.</span></div>`);
+  }
   for (const p of short) for (const q of spare){
     const amt = Math.floor(Math.min(-have[p], have[q])); if (amt < 5) continue;
     const from = accs(q)[0], to = accs(p)[0]; if (!from || !to) continue;
@@ -4167,7 +4181,14 @@ function renderEnvelopes(el){
     return `<div class="ybr env ${empty ? 'empty' : ''}" data-envkey="${esc(r.key)}" role="button" tabindex="0" title="Tap to assign money"><span class="nm">${badge(r)}<span class="tx">${esc(nameOf(r))}</span>${r.card && r.owes > 0.5 ? `<span class="xnote">owes ${eur0.format(r.owes)}</span>` : ''}${outNote(r)}</span><span class="n a">${cell(r.assigned)}</span><span class="n c">${cell(r.activity)}</span><span class="pill av ${cls}" ${r.card && r.owes != null ? `title="Set aside ${eur.format(r.available)} of the ${eur.format(r.owes)} the card owes"` : ''}>${m0(r.available)}</span>${bar(r)}</div>`; };
   const noneRow = r => `<div class="ybr env" data-envcats role="button" tabindex="0" title="Spending in no envelope: tap to put it in one"><span class="nm"><span class="tx">${esc(r.name)}</span></span><span class="n a"><span class="z">–</span></span><span class="n c">${cell(r.activity)}</span><span class="pill av neg">${m0(r.available)}</span></div>`;
   const head = (g, label, info) => `<summary><div class="ybr"><span class="nm">${label}${info ? `<button class="ib" type="button" data-envinfo aria-label="What is this?" title="${esc(info)}">?</button>` : ''}</span><span class="n a">${cell(g.assigned)}</span><span class="n c">${cell(g.activity)}</span><span class="n">${m0(g.available)}</span></div></summary>${info ? `<p class="ginfo" hidden>${info}</p>` : ''}`;
-  const grp = g => {
+// Each category in its own colour, so they tell apart at a glance: your categories take the chart colours in a fixed
+// order (by their place in your list, so a colour stays with its category; the order is the charts' validated one,
+// told apart also with colour blindness, skipping the green that means "left"); Credit Card Payments, Travel per trip
+// and Savings made for you are grey. The name is always written next to it, so colour is never the only cue.
+  const GC = ['--s1', '--s2', '--s3', '--s4', '--s5', '--s7'], gidx = new Map((cfg.groups || []).map((x, i) => [x.id, i]));
+  const gcol = g => g.none ? 'var(--danger)' : g.gid && gidx.has(g.gid) && gidx.get(g.gid) < GC.length ? `var(${GC[gidx.get(g.gid)]})` : 'var(--s8)';
+  const grp = g => { const h = grp0(g); return h.replace('<details class="ybg"', `<details class="ybg gc" style="--gc:${gcol(g)}"`).replace('<summary><div class="ybr"><span class="nm">', '<summary><div class="ybr"><span class="nm"><i class="gdot" aria-hidden="true"></i>'); };
+  const grp0 = g => {
     if (g.cards) return `<details class="ybg" open>${head(g, 'Credit Card Payments', 'Money set aside to pay each card. Buying with a card moves the money here from its category; paying the card takes it out. Amber: less set aside than the card owes.')}${g.rows.map(row).join('')}</details>`;
     if (g.empty) return `<p class="muted" style="margin:10px 0 0;font-size:13px">No categories yet. <button class="linkbtn" type="button" data-envcats>Create your categories</button></p>`;
     if (g.group === 'Travel' && !g.gid){
@@ -8051,8 +8072,33 @@ setInterval(() => { if (state.user) renderBadge(); }, 5 * 60e3);
 // --- viewing ---
 const fmtDT = s => s ? shortDate(s.slice(0, 10)) + (s.length > 10 ? ' ' + s.slice(11, 16) : '') : '';
 const wday = d => new Date(d.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-IE', { weekday: 'short' });
+// A flight's departure time: the booking's own, else the scheduled time from the flight data (at the airport it leaves).
+function depHM(b){
+  if (b.start && b.start.length > 10) return b.start.slice(11, 16);
+  const st = b.type === 'flight' && state.flightStatus[b.id]; return st?.sched ? tzHM(st.sched, st.fromTz) : '';
+}
+// A flight saved without its departure time (a boarding pass PDF often has only the date): look the schedule up once
+// (one flight-data lookup) and save the time on the booking, so it shows everywhere.
+async function lookupDep(b, manual){
+  const key = b.id + '|' + (b.start || ''), tried = lsGet('depTried', []);
+  if (!manual && tried.includes(key)) return; lsSet('depTried', [...tried.slice(-40), key]);
+  try {
+    const r = await api('/api/flight-check', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ bookingId: b.id, force: !!manual }) });
+    const j = await r.json(); if (!r.ok || !j.sched){ if (manual) toast(j.error || 'The flight data has no departure time for it yet.'); return; }
+    const day = new Date(j.sched).toLocaleDateString('en-CA', { timeZone: j.fromTz || undefined }), hm = tzHM(j.sched, j.fromTz);
+    const cur = state.bookings.find(x => x.id === b.id);
+    if (cur && day === String(cur.start || '').slice(0, 10) && !(cur.start || '').includes('T')){
+      await setDoc(doc(fs, 'bookings', b.id), pickDoc(BK_KEYS, cur, { start: day + 'T' + hm, updatedBy: usernameOf(state.user) }));
+      if (manual) toast(`${cur.number || 'The flight'} leaves at ${hm}`);
+    } else if (manual) toast(`Leaves ${hm}` + (day !== String(cur?.start || '').slice(0, 10) ? ` on ${shortDate(day)}: check the booking’s date` : ''));
+  } catch (x){ if (manual) toast(x.message); }
+}
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-deplook]'); if (!b) return; e.preventDefault(); e.stopPropagation();
+  const bk = state.bookings.find(x => x.id === b.dataset.deplook); if (!bk) return; b.disabled = true; b.textContent = 'Looking it up…'; lookupDep(bk, true).finally(() => { b.disabled = false; b.textContent = 'Look it up'; }); }, true);
 function bkWhen(b){
   if (!b.start) return '';
+  if (b.type === 'flight' && b.start.length <= 10){ const d = depHM(b);
+    return wday(b.start) + ' ' + fmtDT(b.start) + (d ? ', leaves ' + d + ' (flight data)' : ', departure time not saved') + (b.end && b.end.length > 10 && b.end.slice(0, 10) === b.start ? ', lands ' + b.end.slice(11, 16) : b.end ? ' → ' + wday(b.end) + ' ' + fmtDT(b.end) : ''); }
   if (!b.end) return wday(b.start) + ' ' + fmtDT(b.start);
   if (b.end.slice(0, 10) === b.start.slice(0, 10)) return wday(b.start) + ' ' + fmtDT(b.start) + (b.end.length > 10 ? '–' + b.end.slice(11, 16) : '');
   return wday(b.start) + ' ' + fmtDT(b.start) + ' → ' + wday(b.end) + ' ' + fmtDT(b.end);
@@ -8074,10 +8120,10 @@ function bkItinerary(list, { dayLabels = true, from = '', to = '9999' } = {}){
   for (const e of ev){
     const d = e.at === '9999' ? 'No date' : e.at.slice(0, 10), b = e.b;
     if (dayLabels && d !== day){ day = d; out += `<div class="day">${d === 'No date' ? d : new Date(d + 'T12:00:00').toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'short' })}${d === td ? ' · today' : d === addDays(td, 1) ? ' · tomorrow' : ''}</div>`; }
-    const tm = e.at.length > 10 ? e.at.slice(11, 16) : '';
+    const tm = e.at.length > 10 ? e.at.slice(11, 16) : !e.co && b.type === 'flight' ? depHM(b) : '';
     const title = e.co ? (b.type === 'hotel' ? 'Check out · ' : 'Return car · ') + esc(b.title) : (b.type === 'hotel' ? 'Check in · ' : '') + esc(b.title);
     const route = b.from && b.to && !b.title.includes(bkCity(b.to)) ? esc(b.from) + ' → ' + esc(b.to) : '';
-    const sub = e.co ? esc(b.address || b.ref || '') : [route, !['hotel','car'].includes(b.type) && b.end && b.end.length > 10 ? 'arr ' + b.end.slice(11, 16) : '', b.seat ? esc(seatTxt(b.seat)) : '', b.type === 'hotel' ? esc(b.address || '') : '', b.ref ? esc(b.ref) : ''].filter(Boolean).join(' · ');
+    const sub = e.co ? esc(b.address || b.ref || '') : [route, !['hotel','car'].includes(b.type) && b.end && b.end.length > 10 ? 'lands ' + b.end.slice(11, 16) + (b.type === 'flight' && !tm && !e.co ? ' · no departure time saved' : '') : '', b.seat ? esc(seatTxt(b.seat)) : '', b.type === 'hotel' ? esc(b.address || '') : '', b.ref ? esc(b.ref) : ''].filter(Boolean).join(' · ');
     out += `<button type="button" class="bk ${d < td ? 'past' : ''} ${e.co ? 'co' : ''}" data-bkopen="${esc(b.id)}"><span class="tm">${dayLabels ? tm : (d === td ? 'Today' : d === addDays(td, 1) ? 'Tmrw' : shortDate(d)) + (tm ? '<br>' + tm : '')}</span><span class="ic" aria-hidden="true">${(BK_TYPES[b.type] || BK_TYPES.other)[0]}</span><span class="ti">${title}<span class="sub">${sub || '&nbsp;'}</span></span>${!e.co && (b.codes || []).length ? `<span class="chip">${b.type === 'flight' ? 'Boarding pass' : 'Ticket'}</span>` : !e.co && b.fileId ? '<span class="chip">PDF</span>' : '<span></span>'}</button>`;
   }
   return out;
@@ -8641,8 +8687,10 @@ function renderNextUp(){
   const shown = new Set();
   const acts = flights.map(b => {
     const who = bkWho(b), mine = !who.size || who.has(me), st = flightLine(b), codes = myCodes(b);
-    const route = b.from && b.to ? ` · ${esc(placeCode(b.from))} → ${esc(placeCode(b.to))}` : '', arr = b.end && b.end.length > 10 ? ' · arr ' + b.end.slice(11, 16) : '';
-    const label = `<strong>${esc(b.number || b.title)}</strong> ${when(b)}${route}${arr}`;
+    const route = b.from && b.to ? ` · ${esc(placeCode(b.from))} → ${esc(placeCode(b.to))}` : '', arr = b.end && b.end.length > 10 ? ', lands ' + b.end.slice(11, 16) : '';
+    const dep = depHM(b), day = b.start.slice(0, 10) === td ? 'today' : b.start.slice(0, 10) === addDays(td, 1) ? 'tomorrow' : wday(b.start);
+    if (!dep) lookupDep(b);
+    const label = `<strong>${esc(b.number || b.title)}</strong> ${day}${dep ? ', leaves ' + dep : ''}${arr}${route}${dep ? '' : ` · <button class="linkbtn" type="button" data-deplook="${esc(b.id)}">departure time?</button>`}`;
     shown.add(b.id);
     if (!mine) return `<div class="bkact"><span>${esc([...who].join(' & '))}’s flight ${label}${st ? '<br>' + st : ''}</span><button class="btn small" type="button" data-bkopen="${esc(b.id)}">Details</button></div>`;
     if (codes.length) return `<div class="bkact"><span data-bkopen="${esc(b.id)}" role="button" tabindex="0" style="cursor:pointer" title="Details">${label}${b.seat ? ' · ' + esc(seatTxt(b.seat)) : ''}${st ? '<br>' + st : ''}</span><button class="btn primary" type="button" data-bkpass="${esc(b.id)}">Show boarding pass</button></div>`;
