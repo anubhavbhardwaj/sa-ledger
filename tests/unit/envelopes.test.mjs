@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ccKey, CC_UNKNOWN, norm, spendingStats, budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
+import { ccKey, CC_UNKNOWN, norm, spendingStats, budgetMonth, committedBy, SAVE_A, SAVE_S, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, tripKey, SAVE_KEY, NONE_KEY, monthsBetween, srcLabel } from '../../public/envelopes.js';
 
 const cfg = () => ({ start: '2026-10-10', accounts: ['Deutsche Bank', 'Wise Common', 'Wise Sulekha', 'DB Card', 'IDFC Card'], opening: 2000, trips: true,
   groups: [
@@ -145,4 +145,24 @@ test('envelopes: assigning in a later month (YNAB) takes it from Ready to Assign
   // Money in a deleted envelope's future plan doesn't count.
   c.assigned = setAssigned(c, '2026-11', 'gone', 99);
   assert.equal(budgetMonth(c, '2026-10', d).future, 1050);
+});
+
+test('envelopes: whose money each envelope is; savings per account owner; what is still set aside for each of you', () => {
+  const c = cfg();
+  c.groups[0].envs[0].split = { Anubhav: 860, Sulekha: 900 };   // Rent
+  c.groups[1].envs[1].owner = 'Sulekha';                        // Bakery
+  c.groups.push({ id: 'g3', name: 'Life', envs: [{ id: 'wed', name: 'Wedding', src: ['Wedding'], owner: 'Anubhav' }] });
+  const owners = { 'Deutsche Bank': 'Anubhav', 'Wise Sulekha': 'Sulekha', 'Wise Common': 'Shared', 'DB Card': 'Anubhav' };
+  const acc = n => owners[n] ? { name: n, owner: owners[n], type: /Card/.test(n) ? 'card' : 'bank' } : null;
+  const transfers = [...data.transfers, { date: '2026-10-18', amount: 100, from: 'Wise Sulekha', to: 'Fineco' }, { date: '2026-10-19', amount: 50, from: 'Wise Common', to: 'Fineco' }];
+  c.assigned = { '2026-10': { rent: 1760, food: 400, bakery: 30, wed: 1000, [SAVE_A]: 600, [SAVE_S]: 100 }, '2026-11': { wed: 200 } };
+  const d = { ...data, transfers, acc, now: '2026-10' }, oct = budgetMonth(c, '2026-10', d), by = Object.fromEntries(oct.rows.map(r => [r.key, r]));
+  assert.deepEqual([by[SAVE_A].activity, by[SAVE_S].activity, by[SAVE_KEY].activity], [-500, -100, -50], 'each from the account it left');
+  assert.equal(by[SAVE_A].name, 'Investing & India · Anubhav');
+  assert.deepEqual(groupRows(c, oct.rows).find(g => g.group === 'Savings').rows.map(r => r.key), [SAVE_A, SAVE_S, SAVE_KEY]);
+  assert.deepEqual(oct.futureBy, { wed: 200 });
+  const W = committedBy(c, oct.rows, { futureBy: oct.futureBy, tripOwner: id => id === 'rome' ? 'Anubhav' : 'Both' });
+  // Rent 1760 not paid yet in October: 860 / 900. Wedding 1000 + 200 planned for November. Savings left 100 (A), 0 (S).
+  // Food 210 left → Both. Bakery 30 − 15 = 15 → Sulekha. Rome trip overspent → nothing. Card envelope and Not assigned left out.
+  assert.deepEqual(W, { Anubhav: 860 + 1200 + 100, Sulekha: 900 + 15, Both: 210 });
 });

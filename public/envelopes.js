@@ -12,7 +12,8 @@
 //   (a transfer, or a bill logged as spending in a category like "Credit Card") comes out of the card's envelope.
 //   Debt from before the start isn't taken off Ready to Assign: it shows on the card's envelope, to be given money;
 // - money moved from a budget account to any other account (investing, sending to India) is Activity in
-//   Savings › Investing & India; moves between budget cash accounts change nothing;
+//   Savings › Investing & India, one envelope per owner of the account it leaves (Anubhav, Sulekha, Common);
+//   moves between budget cash accounts change nothing;
 // - with trips on, spending on a trip goes to that trip's envelope under Travel;
 // - like YNAB, an envelope that ends a month overspent starts the next one at zero and the overspending comes out of
 //   that month's Ready to Assign.
@@ -20,12 +21,23 @@
 // Spending in envelope categories paid from an account outside the budget isn't counted, but it's reported (outside),
 // so it doesn't vanish silently; accounts in cfg.excluded are left out of that report on purpose.
 //
-// cfg = { start, accounts: [names], excluded: [names], opening, trips, groups: [{ id, name, envs: [{ id, name, src: ['Cat', 'Cat›Sub'] }] }],
+// Each envelope has an owner, whose money it is: 'Anubhav', 'Sulekha' or 'Both' (the common money, the default), or a
+// split by fixed amounts (Rent: { Anubhav: 860, Sulekha: 900 }). It doesn't change the budget; it tells each of you
+// how much of your balance is still set aside (committedBy).
+//
+// cfg = { start, accounts: [names], excluded: [names], opening, trips,
+//         groups: [{ id, name, envs: [{ id, name, src: ['Cat', 'Cat›Sub'], owner?: 'Anubhav'|'Sulekha'|'Both', split?: { Anubhav: €, Sulekha: € } }] }],
 //         assigned: { 'YYYY-MM': { envId: € } }, targets: { envId: € } }
 
 const r2 = v => Math.round(v * 100) / 100;
 export const SEP = '›';
 export const SAVE_KEY = 's_save', NONE_KEY = 'u_none', CC_UNKNOWN = 'cc_unknown';
+// Savings per owner of the account the money leaves: yours, Sulekha's, and the common one (SAVE_KEY).
+export const SAVE_A = 's_save_anubhav', SAVE_S = 's_save_sulekha';
+export const PEOPLE = ['Anubhav', 'Sulekha'];
+export const saveKeyOf = owner => owner === 'Anubhav' ? SAVE_A : owner === 'Sulekha' ? SAVE_S : SAVE_KEY;
+export const isSaveKey = k => k === SAVE_KEY || k === SAVE_A || k === SAVE_S;
+const saveOwner = k => k === SAVE_A ? 'Anubhav' : k === SAVE_S ? 'Sulekha' : 'Both';
 export const ccKey = name => 'cc_' + norm(name).replace(/[^a-z0-9]+/g, '-');
 // Card bills logged as spending: a category or subcategory like "Credit Card", "Kreditkarte", "Card payment".
 export const CC_RE = /credit\s*card|kreditkarte|card\s*(bill|payment)|carta di credito|cc bill/i;
@@ -40,7 +52,7 @@ export const monthsBetween = (a, b) => { const out = []; let [y, m] = a.split('-
 
 export function makeBudget(cfg, acc = () => null){
   const idx = new Map(), info = new Map();
-  (cfg.groups || []).forEach(g => (g.envs || []).forEach(e => { info.set(e.id, { group: g.name, name: e.name, gid: g.id });
+  (cfg.groups || []).forEach(g => (g.envs || []).forEach(e => { info.set(e.id, { group: g.name, name: e.name, gid: g.id, owner: PEOPLE.includes(e.owner) ? e.owner : 'Both', ...(splitOf(e) ? { split: splitOf(e) } : {}) });
     (e.src || []).forEach(s => { if (!idx.has(norm(s))) idx.set(norm(s), e.id); }); }));
   const inB = new Set((cfg.accounts || []).map(a => String(a).toLowerCase()));
   const isB = name => inB.has(String(name || '').toLowerCase());
@@ -58,7 +70,7 @@ export function makeBudget(cfg, acc = () => null){
   const isBill = e => !isCard(e.account) && (CC_RE.test(e.category || '') || CC_RE.test(e.subcategory || ''));
   const keyFor = e => cfg.trips !== false && e.tripId ? tripKey(e.tripId)
     : idx.get(norm(srcOf(e.category, e.subcategory))) || idx.get(norm(srcOf(e.category))) || NONE_KEY;
-  const describe = k => k === SAVE_KEY ? { group: 'Savings', name: 'Investing & India', save: true }
+  const describe = k => isSaveKey(k) ? { group: 'Savings', name: { [SAVE_A]: 'Investing & India · Anubhav', [SAVE_S]: 'Investing & India · Sulekha' }[k] || 'Investing & India · Common', save: true, owner: saveOwner(k) }
     : k === CC_UNKNOWN ? { group: 'Credit Card Payments', name: 'Card payments (card not recognised)', card: true }
     : k.startsWith('cc_') ? (cardName.has(k) ? { group: 'Credit Card Payments', name: cardName.get(k), card: true, account: cardName.get(k) } : null)
     : k === NONE_KEY ? { group: 'Not assigned', name: 'Spending in no envelope', none: true }
@@ -94,7 +106,7 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
     const f = isB(t.from), to = isB(t.to), m = t.date.slice(0, 7), v = +t.amount || 0;
     if (f && isCard(t.from)) add(m, ccKey(t.from), v);       // money taken from a card (cash advance, balance transfer)
     if (to && isCard(t.to)) add(m, ccKey(t.to), -v);         // a payment to a card
-    if (f && !to) add(m, SAVE_KEY, -v); else if (!f && to) inflow[m] = (inflow[m] || 0) + v;
+    if (f && !to) add(m, saveKeyOf(acc(t.from)?.owner), -v); else if (!f && to) inflow[m] = (inflow[m] || 0) + v;
   });
   // Money assigned to an envelope that has since been deleted goes back to Ready to Assign.
   const known = k => !!describe(k);
@@ -116,9 +128,11 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
   }
   // YNAB: money assigned in a later month is already spoken for, so this month (and any month ahead of it) shows Ready to
   // Assign without it; otherwise the same euros could be assigned twice. Past months stay as they were at their end.
-  const future = month >= now ? r2(Object.entries(cfg.assigned || {}).filter(([m]) => m > month)
-    .reduce((s, [, a]) => s + Object.entries(a || {}).filter(([k]) => known(k)).reduce((x, [, v]) => x + (+v || 0), 0), 0)) : 0;
-  return { ready: r2(ready - future), future, opening: r2(opening), cardDebt, ...out };
+  const futureBy = {};
+  if (month >= now) Object.entries(cfg.assigned || {}).filter(([m]) => m > month).forEach(([, a]) => Object.entries(a || {}).filter(([k]) => known(k))
+    .forEach(([k, v]) => { futureBy[k] = r2((futureBy[k] || 0) + (+v || 0)); }));
+  const future = r2(Object.values(futureBy).reduce((s, v) => s + v, 0));
+  return { ready: r2(ready - future), future, futureBy, opening: r2(opening), cardDebt, ...out };
 }
 
 // Rows in your order: your categories as you arranged them, then Travel and Savings; Not assigned first when it has
@@ -132,8 +146,31 @@ export function groupRows(cfg, rows){
   const cc = rows.filter(r => r.key.startsWith('cc_')); if (cc.length) out.push(pack('Credit Card Payments', cc, { cards: true }));
   (cfg.groups || []).forEach(g => out.push(pack(g.name, (g.envs || []).map(e => by.get(e.id)).filter(Boolean), { gid: g.id })));
   const trips = rows.filter(r => r.key.startsWith('t_')); if (trips.length) out.push(pack('Travel', trips));
-  const save = by.get(SAVE_KEY); if (save) out.push(pack('Savings', [save]));
+  const save = [SAVE_A, SAVE_S, SAVE_KEY].map(k => by.get(k)).filter(Boolean); if (save.length) out.push(pack('Savings', save));
   return out;
+}
+
+// A split envelope's fixed amounts ({ Anubhav: 860, Sulekha: 900 }), or null.
+export function splitOf(e){
+  const s = e && e.split; if (!s) return null;
+  const o = Object.fromEntries(PEOPLE.map(p => [p, Math.max(0, +s[p] || 0)]));
+  return o.Anubhav + o.Sulekha > 0 ? o : null;
+}
+// How much of each one's money is still set aside: what's available in the envelopes each owns (Both → the common
+// money), plus what's assigned to them in later months (futureBy). A split envelope is shared out by its fixed
+// amounts. Card envelopes are left out (what a card owes is already taken off its owner's balance) and so is Not
+// assigned; an overspent envelope holds nothing. tripOwner(tripId) → 'Anubhav' | 'Sulekha' | 'Both'.
+export function committedBy(cfg, rows, { futureBy = {}, tripOwner = () => 'Both' } = {}){
+  const { describe } = makeBudget(cfg), out = { Anubhav: 0, Sulekha: 0, Both: 0 };
+  const byKey = new Map(rows.map(r => [r.key, r]));
+  for (const k of new Set([...byKey.keys(), ...Object.keys(futureBy)])){
+    if (k.startsWith('cc_') || k === NONE_KEY) continue;
+    const v = Math.max(0, byKey.get(k)?.available || 0) + (+futureBy[k] || 0); if (!(v > 0)) continue;
+    const d = k.startsWith('t_') ? { owner: tripOwner(k.slice(2)) } : describe(k); if (!d) continue;
+    if (d.split){ const t = d.split.Anubhav + d.split.Sulekha; PEOPLE.forEach(p => { out[p] += v * d.split[p] / t; }); continue; }
+    const o = PEOPLE.includes(d.owner) ? d.owner : 'Both'; out[o] += v;
+  }
+  return { Anubhav: r2(out.Anubhav), Sulekha: r2(out.Sulekha), Both: r2(out.Both) };
 }
 
 // Spending on the budget accounts by source (category, or category › subcategory) that no envelope covers yet, largest first.

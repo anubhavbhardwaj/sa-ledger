@@ -630,7 +630,7 @@ test('envelopes: your own categories (Fixed, Flexible) and envelopes fed by chos
   assert.match(t, /Credit Card Payments.*DB Card owes €280\s*€0\s*€80\.00\s*€80\.00/, 'groceries bought on the card moved to its envelope');
   assert.match(t, /Not assigned.*Spending in no envelope\s*—\s*−€30\.00/, 'Magazines has no envelope; HDFC spending left out');
   assert.match(t, /Fixed.*Rent\s*€0\s*−€800\.00\s*−€800\.00.*Flexible.*Food\s*€0\s*−€200\.00\s*−€200\.00/);
-  assert.match(t, /Savings.*Investing & India\s*€0\s*−€200\.00/);
+  assert.match(t, /Savings.*Investing & India · Anubhav\s*€0\s*−€200\.00/, 'from Deutsche Bank, his');
   await page.click('[data-envtargets]'); await page.waitForTimeout(200);
   assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€3,500\.00.*Rent\s*€800\s*−€800\.00\s*€0\.00/);
   const food = await page.$eval('.ybr.env:has-text("Food")', el => el.dataset.envkey);
@@ -709,7 +709,7 @@ test('envelopes: cover overspending from another envelope, YNAB-style; Savings l
   await page.click('[data-envkey="tr"]'); await page.click('#eaCover [data-cover="food"]'); await page.waitForTimeout(250);
   t = await app.text('#budgetPanel');
   assert.match(t, /Transportation\s*€240\s*−€240\.00\s*€0\.00/); assert.match(t, /Groceries\s*€260\s*€0\s*€260\.00/);
-  await page.click('[data-envkey="s_save"]'); await page.waitForSelector('#envAsgDlg[open]');
+  await page.click('[data-envkey="s_save_anubhav"]'); await page.waitForSelector('#envAsgDlg[open]');
   assert.match(await app.text('#eaActs'), /To Scalable\s*from Deutsche Bank · ETF\s*€500\.00/);
   await clean(app);
 });
@@ -940,18 +940,34 @@ test('envelopes: plan ahead like YNAB: assign in next month, Ready to Assign now
   await clean(app);
 });
 
-test('envelopes: Ready to Assign shows where each of you stands (own budget accounts, bank minus cards) and the common accounts', async () => {
-  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString(), td = d(0);
+test('envelopes: Ready to Assign shows where each of you stands and what is left after the envelopes each one owns (rent split 860 / 900)', async () => {
+  const app = await openApp(), { page } = app, m = month(0), nx = month(1), now = new Date().toISOString(), td = d(0);
   await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, ws: { name: 'Wise Sulekha', type: 'bank', currency: 'EUR', owner: 'Sulekha' },
       wc: { name: 'Wise Common', type: 'bank', currency: 'EUR', owner: 'Shared' }, amex: { name: 'AMEX', type: 'card', currency: 'EUR', owner: 'Anubhav' },
       nre: { name: 'HDFC NRE', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
     checkins: { a: { accountId: 'db', date: td, balance: 4120, createdAt: now }, b: { accountId: 'ws', date: td, balance: 2850, createdAt: now },
       c: { accountId: 'wc', date: td, balance: 1340, createdAt: now }, e: { accountId: 'amex', date: td, balance: -302, createdAt: now }, f: { accountId: 'nre', date: td, balance: 9000, createdAt: now } },
-    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank', 'Wise Sulekha', 'Wise Common', 'AMEX'], opening: 0, groups: [], assigned: {}, updatedAt: now } } });
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank', 'Wise Sulekha', 'Wise Common', 'AMEX'], opening: 0, updatedAt: now,
+      groups: [{ id: 'g1', name: 'Fixed', envs: [{ id: 'rent', name: 'Rent', src: ['Rent'], split: { Anubhav: 860, Sulekha: 900 } }] },
+        { id: 'g2', name: 'Flexible', envs: [{ id: 'food', name: 'Groceries', src: ['Groceries'] }, { id: 'wed', name: 'Wedding', src: ['Wedding'], owner: 'Anubhav' }] }],
+      assigned: { [m]: { rent: 1760, food: 300, wed: 1000 }, [nx]: { wed: 200 } } } } });
   await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(200);
   assert.match(await app.text('.rta .rwl'), /Where you stand today/);
-  assert.equal(await app.text('[data-envwho="Anubhav"]'), 'Anubhav€3,818bank €4,120 − cards €302', 'HDFC NRE is outside the budget');
-  assert.equal(await app.text('[data-envwho="Sulekha"]'), 'Sulekha€2,850bank €2,850', 'Wise Common not in hers');
-  assert.equal(await app.text('[data-envwho="Shared"]'), 'Common€1,340bank €1,340', 'Wise Common on its own');
+  // Anubhav: 3,818 (HDFC NRE is outside the budget) − rent 860 − wedding 1,000 and 200 planned for next month.
+  assert.equal(await app.text('[data-envwho="Anubhav"]'), 'Anubhav€3,818bank €4,120 − cards €302≈ €1,758 leftafter €2,060 in envelopes');
+  assert.equal(await app.text('[data-envwho="Sulekha"]'), 'Sulekha€2,850bank €2,850≈ €1,950 leftafter €900 in envelopes', 'her part of the rent');
+  assert.equal(await app.text('[data-envwho="Shared"]'), 'Common€1,340bank €1,340≈ €1,040 leftafter €300 in envelopes', 'groceries are common money');
+  const t = await app.text('#budgetPanel'); assert.match(t, /Rent €860 \/ €900/); assert.match(t, /Wedding Anubhav/);
+  // Groceries becomes Sulekha's in Categories.
+  await page.click('[data-envcats]'); await page.waitForSelector('#envCatDlg[open]');
+  await page.selectOption('[data-ecown="1.0"]', 'Sulekha'); await page.click('#envCatForm [type=submit]'); await page.waitForTimeout(300);
+  assert.match(await app.text('[data-envwho="Sulekha"]'), /≈ €1,650 leftafter €1,200 in envelopes/);
+  assert.match(await app.text('[data-envwho="Shared"]'), /≈ €1,340 leftafter €0 in envelopes/);
+  // A split needs its amounts.
+  await page.click('[data-envcats]'); await page.waitForSelector('#envCatDlg[open]');
+  await page.selectOption('[data-ecown="1.1"]', 'split'); await page.click('#envCatForm [type=submit]'); await page.waitForTimeout(150);
+  assert.match(await app.text('#ecErr'), /Give Wedding the amounts to split/);
+  await page.fill('[data-ecsplit="1.1.Anubhav"]', '600'); await page.fill('[data-ecsplit="1.1.Sulekha"]', '400'); await page.click('#envCatForm [type=submit]'); await page.waitForTimeout(300);
+  assert.match(await app.text('[data-envwho="Anubhav"]'), /after €1,580 in envelopes/, '860 + 60% of 1,200');
   await clean(app);
 });
