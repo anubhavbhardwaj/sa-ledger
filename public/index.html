@@ -170,6 +170,10 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .avatar[aria-expanded="true"]{box-shadow:0 0 0 3px var(--accent-soft)}
 .pmenu{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:250px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:grid}
 .pmenu[hidden]{display:none!important}
+.envnav{display:flex;align-items:center;gap:6px;margin:0}
+.envnav .navb{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
+.envnav .navb[disabled]{opacity:.35;cursor:default}
+.rta .sub strong.fut{font:inherit;font-weight:600;color:var(--ink-2)}
 .rta{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:var(--sunk)}.rta strong{font-family:var(--f-mono);font-size:22px}
 .rta.pos{background:color-mix(in srgb,var(--good) 16%,var(--surface))}.rta.neg{background:color-mix(in srgb,var(--danger) 14%,var(--surface))}.rta .sub{flex-basis:100%;font-size:12px;color:var(--muted)}
 .ybud{display:grid}.ybh,.ybr{display:grid;grid-template-columns:minmax(0,1fr) 84px 84px 96px;gap:8px;align-items:center;padding:7px 4px}.ybh{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line)}
@@ -684,6 +688,7 @@ label.inl{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 
 .months{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;cursor:pointer;white-space:nowrap;font-size:13px;color:var(--ink-2)}
+.chip.ahead{border-style:dashed}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
 
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -1908,7 +1913,8 @@ window.addEventListener('hashchange', route);
 // ---------- render ----------
 function render(){
   if (!state.user) return;
-  const ms = monthsPresent();
+  let ms = monthsPresent();
+  if (state.page === 'budget' && ENVELOPES && envOn()) ms = [...new Set([...ms, ...envFutureMonths()])].sort();
   if (!state.period || (state.period !== 'all' && !ms.includes(state.period))){
     const cur = today().slice(0,7);
     state.period = ms.includes(cur) ? cur : (ms[ms.length-1] || cur);
@@ -1930,7 +1936,8 @@ function renderMonths(ms){
   const all = [...new Set([...ms, state.period].filter(p => p && p !== 'all'))].sort();
   const opts = all.reverse().map(m => [m, monthLabel(m)]);
   opts.push(['all','All time']);
-  $('#months').innerHTML = opts.map(([v,l]) => `<button class="chip" type="button" data-p="${v}" aria-pressed="${state.period===v}">${l}</button>`).join('');
+  const cm = thisMonth();
+  $('#months').innerHTML = opts.map(([v,l]) => `<button class="chip${v !== 'all' && v > cm ? ' ahead' : ''}" type="button" data-p="${v}" aria-pressed="${state.period===v}" ${v !== 'all' && v > cm ? 'title="Plan ahead"' : ''}>${l}</button>`).join('');
 }
 
 // Overview ignores bar filters: it is the unfiltered picture of the chosen period.
@@ -3718,7 +3725,17 @@ function goalEmergency(g){
 // (envelopes.js); the budgets stay saved.
 const ENVELOPES = true;
 const envOn = () => !!state.envCfg?.accounts?.length;
-const envData = () => ({ items: state.items, income: state.income, transfers: state.transfers, acc: accOf });
+const envData = () => ({ items: state.items, income: state.income, transfers: state.transfers, acc: accOf, now: thisMonth() });
+// Months ahead you can plan on the Budget page (YNAB): next month, any month with money assigned, and the one you stepped to,
+// up to a year ahead.
+const ENV_AHEAD = 12;
+function envFutureMonths(){
+  const cm = thisMonth(), next = addMonth(cm, 1), lim = addMonth(cm, ENV_AHEAD);
+  const used = Object.entries(state.envCfg?.assigned || {}).filter(([m, a]) => m > cm && m <= lim && Object.keys(a || {}).length).map(([m]) => m);
+  const sel = state.period && state.period !== 'all' && state.period > cm && state.period <= lim ? [state.period] : [];
+  const end = [next, ...used, ...sel].sort().pop();
+  return monthsBetween(next, end);
+}
 const envMonthSel = () => state.period === 'all' ? thisMonth() : state.period;
 const envName = r => r.tripId ? (state.tripMap?.[r.tripId]?.name || 'Trip') : r.name;
 // All your envelopes (also empty ones), upcoming trips and Savings, on top of the ones with numbers this month.
@@ -3747,7 +3764,7 @@ function envKpi(){
   const B = budgetMonth(state.envCfg, envMonthSel(), envData());
   if (B.before) return `<div class="kpi"><span class="lbl">Ready to assign</span><span class="val">—</span><span class="sub">Envelopes start ${shortDate(state.envCfg.start, true)}</span></div>`;
   const over = B.rows.filter(r => r.available < -0.004).length;
-  return `<a class="kpi kpilink" href="#budget"><span class="lbl">Ready to assign</span><span class="val ${B.ready < -0.004 ? 'neg' : ''}">${signedEur(B.ready)}</span><span class="sub">${B.ready < -0.004 ? 'Assigned more than you have' : B.ready > 0.004 ? 'Give it a job' : 'Every euro has a job'}${over ? ` · <span class="neg">${over} overspent</span>` : ''} · Budget →</span></a>`;
+  return `<a class="kpi kpilink" href="#budget"><span class="lbl">Ready to assign</span><span class="val ${B.ready < -0.004 ? 'neg' : ''}">${signedEur(B.ready)}</span><span class="sub">${B.ready < -0.004 ? 'Assigned more than you have' : B.ready > 0.004 ? 'Give it a job' : 'Every euro has a job'}${over ? ` · <span class="neg">${over} overspent</span>` : ''}${B.future ? ` · ${eur0.format(B.future)} set for later months` : ''} · Budget →</span></a>`;
 }
 function renderEnvelopes(el){
   const m = envMonthSel(), cfg = state.envCfg;
@@ -3777,10 +3794,12 @@ function renderEnvelopes(el){
     if (g.group === 'Travel' && !g.gid) return `<details class="ybg" ${g.rows.some(r => r.activity) ? 'open' : ''}><summary><div class="ybr"><span class="nm">Travel <span class="muted" style="font-weight:400">(one per trip)</span></span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>
       <p class="muted" style="margin:6px 4px;font-size:12.5px">Trip spending is kept per trip here. <button class="linkbtn" type="button" data-envnotrips>Use my categories instead</button></p>${g.rows.map(row).join('')}</details>`;
     if (g.none) return `<details class="ybg" open><summary><div class="ybr"><span class="nm" style="color:var(--danger)">Not assigned</span><span class="n a"></span><span class="n c">${signedEur(g.activity)}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(noneRow).join('')}</details>`;
-    const hot = g.rows.some(r => r.available < -0.004 || r.activity || r.assigned) || !g.rows.length;
+    const hot = g.rows.some(r => Math.abs(r.available) > 0.004 || r.activity || r.assigned) || !g.rows.length || m > thisMonth();
     return `<details class="ybg" ${hot ? 'open' : ''}><summary><div class="ybr"><span class="nm">${esc(g.group)}</span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(row).join('')}</details>`; };
-  el.innerHTML = `<header><h2>Envelopes · ${monthLabel(m)}</h2><span class="right">${toFill ? `<button class="btn primary small" type="button" data-envtargets>Assign ${toFill} target${toFill === 1 ? '' : 's'}</button>` : ''}<button class="btn small" type="button" data-envmove>Move</button><button class="btn ghost small" type="button" data-envcats>Categories</button><button class="btn ghost small" type="button" data-envsetup>Settings</button></span></header>
-    <div class="rta ${B.ready > 0.004 ? 'pos' : B.ready < -0.004 ? 'neg' : ''}"><span>Ready to Assign</span><strong>${signedEur(B.ready)}</strong><span class="sub">${monthLabel(m)}: ${eur0.format(B.inflow)} came in · ${eur0.format(B.assigned)} assigned${B.overspentLast ? ` · ${eur0.format(B.overspentLast)} overspent last month` : ''}. Tap an envelope to assign money.</span></div>
+  const cm = thisMonth(), ahead = m > cm, canNext = m < addMonth(cm, ENV_AHEAD), canPrev = m > cfg.start.slice(0, 7);
+  el.innerHTML = `<header><h2 class="envnav"><button class="navb" type="button" data-envnav="-1" aria-label="Previous month" ${canPrev ? '' : 'disabled'}>‹</button><span>Envelopes · ${monthLabel(m)}</span><button class="navb" type="button" data-envnav="1" aria-label="Next month" ${canNext ? '' : 'disabled'}>›</button></h2><span class="right">${toFill ? `<button class="btn primary small" type="button" data-envtargets>Assign ${toFill} target${toFill === 1 ? '' : 's'}</button>` : ''}<button class="btn small" type="button" data-envmove>Move</button><button class="btn ghost small" type="button" data-envcats>Categories</button><button class="btn ghost small" type="button" data-envsetup>Settings</button></span></header>
+    <div class="rta ${B.ready > 0.004 ? 'pos' : B.ready < -0.004 ? 'neg' : ''}"><span>Ready to Assign</span><strong>${signedEur(B.ready)}</strong><span class="sub">${monthLabel(m)}: ${eur0.format(B.inflow)} came in · ${eur0.format(B.assigned)} assigned${B.overspentLast ? ` · ${eur0.format(B.overspentLast)} overspent last month` : ''}${B.future ? ` · <strong class="fut">${eur0.format(B.future)} assigned in later months</strong>` : ''}. Tap an envelope to assign money.</span></div>
+    ${ahead ? `<p class="banner" style="margin:0;font-size:13px"><span><strong>Planning ahead.</strong> ${monthLabel(m)} hasn’t started: each envelope starts with what it has left at the end of ${monthLabel(addMonth(m, -1))}, plus what you assign here. Money assigned here comes out of Ready to Assign now, so it can’t be assigned twice.${B.overspentLast ? ` Ready to Assign here is already after ${MON[+addMonth(m, -1).slice(5, 7) - 1]}’s overspending (${eur0.format(B.overspentLast)}); cover it in ${MON[+addMonth(m, -1).slice(5, 7) - 1]} to take it from an envelope instead.` : ''}</span><button class="btn small" type="button" data-envnow>Back to ${MON[+cm.slice(5, 7) - 1]}</button></p>` : ''}
     ${outBanner}
     ${ccBanner(m)}
     ${cfg.start.startsWith(m) && cfg.start.slice(8) !== '01' ? `<p class="banner" style="margin:0;font-size:13px"><span>Counting from ${shortDate(cfg.start)}, your start day: ${monthLabel(m)} spending before it isn’t in the envelopes (it’s in the starting money).</span><button class="btn small" type="button" data-envwhole="${m}-01">Count all of ${MON[+m.slice(5, 7) - 1]}</button></p>` : ''}
@@ -3905,6 +3924,8 @@ document.addEventListener('click', async e => {
     return;
   }
   if (t.closest('[data-envmove]')) return openEnvMove();
+  const nav = t.closest('[data-envnav]'); if (nav){ state.period = addMonth(envMonthSel(), +nav.dataset.envnav); render(); return; }
+  if (t.closest('[data-envnow]')){ state.period = thisMonth(); render(); return; }
   if (t.closest('[data-ccfix]')) return openCcFix();
   if (t.closest('[data-cckeep]')){ lsSet('ccFixKept', '1'); render(); return; }
   if (t.closest('[data-estoday]')){ openCheckin(JSON.parse(t.closest('[data-estoday]').dataset.estoday)); return; }
@@ -5662,7 +5683,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-26p';
+const APP_VERSION = '2026-10-27a';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

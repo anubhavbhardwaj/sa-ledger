@@ -913,3 +913,29 @@ test('country: entries without one count where their account is usually used (no
   assert.equal(await page.inputValue('#f-country'), 'Italy');
   await clean(app);
 });
+
+test('envelopes: plan ahead like YNAB: assign in next month, Ready to Assign now goes down; that month starts with what this one leaves', async () => {
+  const app = await openApp(), { page } = app, m = month(0), nx = month(1), now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    income: { i1: { amount: 3000, date: m + '-01', source: 'Salary', category: 'Salary', account: 'Deutsche Bank', earner: 'Anubhav', createdAt: now } },
+    expenses: { e1: { amount: 100, date: m + '-01', store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now } },
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 0, groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'food', name: 'Food', src: ['Groceries'] }] }], assigned: { [m]: { food: 400 } }, updatedAt: now } } });
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(200);
+  assert.match(await app.text('#budgetPanel'), /Ready to Assign\s*€2,600\.00/);
+  await page.click('[data-envnav="1"]'); await page.waitForTimeout(200);
+  assert.equal(await page.getAttribute(`#months [data-p="${nx}"]`, 'aria-pressed'), 'true');
+  let t = await app.text('#budgetPanel');
+  assert.match(t, /Planning ahead/); assert.match(t, /Food\s*€0\s*€0(\.00)?\s*€300\.00/, 'starts with this month’s leftover');
+  await page.click('[data-envkey="food"]'); await page.waitForSelector('#envAsgDlg[open]');
+  await page.fill('#ea-amt', '450'); await page.click('#envAsgForm [type=submit]'); await page.waitForTimeout(250);
+  t = await app.text('#budgetPanel'); assert.match(t, /Ready to Assign\s*€2,150\.00/); assert.match(t, /Food\s*€450\s*€0(\.00)?\s*€750\.00/);
+  await page.click('[data-envnow]'); await page.waitForTimeout(200);
+  t = await app.text('#budgetPanel'); assert.match(t, /Ready to Assign\s*€2,150\.00.*€450 assigned in later months/);
+  assert.match(t, /Food\s*€400\s*−€100\.00\s*€300\.00/, 'this month is unchanged');
+  await app.go('overview'); await page.waitForTimeout(150);
+  assert.match(await app.text('#kpis'), /Ready to assign\s*€2,150\.00.*€450 set for later months/);
+  assert.equal(await page.$(`#months [data-p="${nx}"]`), null, 'months ahead only on the Budget page');
+  await app.go('budget'); await page.waitForTimeout(150);
+  assert.match(await page.getAttribute(`#months [data-p="${nx}"]`, 'class'), /ahead/, 'a month with money planned stays listed');
+  await clean(app);
+});

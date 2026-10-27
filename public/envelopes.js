@@ -67,8 +67,9 @@ export function makeBudget(cfg, acc = () => null){
   return { isB, isCard, isBill, billCard, keyFor, describe, info, cards };
 }
 
-// The month's numbers. data = { items, income, transfers, acc } (acc(name) → the account, to know which are cards).
-export function budgetMonth(cfg, month, { items = [], income = [], transfers = [], acc = () => null } = {}){
+// The month's numbers. data = { items, income, transfers, acc, now } (acc(name) → the account, to know which are cards;
+// now: this month as YYYY-MM).
+export function budgetMonth(cfg, month, { items = [], income = [], transfers = [], acc = () => null, now = new Date().toISOString().slice(0, 7) } = {}){
   const start = cfg.start, sm = start.slice(0, 7);
   if (month < sm) return { before: true, ready: 0, rows: [] };
   const { isB, isCard, isBill, billCard, keyFor, describe, cards } = makeBudget(cfg, acc), after = d => d >= start;
@@ -113,7 +114,11 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
       outside: { total: r2((outside[m] || {}).total || 0), byAcc: Object.entries((outside[m] || {}).byAcc || {}).map(([acc, amount]) => ({ acc, amount: r2(amount) })).sort((a, b) => b.amount - a.amount), byKey: (outside[m] || {}).byKey || {} },
       rows: [...keys].map(k => ({ key: k, ...describe(k), carry: r2(carry[k] || 0), assigned: r2(+asg[k] || 0), activity: r2(a[k] || 0), available: avail[k], ...(k in cardDebt ? { debtAtStart: cardDebt[k] } : {}) })) };
   }
-  return { ready, opening: r2(opening), cardDebt, ...out };
+  // YNAB: money assigned in a later month is already spoken for, so this month (and any month ahead of it) shows Ready to
+  // Assign without it; otherwise the same euros could be assigned twice. Past months stay as they were at their end.
+  const future = month >= now ? r2(Object.entries(cfg.assigned || {}).filter(([m]) => m > month)
+    .reduce((s, [, a]) => s + Object.entries(a || {}).filter(([k]) => known(k)).reduce((x, [, v]) => x + (+v || 0), 0), 0)) : 0;
+  return { ready: r2(ready - future), future, opening: r2(opening), cardDebt, ...out };
 }
 
 // Rows in your order: your categories as you arranged them, then Travel and Savings; Not assigned first when it has

@@ -125,3 +125,24 @@ test('envelopes: credit cards the YNAB way (card spending moves to the card enve
   assert.equal(Math.round((B.ready + avail) * 100) / 100, cash, 'Ready to Assign + all envelopes = cash in the budget accounts');
   assert.deepEqual(groupRows(c, B.rows).map(g => g.group), ['Credit Card Payments', 'Daily']);
 });
+
+test('envelopes: assigning in a later month (YNAB) takes it from Ready to Assign now; that month starts with what this one leaves', () => {
+  const c = cfg(); c.assigned = assignTargets(c, '2026-10').assigned;
+  const now = '2026-10', d = { ...data, now };
+  const before = budgetMonth(c, '2026-10', d).ready;
+  c.assigned = setAssigned(c, '2026-11', 'food', 250);
+  c.assigned = setAssigned(c, '2026-12', 'rent', 800);
+  const oct = budgetMonth(c, '2026-10', d);
+  assert.equal(oct.future, 1050); assert.equal(oct.ready, before - 1050, 'November and December assignments are spoken for');
+  const nov = budgetMonth(c, '2026-11', d), food = nov.rows.find(r => r.key === 'food');
+  assert.deepEqual([food.carry, food.assigned, food.available], [210, 250, 460], 'October leftover + November assignment');
+  assert.equal(nov.future, 800, 'December still counts against November');
+  assert.equal(nov.ready, before - 755 - 250 - 800, 'November: October overspending, its own and December’s assignments');
+  const dec = budgetMonth(c, '2026-12', d);
+  assert.equal(dec.future, 0); assert.equal(dec.rows.find(r => r.key === 'rent').available, 800 - 800 + 800, 'rent carried 0 after November’s bill, then 800');
+  // A month already over isn't rewritten by later plans.
+  assert.equal(budgetMonth(c, '2026-10', { ...data, now: '2026-12' }).future, 0);
+  // Money in a deleted envelope's future plan doesn't count.
+  c.assigned = setAssigned(c, '2026-11', 'gone', 99);
+  assert.equal(budgetMonth(c, '2026-10', d).future, 1050);
+});
