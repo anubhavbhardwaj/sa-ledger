@@ -1047,3 +1047,22 @@ test('card payments: checks find what the old conversion counted twice, and one 
   assert.equal(await page.isHidden('#wv-cash [data-paybar]'), true, '"It wasn’t" puts it away for good');
   await clean(app);
 });
+
+test('envelope bars: grey spent, then what is left in the amount’s colour (green, amber short of target, red overspent); none when it had nothing', async () => {
+  const app = await openApp({ mobile: true }), { page } = app, m = month(0), now = new Date().toISOString(), td = d(0);
+  const E = (id, amount, category) => [id, { amount, date: td, store: 'S' + id, category, account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now }];
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    expenses: Object.fromEntries([E('a', 75, 'Eating out'), E('b', 464, 'Groceries'), E('c', 20, 'Gifts')]),
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 3000, updatedAt: now, targets: { gift: 100 },
+      groups: [{ id: 'g', name: 'Flexible', envs: [{ id: 'eat', name: 'Eating out', src: ['Eating out'] }, { id: 'gro', name: 'Groceries', src: ['Groceries'] }, { id: 'gift', name: 'Gifts', src: ['Gifts'] }, { id: 'pc', name: 'Personal care', src: ['Personal care'] }] }],
+      assigned: { [m]: { eat: 200, gro: 450, gift: 50 } } } } });
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(250);
+  const bar = k => page.$$eval(`[data-envkey="${k}"] .bar i`, els => els.filter(e => getComputedStyle(e).display !== 'none').map(e => e.className + ' ' + e.style.width));
+  assert.deepEqual(await bar('eat'), ['spent 37.5%', 'left ok 62.5%']);
+  assert.deepEqual(await bar('gro'), ['over 100%']);
+  assert.deepEqual(await bar('gift'), ['spent 40%', 'left short 60%'], 'below its €100 target: amber, like its amount');
+  assert.deepEqual(await bar('pc'), [], 'nothing assigned, nothing spent: no bar');
+  assert.equal(await page.getAttribute('[data-envkey="eat"] .bar', 'title'), 'Spent €75 of €200 · €125 left');
+  assert.match(await app.text('.oblegend'), /spent\s*left\s*short of its target, or of what a card owes\s*overspent/);
+  await clean(app);
+});

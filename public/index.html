@@ -225,12 +225,26 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .ob-split{background:linear-gradient(90deg,color-mix(in srgb,var(--s1) 22%,var(--surface)) 50%,color-mix(in srgb,var(--s5) 22%,var(--surface)) 50%);color:var(--ink-2)}
 .oblegend{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 6px 0;font-size:11.5px;color:var(--muted)}.oblegend .ob{margin-left:6px}.oblegend .ob:first-child{margin-left:0}
 .pill.av{justify-self:end;font-family:var(--f-mono);font-size:12.5px;padding:2px 9px;border-radius:999px;color:var(--muted)}.pill.av.pos{background:color-mix(in srgb,var(--good) 20%,var(--surface));color:var(--ink)}.pill.av.neg{background:color-mix(in srgb,var(--danger) 20%,var(--surface));color:var(--danger)}.pill.av.short{background:var(--warn-soft);color:var(--warn)}
-.ybr .bar{display:none}
+/* the bars: grey spent, then what's left in the amount's colour */
+.ybr .bar{display:flex;gap:2px;height:4px;border-radius:3px;background:var(--sunk);overflow:hidden}
+@media (min-width:561px){
+  /* desktop: the bar has its own column between the name and the numbers, so rows stay one line */
+  .ybh,.ybr{grid-template-columns:minmax(0,1fr) minmax(40px,150px) 78px 84px 92px}
+  .ybh>span:nth-child(2){grid-column:3}.ybh>span:nth-child(3){grid-column:4}.ybh>span:nth-child(4){grid-column:5}
+  .ybr>.nm{grid-column:1}.ybr>.n.a{grid-column:3}.ybr>.n.c{grid-column:4}.ybr>.n:not(.a):not(.c),.ybr>.pill.av{grid-column:5}
+  .ybr>.bar{grid-column:2;grid-row:1;align-self:center}
+}
+.ybr .bar i,.oblegend .lg i{display:block;height:100%;flex:none;border-radius:2px}
+.ybr .bar i[style^="width:0%"]{display:none}
+.ybr .bar .spent,.oblegend .lg .spent{background:color-mix(in srgb,var(--ink) 26%,var(--surface))}
+.ybr .bar .left.ok,.oblegend .lg .left.ok{background:var(--good)}
+.ybr .bar .left.short,.oblegend .lg .left.short{background:var(--warn)}
+.ybr .bar .over,.oblegend .lg .over{background:var(--danger)}
+.oblegend .lg{display:inline-flex;align-items:center;gap:5px;margin-right:10px}.oblegend .lg i{width:16px;height:4px}
+.oblegend+.oblegend{margin-top:6px}
 @media (max-width:560px){
   .ybh,.ybr{grid-template-columns:minmax(0,1fr) auto}.ybh span:nth-child(2),.ybh span:nth-child(3),.ybr .n.a,.ybr .n.c{display:none}
-  .ybr .bar{display:block;grid-column:1/-1;height:3px;border-radius:2px;background:var(--sunk);margin:2px 0 0 28px;overflow:hidden}
-  .ybr .bar i{display:block;height:100%;background:color-mix(in srgb,var(--ink) 35%,transparent);border-radius:2px}
-  .ybr .bar.neg i{background:var(--danger)}.ybr .bar.short i{background:var(--warn)}
+  .ybr .bar{grid-column:1/-1;margin:2px 0 0 28px}
   .envnav{font-size:16px}.rta>strong{font-size:21px}
 }
 .ecown{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--muted)}.ecown label{display:flex;gap:6px;align-items:center}
@@ -3888,12 +3902,20 @@ function renderEnvelopes(el){
   const badge = r => { const o = ownerOf(r); if (!o) return '';
     const [t, c, tip] = o === 'split' ? ['A·S', 'split', `Split: Anubhav ${eur0.format(r.split.Anubhav)}, Sulekha ${eur0.format(r.split.Sulekha)}`] : o === 'Anubhav' ? ['A', 'a', 'Anubhav’s money'] : o === 'Sulekha' ? ['S', 's', 'Sulekha’s money'] : ['C', 'c', 'Common money'];
     return `<span class="ob ob-${c}" title="${tip}" aria-label="${tip}">${t}</span>`; };
-  // On a phone a thin bar under each envelope takes the place of the numbers line: how much of what it had is spent
-  // (red when overspent); for a card, how much of what it owes is set aside.
+  // A thin bar under each envelope, the whole of it being what the envelope had this month: the grey part is spent,
+  // the coloured part is what's left, in the same colours as the amount on the right: green left, amber short (below
+  // its target, or a card with less set aside than it owes), red overspent. A card's bar is what it owes, coloured as
+  // far as money is set aside. No bar when the envelope had nothing.
+  const pct = f => Math.round(Math.max(0, Math.min(1, f)) * 1000) / 10 + '%';
   const bar = r => {
-    if (r.card) return r.owes > 0.5 ? `<span class="bar ${r.available + 0.5 < r.owes ? 'short' : ''}"><i style="width:${Math.round(Math.max(0, Math.min(1, r.available / r.owes)) * 100)}%"></i></span>` : '';
-    if (r.available < -0.004) return '<span class="bar neg"><i style="width:100%"></i></span>';
-    const have = r.carry + r.assigned; return have > 0.5 ? `<span class="bar"><i style="width:${Math.round(Math.min(1, Math.max(0, -r.activity) / have) * 100)}%"></i></span>` : '';
+    const tip = t => ` title="${t}" aria-label="${t}"`;
+    if (r.card && r.available < -0.004) return `<span class="bar"${tip(`Overspent by ${eur0.format(-r.available)}: paid out more than was set aside`)}><i class="over" style="width:100%"></i></span>`;
+    if (r.card){ if (!(r.owes > 0.5)) return ''; const f = r.available / r.owes, short = r.available + 0.5 < r.owes;
+      return `<span class="bar"${tip(`Set aside ${eur0.format(Math.max(0, r.available))} of the ${eur0.format(r.owes)} it owes`)}><i class="left ${short ? 'short' : 'ok'}" style="width:${pct(f)}"></i></span>`; }
+    if (r.available < -0.004) return `<span class="bar"${tip(`Overspent by ${eur0.format(-r.available)}`)}><i class="over" style="width:100%"></i></span>`;
+    const have = r.carry + r.assigned; if (!(have > 0.5)) return '';
+    const spent = Math.max(0, -r.activity), short = avCls(r, cfg) === 'short';
+    return `<span class="bar"${tip(`Spent ${eur0.format(spent)} of ${eur0.format(have)} · ${eur0.format(Math.max(0, r.available))} left`)}><i class="spent" style="width:${pct(spent / have)}"></i><i class="left ${short ? 'short' : 'ok'}" style="width:${pct(r.available / have)}"></i></span>`;
   };
   const nameOf = r => r.save ? 'Investing & India' : envName(r);
   const row = r => { const empty = Math.abs(r.assigned) < 0.5 && Math.abs(r.activity) < 0.5 && Math.abs(r.available) < 0.5;
@@ -3916,6 +3938,7 @@ function renderEnvelopes(el){
     <div class="rta ${B.ready > 0.004 ? 'pos' : B.ready < -0.004 ? 'neg' : ''}"><span>Ready to Assign</span><strong>${signedEur(B.ready)}</strong><span class="sub">${eur0.format(B.inflow)} came in · ${eur0.format(B.assigned)} assigned${B.overspentLast ? ` · ${eur0.format(B.overspentLast)} overspent last month` : ''}${B.future ? ` · <strong class="fut">${eur0.format(B.future)} assigned in later months</strong>` : ''}</span>${envWhoHtml(m, B)}</div>
     ${al.length ? `<div class="envalerts">${al.join('')}</div>` : ''}
     <div class="ybud"><div class="ybh"><span>Envelope</span><span>Assigned</span><span>Activity</span><span>Available</span></div>${G.map(grp).join('')}
+      <p class="oblegend"><span class="lg"><i class="spent"></i>spent</span><span class="lg"><i class="left ok"></i>left</span><span class="lg"><i class="left short"></i>short of its target, or of what a card owes</span><span class="lg"><i class="over"></i>overspent</span></p>
       <p class="oblegend"><span class="ob ob-a">A</span>Anubhav <span class="ob ob-s">S</span>Sulekha <span class="ob ob-c">C</span>Common <span class="ob ob-split">A·S</span>split · tap an envelope to assign money or change whose it is</p></div>`;
 }
 // Card bills logged as spending: if the card's purchases are logged too, the same money counts twice.
@@ -5901,7 +5924,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-27h';
+const APP_VERSION = '2026-10-27i';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
