@@ -1327,6 +1327,7 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
   <form id="envCatForm" novalidate style="display:grid;gap:12px;padding:20px;max-width:620px">
     <h3>Your categories</h3>
     <p class="muted" style="margin:0;font-size:13px">Make categories such as Fixed and Flexible, add envelopes to them (Rent, Internet, Groceries, …) and add the spending each envelope gets: a whole category, or one subcategory. The most specific one wins. €/month is the envelope’s monthly target.</p>
+    <div id="ecMerge" class="billask" hidden></div>
     <div id="ecList" style="display:grid;gap:10px"></div>
     <div><button class="btn small" type="button" id="ecNewGroup">+ Category</button></div>
     <p class="muted" id="ecUn" style="margin:0;font-size:12.5px"></p>
@@ -3266,10 +3267,16 @@ $('#form').addEventListener('submit', async e => {
         await putEdit('income', { ...rec, createdAt: old.createdAt || new Date().toISOString(), createdBy: old.createdBy || usernameOf(state.user), updatedBy: usernameOf(state.user) });
         toast(state.editKind !== state.kind ? 'Changed to ' + state.kind : 'Saved changes');
       } else {
-        await addDoc(incomeCol, { ...rec, createdAt: new Date().toISOString(), createdBy: usernameOf(state.user) });
+        const created = new Date().toISOString();
+        await addDoc(incomeCol, { ...rec, createdAt: created, createdBy: usernameOf(state.user) });
         if (state.period !== 'all') state.period = date.slice(0,7);
         state.txKind = 'income'; render();
-        toast('Added income ' + eur.format(amount) + ' from ' + rec.source);
+        // Money into the budget: say what there is to give a job now, one tap from the Budget page.
+        if (ENVELOPES && envOn() && date >= state.envCfg.start && makeBudget(state.envCfg, accOf).isB(rec.account)){
+          const inc = state.income.some(i => i.createdAt === created) ? state.income : [...state.income, rec];
+          const B = budgetMonth(state.envCfg, date.slice(0, 7) < thisMonth() ? thisMonth() : date.slice(0, 7), { ...envData(), income: inc });
+          toast(`Added ${eur.format(amount)} from ${rec.source}: ${signedEur(B.ready)} to assign`, B.ready > 0.5 ? { label: 'Assign', fn: () => { state.envMonth = date.slice(0, 7) < thisMonth() ? thisMonth() : date.slice(0, 7); location.hash = 'budget'; } } : null);
+        } else toast('Added income ' + eur.format(amount) + ' from ' + rec.source);
       }
       doneInbox(); dlg.close();
     } catch (x) { err.textContent = writeError(x); err.hidden = false; }
@@ -4543,7 +4550,38 @@ function ownPick(e, gi, ei){
   return `<div class="ecown"><label>Whose money <select data-ecown="${at}" aria-label="Whose money">${[['Both', 'Both (common)'], ['Anubhav', 'Anubhav'], ['Sulekha', 'Sulekha'], ['split', 'Split by amount']].map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     ${v === 'split' ? PEOPLE.map(p => `<label>${p} €<input data-ecsplit="${at}.${p}" type="number" step="1" min="0" inputmode="decimal" value="${+e.split[p] || ''}" aria-label="${p}’s part"></label>`).join('') : ''}</div>`;
 }
+// Categories that are really one category per person or place ("Rent - Anubhav", "Rent - Sulekha"): offered as one
+// category with subcategories, so charts show Rent once and an envelope can still take each part.
+function mergeCandidates(){
+  const by = new Map();
+  state.items.forEach(i => { const m = String(i.category || '').match(/^(.+?)\s+-\s+(.+)$/); if (!m) return;
+    const base = m[1].trim(), mp = by.get(base.toLowerCase()) || by.set(base.toLowerCase(), { base, cats: new Map() }).get(base.toLowerCase()); mp.cats.set(i.category, m[2].trim()); });
+  return [...by.values()].filter(x => x.cats.size >= 2).map(x => ({ base: x.base, cats: [...x.cats.keys()], subs: [...x.cats.values()], n: state.items.filter(i => x.cats.has(i.category)).length }));
+}
+function drawEcMerge(){
+  const C = mergeCandidates(), el = $('#ecMerge'); el.hidden = !C.length;
+  el.innerHTML = C.map((c, k) => `<span><strong>${c.cats.map(esc).join(' and ')}</strong> look like one category. Make them <strong>${esc(c.base)}</strong>, with ${c.subs.map(esc).join(' and ')} as subcategories? Charts then show ${esc(c.base)} once; envelopes keep getting each part. ${c.n} entr${c.n === 1 ? 'y changes' : 'ies change'}.</span>
+    <span class="billrow"><button class="btn small primary" type="button" data-catmerge="${k}">Merge into ${esc(c.base)}</button></span>`).join('');
+}
+async function mergeCategory(c){
+  const map = Object.fromEntries(c.cats.map((cat, k) => [cat, c.subs[k]])), olds = state.items.filter(i => i.category in map);
+  const docs = olds.map(i => [i.id, { ...docOf(i), category: c.base, subcategory: i.subcategory ? `${map[i.category]} ${i.subcategory}` : map[i.category], updatedBy: usernameOf(state.user) }]);
+  const fix = src => (src || []).map(x => { const k = Object.keys(map).find(cat => srcNorm(cat) === srcNorm(x)); return k ? `${c.base}›${map[k]}` : x; });
+  const oldGroups = state.envCfg?.groups, groups = (oldGroups || []).map(g => ({ ...g, envs: (g.envs || []).map(e => ({ ...e, src: fix(e.src) })) }));
+  try {
+    for (let i = 0; i < docs.length; i += 400){ const b = writeBatch(fs); docs.slice(i, i + 400).forEach(([id, d]) => b.set(doc(fs, 'expenses', id), d)); await b.commit(); }
+    if (oldGroups) await saveEnv({ groups });
+    if (state.ecDraft) state.ecDraft = state.ecDraft.map(g => ({ ...g, envs: (g.envs || []).map(e => ({ ...e, src: fix(e.src) })) }));
+    toast(`${olds.length} entr${olds.length === 1 ? 'y is' : 'ies are'} in ${c.base} now`, { label: 'Undo', fn: async () => { await restoreDocs('expenses', olds); if (oldGroups) await saveEnv({ groups: oldGroups }); } });
+  } catch (x){ toast(writeError(x)); }
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('[data-catmerge]'); if (!b) return; e.preventDefault();
+  const c = mergeCandidates()[+b.dataset.catmerge]; if (!c) return; b.disabled = true;
+  await mergeCategory(c); setTimeout(() => { if ($('#envCatDlg').open) drawEnvCats(); }, 300);
+});
 function drawEnvCats(){
+  drawEcMerge();
   const D = state.ecDraft, used = new Set(D.flatMap(g => g.envs.flatMap(e => (e.src || []).map(srcNorm)))), all = [...allSources(state.items), ...transferSources(state.envCfg, state.transfers)];
   const since = addMonth(thisMonth(), -2) + '-01';
   const un = unassignedSources({ ...state.envCfg, groups: D }, state.items, since);

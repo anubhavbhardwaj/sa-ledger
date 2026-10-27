@@ -13,6 +13,14 @@ version of the app never touches the data.
 Changing `firestore.rules` here does not publish it: paste it into
 Firebase console → Firestore Database → Rules → Publish.
 
+## Budget (envelopes, like YNAB)
+
+`public/envelopes.js` holds the envelope maths (`budgetMonth`, `committedBy`, `cardShares`), used by the app and by the
+evening notification. The Budget page checks that the budget accounts' balances and the budget agree; when they
+don't, it lists the likely causes (a starting amount the entries no longer back, an entry on the wrong side of a
+balance logged the same day) and can record an adjustment to Ready to Assign. Entries dated on a day an account's
+balance was logged carry `inBal` (already in that balance, or after it) once someone says which.
+
 ## Phone capture (Android)
 
 `netlify/functions/capture.mjs` is served at `/api/capture`. MacroDroid on the phone POSTs each

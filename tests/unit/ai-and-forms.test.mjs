@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { handle as tripAi } from '../../netlify/functions/trip-ai.mjs';
 import { clean as cleanToBook, handle as toBook } from '../../netlify/functions/tobook.mjs';
 import { clean as cleanBooking } from '../../netlify/functions/extract.mjs';
-import { message as dailyMessage, dueLines } from '../../netlify/functions/daily.mjs';
+import { message as dailyMessage, dueLines, moneyLines } from '../../netlify/functions/daily.mjs';
 import { verify, req, fakeGroq } from '../support/fakes.mjs';
 
 test('trip AI: only ids it was given, no duplicates, no em dashes', async () => {
@@ -44,6 +44,21 @@ test('evening reminder: quiet when the day is logged and nothing waits', () => {
   assert.match(dailyMessage('Anubhav', { added: 0, inbox: 2, bookings: 0 }).body, /2 captured payments/);
   const due = dueLines([{ what: 'Hotel', tripId: 't', byDate: '2026-10-17', done: false }], { t: { name: 'Rome' } }, '2026-10-16');
   assert.deepEqual(due, ['Hotel (Rome) by tomorrow']);
+});
+
+test('evening reminder: the budget’s news of the day (an envelope gone overspent today, money that came in), once', () => {
+  const cfg = { start: '2026-10-01', accounts: ['Deutsche Bank'], opening: 500, trips: true, groups: [{ id: 'g', name: 'F', envs: [{ id: 'groc', name: 'Groceries', src: ['Groceries'] }, { id: 'eat', name: 'Eating out', src: ['Eating Out'] }] }],
+    assigned: { '2026-10': { groc: 100, eat: 50 } } };
+  const accounts = [{ name: 'Deutsche Bank', type: 'bank' }], since = '2026-10-27T22:00:00.000Z';
+  const items = [{ date: '2026-10-05', amount: 90, category: 'Groceries', account: 'Deutsche Bank', createdAt: '2026-10-05T10:00:00Z' },
+    { date: '2026-10-27', amount: 30, category: 'Groceries', account: 'Deutsche Bank', createdAt: '2026-10-27T23:00:00Z' },        // today: Groceries goes to −€20
+    { date: '2026-10-20', amount: 80, category: 'Eating Out', account: 'Deutsche Bank', createdAt: '2026-10-20T10:00:00Z' }];      // overspent since the 20th: not news
+  const income = [{ date: '2026-10-27', amount: 3000, account: 'Deutsche Bank', createdAt: '2026-10-27T23:30:00Z' }];
+  const L = moneyLines({ cfg, items, income, accounts }, '2026-10-28', since);
+  assert.deepEqual(L, ['Groceries is €20 overspent', '€3,000 came in: €3,350 to assign']);
+  assert.deepEqual(moneyLines({ cfg, items: items.slice(0, 1), accounts }, '2026-10-28', since), [], 'nothing changed today');
+  const msg = dailyMessage('Anubhav', { added: 2, inbox: 0, bookings: 0, money: L });
+  assert.equal(msg.title, 'Your budget'); assert.match(msg.body, /You added 2 today\. Budget: Groceries is €20 overspent; €3,000 came in: €3,350 to assign\./); assert.equal(msg.url, '/#budget');
 });
 
 import { handle as extract } from '../../netlify/functions/extract.mjs';

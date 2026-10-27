@@ -1494,3 +1494,38 @@ test('left after envelopes: common groceries bought on Anubhav’s card are the 
   assert.match(await app.text('.rwt'), /bank − cards\s*€1,000\s*€500 − €100/);
   await clean(app);
 });
+
+test('categories: "Rent - Anubhav" and "Rent - Sulekha" merge into Rent with subcategories; the envelope keeps getting both (with Undo)', async () => {
+  const app = await openApp(), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    expenses: { r1: { amount: 860, date: s, store: 'Landlord', category: 'Rent - Anubhav', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now },
+      r2: { amount: 900, date: s, store: 'Landlord', category: 'Rent - Sulekha', account: 'Deutsche Bank', spender: 'Sulekha', createdAt: now } },
+    settings: { envelopes: { start: s, accounts: ['Deutsche Bank'], opening: 3000, openingBy: { 'Deutsche Bank': 3000 }, trips: false, updatedAt: now,
+      groups: [{ id: 'g', name: 'Fixed', envs: [{ id: 'rent', name: 'Rent', src: ['Rent - Anubhav', 'Rent - Sulekha'], owner: 'Both', split: { Anubhav: 860, Sulekha: 900 } }] }], assigned: { [m]: { rent: 1760 } } } } });
+  await page.waitForTimeout(400); await app.go('budget'); await page.waitForTimeout(300);
+  assert.match(await envText(app), /Rent\s*€1,760\s*−€1,760\s*€0/);
+  await page.click('[data-envmore]'); await page.click('#budgetPanel [data-envcats]'); await page.waitForSelector('#envCatDlg[open]');
+  assert.match(await app.text('#ecMerge'), /Rent - Anubhav and Rent - Sulekha look like one category\. Make them Rent, with Anubhav and Sulekha as subcategories\?.*2 entries change/);
+  await page.click('[data-catmerge="0"]'); await page.waitForTimeout(500);
+  const ex = await dbDocs(app, 'expenses');
+  assert.deepEqual(ex.map(e => [e.category, e.subcategory]).sort(), [['Rent', 'Anubhav'], ['Rent', 'Sulekha']]);
+  assert.deepEqual((await dbDocs(app, 'settings')).find(x => x.id === 'envelopes').groups[0].envs[0].src, ['Rent›Anubhav', 'Rent›Sulekha']);
+  assert.equal(await page.isHidden('#ecMerge'), true);
+  await page.click('#ecCancel'); await page.waitForTimeout(200);
+  assert.match(await envText(app), /Rent\s*€1,760\s*−€1,760\s*€0/, 'the envelope still gets both');
+  await clean(app);
+});
+
+test('adding income into the budget says what there is to assign, one tap from the Budget page', async () => {
+  const app = await openApp(), { page } = app, m = month(0), s = m + '-01', now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    settings: { envelopes: { start: s, accounts: ['Deutsche Bank'], opening: 100, openingBy: { 'Deutsche Bank': 100 }, trips: false, updatedAt: now, groups: [], assigned: {} } } });
+  await page.waitForTimeout(400);
+  await page.click('#addBtn'); await page.waitForSelector('#dlg[open]'); await page.click('#kindSeg [data-kind="income"]');
+  await page.fill('#f-amount', '4950.38'); await page.fill('#f-store', 'PAYBACK'); await page.fill('#f-account', 'Deutsche Bank');
+  await page.click('#saveBtn'); await page.waitForTimeout(300);
+  assert.match(await app.text('#toast'), /Added €4,950\.38 from PAYBACK: \+?€5,050\.38 to assign\s*Assign/);
+  await page.click('#toast button'); await page.waitForTimeout(300);
+  assert.match(await page.evaluate(() => location.hash), /budget/);
+  await clean(app);
+});
