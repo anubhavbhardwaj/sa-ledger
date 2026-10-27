@@ -174,6 +174,12 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .envnav .navb{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
 .envnav .navb[disabled]{opacity:.35;cursor:default}
 .rta .sub strong.fut{font:inherit;font-weight:600;color:var(--ink-2)}
+.rta .rwho{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px 20px;border-top:1px solid color-mix(in srgb,var(--ink) 12%,transparent);padding-top:8px;margin-top:2px}
+.rta .rwl{flex-basis:100%;font-size:11.5px;color:var(--muted)}
+.rta .rw{display:grid;gap:1px;min-width:0;flex:1 1 120px;max-width:260px;align-content:start}
+.rta .rw .nm{font-size:12px;color:var(--ink-2);font-weight:600}
+.rta .rw strong{font-size:18px;color:var(--ink)}.rta .rw strong.neg{color:var(--danger)}
+.rta .rw small{font-size:11.5px;color:var(--muted)}
 .rta{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:var(--sunk)}.rta strong{font-family:var(--f-mono);font-size:22px}
 .rta.pos{background:color-mix(in srgb,var(--good) 16%,var(--surface))}.rta.neg{background:color-mix(in srgb,var(--danger) 14%,var(--surface))}.rta .sub{flex-basis:100%;font-size:12px;color:var(--muted)}
 .ybud{display:grid}.ybh,.ybr{display:grid;grid-template-columns:minmax(0,1fr) 84px 84px 96px;gap:8px;align-items:center;padding:7px 4px}.ybh{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line)}
@@ -1925,7 +1931,7 @@ function render(){
   $('#fbadge2').hidden = !n; $('#fbadge2').textContent = n;
   if (state.page === 'overview'){ renderOverview(ms); renderNextUp(); }
   if (state.page === 'transactions'){ renderTransactions(); if (state.txView === 'charts') renderVisualizations(); }
-  if (state.page === 'budget') renderBudgets();
+  if (state.page === 'budget'){ loadRates(); renderBudgets(); }
   if (state.page === 'trips'){ renderTrips(); renderPassportBar(); }
   if (state.page === 'wealth') renderWealth();
   if (state.page === 'overview' || state.page === 'transactions') renderCcBars();
@@ -3766,6 +3772,26 @@ function envKpi(){
   const over = B.rows.filter(r => r.available < -0.004).length;
   return `<a class="kpi kpilink" href="#budget"><span class="lbl">Ready to assign</span><span class="val ${B.ready < -0.004 ? 'neg' : ''}">${signedEur(B.ready)}</span><span class="sub">${B.ready < -0.004 ? 'Assigned more than you have' : B.ready > 0.004 ? 'Give it a job' : 'Every euro has a job'}${over ? ` · <span class="neg">${over} overspent</span>` : ''}${B.future ? ` · ${eur0.format(B.future)} set for later months` : ''} · Budget →</span></a>`;
 }
+// Where each of you stands: the balance of your own accounts in the budget (bank minus what your cards owe), at the end
+// of the month shown, or today for this month and months ahead. Shared accounts (Wise Common) are left out.
+function envWho(m){
+  const cm = thisMonth(), [y, mo] = m.split('-').map(Number), asOf = m < cm ? new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10) : today(), out = {};
+  for (const name of state.envCfg.accounts || []){
+    const a = accOf(name); if (!a || !['Anubhav', 'Sulekha'].includes(a.owner)) continue;
+    const e = estimate(a, asOf); if (!e) continue;
+    const v = toEur(a, e.balance), o = (out[a.owner] ||= { cash: 0, cards: 0, n: 0, noRate: false });
+    if ((a.currency || 'EUR') !== 'EUR' && !state.fxLatest[a.currency]) o.noRate = true;
+    if (a.type === 'card') o.cards -= v; else o.cash += v;
+    o.n++;
+  }
+  return { asOf, past: m < cm, who: out };
+}
+function envWhoHtml(m){
+  const W = envWho(m), ppl = ['Anubhav', 'Sulekha'].filter(p => W.who[p]); if (!ppl.length) return '';
+  return `<div class="rwho"><span class="rwl">Where each of you stands ${W.past ? 'on ' + shortDate(W.asOf) : 'today'}: own budget accounts, bank minus cards, shared ones left out</span>
+    ${ppl.map(p => { const o = W.who[p], net = o.cash - o.cards;
+      return `<span class="rw" data-envwho="${p}"><span class="nm">${p}</span><strong class="${net < -0.004 ? 'neg' : ''}">${signedEur(net)}</strong><small>${o.cards > 0.5 || o.cards < -0.5 ? `bank ${eur0.format(o.cash)} − cards ${eur0.format(o.cards)}` : `bank ${eur0.format(o.cash)}`}${o.noRate ? ' · rupee rate loading' : ''}</small></span>`; }).join('')}</div>`;
+}
 function renderEnvelopes(el){
   const m = envMonthSel(), cfg = state.envCfg;
   if (!envOn()){
@@ -3798,7 +3824,7 @@ function renderEnvelopes(el){
     return `<details class="ybg" ${hot ? 'open' : ''}><summary><div class="ybr"><span class="nm">${esc(g.group)}</span><span class="n a">${eur0.format(g.assigned)}</span><span class="n c">${g.activity ? signedEur(g.activity) : '€0'}</span><span class="n">${signedEur(g.available)}</span></div></summary>${g.rows.map(row).join('')}</details>`; };
   const cm = thisMonth(), ahead = m > cm, canNext = m < addMonth(cm, ENV_AHEAD), canPrev = m > cfg.start.slice(0, 7);
   el.innerHTML = `<header><h2 class="envnav"><button class="navb" type="button" data-envnav="-1" aria-label="Previous month" ${canPrev ? '' : 'disabled'}>‹</button><span>Envelopes · ${monthLabel(m)}</span><button class="navb" type="button" data-envnav="1" aria-label="Next month" ${canNext ? '' : 'disabled'}>›</button></h2><span class="right">${toFill ? `<button class="btn primary small" type="button" data-envtargets>Assign ${toFill} target${toFill === 1 ? '' : 's'}</button>` : ''}<button class="btn small" type="button" data-envmove>Move</button><button class="btn ghost small" type="button" data-envcats>Categories</button><button class="btn ghost small" type="button" data-envsetup>Settings</button></span></header>
-    <div class="rta ${B.ready > 0.004 ? 'pos' : B.ready < -0.004 ? 'neg' : ''}"><span>Ready to Assign</span><strong>${signedEur(B.ready)}</strong><span class="sub">${monthLabel(m)}: ${eur0.format(B.inflow)} came in · ${eur0.format(B.assigned)} assigned${B.overspentLast ? ` · ${eur0.format(B.overspentLast)} overspent last month` : ''}${B.future ? ` · <strong class="fut">${eur0.format(B.future)} assigned in later months</strong>` : ''}. Tap an envelope to assign money.</span></div>
+    <div class="rta ${B.ready > 0.004 ? 'pos' : B.ready < -0.004 ? 'neg' : ''}"><span>Ready to Assign</span><strong>${signedEur(B.ready)}</strong><span class="sub">${monthLabel(m)}: ${eur0.format(B.inflow)} came in · ${eur0.format(B.assigned)} assigned${B.overspentLast ? ` · ${eur0.format(B.overspentLast)} overspent last month` : ''}${B.future ? ` · <strong class="fut">${eur0.format(B.future)} assigned in later months</strong>` : ''}. Tap an envelope to assign money.</span>${envWhoHtml(m)}</div>
     ${ahead ? `<p class="banner" style="margin:0;font-size:13px"><span><strong>Planning ahead.</strong> ${monthLabel(m)} hasn’t started: each envelope starts with what it has left at the end of ${monthLabel(addMonth(m, -1))}, plus what you assign here. Money assigned here comes out of Ready to Assign now, so it can’t be assigned twice.${B.overspentLast ? ` Ready to Assign here is already after ${MON[+addMonth(m, -1).slice(5, 7) - 1]}’s overspending (${eur0.format(B.overspentLast)}); cover it in ${MON[+addMonth(m, -1).slice(5, 7) - 1]} to take it from an envelope instead.` : ''}</span><button class="btn small" type="button" data-envnow>Back to ${MON[+cm.slice(5, 7) - 1]}</button></p>` : ''}
     ${outBanner}
     ${ccBanner(m)}
@@ -4442,8 +4468,12 @@ function investInfo(acc){
 }
 async function loadRates(){
   const curs = [...new Set([...state.accounts.map(a => a.currency), ...(state.home === 'INR' ? ['INR'] : [])].filter(c => c && c !== 'EUR'))].filter(c => !state.fxLatest[c]);
-  for (const c of curs){ try { const r = await getRate(c, today()); state.fxLatest[c] = typeof r === 'number' ? r : r.rate; } catch {} }
-  if (curs.length){ pfCache = null; if (state.page === 'wealth' || state.page === 'overview') render(); }
+  // Re-render only when a rate actually came in: offline, re-rendering on a failed fetch would ask again at once, forever.
+  if (!curs.length || state.ratesBusy) return;
+  state.ratesBusy = true; let got = 0;
+  try { for (const c of curs){ try { const r = await getRate(c, today()), v = typeof r === 'number' ? r : r?.rate; if (v > 0){ state.fxLatest[c] = v; got++; } } catch {} } }
+  finally { state.ratesBusy = false; }
+  if (got){ pfCache = null; if (['wealth', 'overview', 'budget'].includes(state.page)) render(); }
 }
 
 function suggestAccounts(){
@@ -5683,7 +5713,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-27a';
+const APP_VERSION = '2026-10-27b';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);

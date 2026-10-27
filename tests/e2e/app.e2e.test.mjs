@@ -939,3 +939,18 @@ test('envelopes: plan ahead like YNAB: assign in next month, Ready to Assign now
   assert.match(await page.getAttribute(`#months [data-p="${nx}"]`, 'class'), /ahead/, 'a month with money planned stays listed');
   await clean(app);
 });
+
+test('envelopes: Ready to Assign shows where each of you stands (own budget accounts, bank minus cards, shared left out)', async () => {
+  const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString(), td = d(0);
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, ws: { name: 'Wise Sulekha', type: 'bank', currency: 'EUR', owner: 'Sulekha' },
+      wc: { name: 'Wise Common', type: 'bank', currency: 'EUR', owner: 'Shared' }, amex: { name: 'AMEX', type: 'card', currency: 'EUR', owner: 'Anubhav' },
+      nre: { name: 'HDFC NRE', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    checkins: { a: { accountId: 'db', date: td, balance: 4120, createdAt: now }, b: { accountId: 'ws', date: td, balance: 2850, createdAt: now },
+      c: { accountId: 'wc', date: td, balance: 1340, createdAt: now }, e: { accountId: 'amex', date: td, balance: -302, createdAt: now }, f: { accountId: 'nre', date: td, balance: 9000, createdAt: now } },
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank', 'Wise Sulekha', 'Wise Common', 'AMEX'], opening: 0, groups: [], assigned: {}, updatedAt: now } } });
+  await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(200);
+  assert.match(await app.text('.rta .rwl'), /Where each of you stands today/);
+  assert.equal(await app.text('[data-envwho="Anubhav"]'), 'Anubhav€3,818.00bank €4,120 − cards €302', 'HDFC NRE is outside the budget');
+  assert.equal(await app.text('[data-envwho="Sulekha"]'), 'Sulekha€2,850.00bank €2,850', 'Wise Common left out');
+  await clean(app);
+});
