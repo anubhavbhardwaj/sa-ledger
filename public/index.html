@@ -174,9 +174,9 @@ details.tgroup[open] > summary::before{content:'▾ ';}
 .envnav .navb{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
 .envnav .navb[disabled]{opacity:.35;cursor:default}
 .rta .sub strong.fut{font:inherit;font-weight:600;color:var(--ink-2)}
-.rta .rwho{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px 20px;border-top:1px solid color-mix(in srgb,var(--ink) 12%,transparent);padding-top:8px;margin-top:2px}
+.rta .rwho{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px 14px;border-top:1px solid color-mix(in srgb,var(--ink) 12%,transparent);padding-top:8px;margin-top:2px}
 .rta .rwl{flex-basis:100%;font-size:11.5px;color:var(--muted)}
-.rta .rw{display:grid;gap:1px;min-width:0;flex:1 1 120px;max-width:260px;align-content:start}
+.rta .rw{display:grid;gap:1px;min-width:0;flex:1 1 80px;max-width:260px;align-content:start}
 .rta .rw .nm{font-size:12px;color:var(--ink-2);font-weight:600}
 .rta .rw strong{font-size:18px;color:var(--ink)}.rta .rw strong.neg{color:var(--danger)}
 .rta .rw small{font-size:11.5px;color:var(--muted)}
@@ -3772,12 +3772,12 @@ function envKpi(){
   const over = B.rows.filter(r => r.available < -0.004).length;
   return `<a class="kpi kpilink" href="#budget"><span class="lbl">Ready to assign</span><span class="val ${B.ready < -0.004 ? 'neg' : ''}">${signedEur(B.ready)}</span><span class="sub">${B.ready < -0.004 ? 'Assigned more than you have' : B.ready > 0.004 ? 'Give it a job' : 'Every euro has a job'}${over ? ` · <span class="neg">${over} overspent</span>` : ''}${B.future ? ` · ${eur0.format(B.future)} set for later months` : ''} · Budget →</span></a>`;
 }
-// Where each of you stands: the balance of your own accounts in the budget (bank minus what your cards owe), at the end
-// of the month shown, or today for this month and months ahead. Shared accounts (Wise Common) are left out.
+// Where each of you stands: the balance of your own accounts in the budget (bank minus what your cards owe), and of the
+// shared ones (Wise Common) as Common, at the end of the month shown, or today for this month and months ahead.
 function envWho(m){
   const cm = thisMonth(), [y, mo] = m.split('-').map(Number), asOf = m < cm ? new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10) : today(), out = {};
   for (const name of state.envCfg.accounts || []){
-    const a = accOf(name); if (!a || !['Anubhav', 'Sulekha'].includes(a.owner)) continue;
+    const a = accOf(name); if (!a || !['Anubhav', 'Sulekha', 'Shared'].includes(a.owner)) continue;
     const e = estimate(a, asOf); if (!e) continue;
     const v = toEur(a, e.balance), o = (out[a.owner] ||= { cash: 0, cards: 0, n: 0, noRate: false });
     if ((a.currency || 'EUR') !== 'EUR' && !state.fxLatest[a.currency]) o.noRate = true;
@@ -3787,10 +3787,10 @@ function envWho(m){
   return { asOf, past: m < cm, who: out };
 }
 function envWhoHtml(m){
-  const W = envWho(m), ppl = ['Anubhav', 'Sulekha'].filter(p => W.who[p]); if (!ppl.length) return '';
-  return `<div class="rwho"><span class="rwl">Where each of you stands ${W.past ? 'on ' + shortDate(W.asOf) : 'today'}: own budget accounts, bank minus cards, shared ones left out</span>
+  const W = envWho(m), ppl = ['Anubhav', 'Sulekha', 'Shared'].filter(p => W.who[p]); if (!ppl.length) return '';
+  return `<div class="rwho"><span class="rwl">Where you stand ${W.past ? 'on ' + shortDate(W.asOf) : 'today'}: accounts in the budget, bank minus cards</span>
     ${ppl.map(p => { const o = W.who[p], net = o.cash - o.cards;
-      return `<span class="rw" data-envwho="${p}"><span class="nm">${p}</span><strong class="${net < -0.004 ? 'neg' : ''}">${signedEur(net)}</strong><small>${o.cards > 0.5 || o.cards < -0.5 ? `bank ${eur0.format(o.cash)} − cards ${eur0.format(o.cards)}` : `bank ${eur0.format(o.cash)}`}${o.noRate ? ' · rupee rate loading' : ''}</small></span>`; }).join('')}</div>`;
+      return `<span class="rw" data-envwho="${p}"><span class="nm">${p === 'Shared' ? 'Common' : p}</span><strong class="${net < -0.5 ? 'neg' : ''}">${net < -0.5 ? '−' : ''}${eur0.format(Math.abs(net))}</strong><small>${o.cards > 0.5 || o.cards < -0.5 ? `bank ${eur0.format(o.cash)} − cards ${eur0.format(o.cards)}` : `bank ${eur0.format(o.cash)}`}${o.noRate ? ' · rupee rate loading' : ''}</small></span>`; }).join('')}</div>`;
 }
 function renderEnvelopes(el){
   const m = envMonthSel(), cfg = state.envCfg;
@@ -5713,7 +5713,7 @@ function returnPanel(y){
 }
 
 // ---------- Sync check: what this device has vs what the database has ----------
-const APP_VERSION = '2026-10-27b';
+const APP_VERSION = '2026-10-27c';
 const syRow = i => `${esc(i.date)} · ${esc(i.store || i.source || (i.from ? i.from + ' → ' + i.to : ''))} · ${eur.format(+i.amount || 0)}${i.createdBy ? ' · added by ' + esc(i.createdBy) : ''}`;
 function syncReport(extra = ''){
   const pend = [...state.items, ...state.income, ...state.transfers].filter(i => i._pending);
