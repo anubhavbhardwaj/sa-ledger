@@ -561,7 +561,7 @@ test('phone: no page or dialog is wider than the screen', async () => {
 
 test('phone layout: Ask AI in the top bar, the + button steps aside while scrolling down, set-up items on one line', async () => {
   const app = await openApp({ mobile: true }), { page } = app;
-  const ex = {}; for (let i = 0; i < 40; i++) ex['e' + i] = { amount: 10 + i, date: d(-i % 20), store: 'Store ' + (i % 7), category: 'Groceries', account: 'DKB', spender: 'Anubhav', createdAt: 'x' };
+  const ex = {}; for (let i = 0; i < 40; i++) ex['e' + i] = { amount: 10 + i, date: d(0), store: 'Store ' + (i % 7), category: 'Groceries', account: 'DKB', spender: 'Anubhav', createdAt: 'x' };   // all this month, also on the 1st
   await app.seed({ expenses: ex }); await page.waitForTimeout(300);
   assert.ok(await page.$('.appbar #aiBtn'), 'Ask AI sits in the top bar');
   assert.match(await app.text('#setupLine'), /Not set up yet:\s*Goals/);
@@ -755,10 +755,12 @@ test('envelopes: starting money worked out from your balances and entries (back 
     accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav', createdAt: td }, cc: { name: 'Deutsche Bank CC', type: 'card', currency: 'EUR', owner: 'Anubhav', createdAt: td },
       wc: { name: 'Wise - Common', type: 'bank', currency: 'EUR', owner: 'Shared', createdAt: td } },
     checkins: { a: { accountId: 'db', date: td, balance: 2500, createdAt: now }, b: { accountId: 'cc', date: td, balance: -300, createdAt: now } },
-    expenses: { e1: { amount: 120, date: m + '-02', store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now },
-      e2: { amount: 80, date: m + '-03', store: 'Zara', category: 'Shopping', account: 'Deutsche Bank CC', spender: 'Anubhav', createdAt: now },
+    // This month's entries are dated today, typed in before the balances (so they're in them): early in a month a later
+    // day would still be in the future.
+    expenses: { e1: { amount: 120, date: td, store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now },
+      e2: { amount: 80, date: td, store: 'Zara', category: 'Shopping', account: 'Deutsche Bank CC', spender: 'Anubhav', createdAt: now },
       e3: { amount: 100, date: pm + '-20', store: 'Lidl', category: 'Groceries', account: 'Wise - Common', spender: 'Anubhav', createdAt: now },
-      e4: { amount: 50, date: m + '-04', store: 'Lidl', category: 'Groceries', account: 'Wise - Common', spender: 'Anubhav', createdAt: now } },
+      e4: { amount: 50, date: td, store: 'Lidl', category: 'Groceries', account: 'Wise - Common', spender: 'Anubhav', createdAt: now } },
     income: { i1: { amount: 1000, date: m + '-01', source: 'Salary', category: 'Salary', account: 'Deutsche Bank', earner: 'Anubhav', createdAt: now },
       i2: { amount: 800, date: pm + '-10', source: 'Gift', category: 'Gift', account: 'Wise - Common', earner: 'Anubhav', createdAt: now } } });
   await page.waitForTimeout(300); await app.go('budget'); await page.waitForTimeout(150);
@@ -1546,3 +1548,18 @@ test('a flight saved without its departure time gets it from the flight data, sa
   await clean(app);
 });
 
+
+test('investing goal: €2,499.75 sent (rupee transfers in euros) meets a €2,500 goal, as it reads', async () => {
+  const app = await openApp(), { page } = app, pm = month(-1), m = month(0), now = new Date().toISOString();
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, nre: { name: 'Axis NRE', type: 'bank', currency: 'EUR', owner: 'Anubhav' },
+      t: { name: 'T212', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' }, u: { name: 'ULIP', type: 'investment', invType: 'ulip', currency: 'EUR', owner: 'Anubhav' } },
+    transfers: { t1: { amount: 2213, date: pm + '-02', from: 'Deutsche Bank', to: 'T212', createdAt: now }, t2: { amount: 286.75, date: pm + '-03', from: 'Axis NRE', to: 'ULIP', createdAt: now } },
+    settings: { goals: { items: [{ type: 'invest', owner: 'Both', amount: 2500 }], updatedAt: now },
+      envelopes: { start: pm + '-01', accounts: ['Deutsche Bank', 'Axis NRE'], opening: 5000, openingBy: { 'Deutsche Bank': 4000, 'Axis NRE': 1000 }, trips: false, updatedAt: now,
+        groups: [{ id: 'gs', name: 'Savings & investing', envs: [{ id: 't212', name: 'T212', src: ['→T212'] }, { id: 'ulip', name: 'ULIP', src: ['→ULIP'] }] }], assigned: { [pm]: { t212: 2213, ulip: 287 } } } } });
+  await page.waitForTimeout(400);
+  const cls = await page.$$eval('#goalsP .gdots i', els => els.map(e => e.className));
+  assert.equal(cls[cls.length - 2], 'hit', 'last month is met');
+  assert.match(await app.text('#goalsP .gdots'), /1 of the last \d months/);
+  await clean(app);
+});

@@ -3914,6 +3914,9 @@ document.addEventListener('click', e => { const b = e.target.closest('[data-goal
 document.addEventListener('click', async e => { const b = e.target.closest && e.target.closest('[data-goalset]'); if (!b) return;
   const [i, v] = b.dataset.goalset.split('|').map(Number), old = state.goals || [], items = old.map((g, k) => k === i ? { ...g, amount: v } : g);
   try { await saveGoals(items, `Investing goal: ${eur0.format(v)} a month, what its envelopes’ targets add up to`); } catch (x){ toast(writeError(x)); } });
+// A goal is met in whole euros, as the amounts are shown: €2,499.75 sent (rupee transfers convert with cents) is the
+// €2,500 it reads as, not 25 cents short.
+const goalMet = (v, t) => v + 0.5 >= t;
 function goalInvest(g){
   const cm = thisMonth(), months = [5, 4, 3, 2, 1, 0].map(k => addMonth(cm, -k));
   // Linked to a budget category: from the envelopes' start on, invested is what was sent to the accounts that category
@@ -3924,7 +3927,7 @@ function goalInvest(g){
   // Months before anything was invested at all don't count as misses.
   const first = [...state.snaps.map(x => x.month), ...state.transfers.filter(t => transferType(t) === 'Investment').map(t => t.date.slice(0, 7))].sort()[0] || cm;
   const now = hist[hist.length - 1], done = hist.slice(0, -1).filter(h => h.m >= first);
-  const hits = done.filter(h => h.v >= g.amount).length;
+  const hits = done.filter(h => goalMet(h.v, g.amount)).length;
   const [y, mo] = cm.split('-').map(Number), daysLeft = new Date(y, mo, 0).getDate() - +today().slice(8, 10);
   return { now, hist, hits, of: done.length, daysLeft, linked };
 }
@@ -4664,16 +4667,16 @@ function renderGoals(){
   const head = `<header><h2>Goals</h2><span class="right"><button class="btn small" type="button" data-goalnew>+ Goal</button></span></header>`;
   el.hidden = !G.length; renderSetupLine();
   if (!G.length) return;
-  const bar = (v, t) => `<span class="lvbar"><i style="width:${Math.min(100, t ? v / t * 100 : 0)}%;background:${v >= t ? 'var(--good)' : 'var(--accent)'}"></i></span>`;
+  const bar = (v, t) => `<span class="lvbar"><i style="width:${Math.min(100, t ? v / t * 100 : 0)}%;background:${goalMet(v, t) ? 'var(--good)' : 'var(--accent)'}"></i></span>`;
   el.innerHTML = head + G.map((g, i) => {
     const who = g.owner === 'Both' ? '' : ` · ${esc(g.owner)}`;
     if (g.type === 'invest'){
       const x = goalInvest(g), v = x.now.v, left = g.amount - v;
       return `<div class="goal"><div class="gh"><strong>Invest ${eur0.format(g.amount)} a month${who}</strong><button class="linkbtn" type="button" data-goaledit="${i}">Edit</button></div>
         <span class="gv">${eur0.format(v)} <small>of ${eur0.format(g.amount)} ${x.linked ? 'sent' : ''} in ${MON[+x.now.m.slice(5, 7) - 1]}</small></span>${bar(v, g.amount)}
-        <span class="muted" style="font-size:12.5px">${left <= 0 ? '<span class="pos">Done for this month</span>' : `${eur0.format(left)} to go · ${x.daysLeft} day${x.daysLeft === 1 ? '' : 's'} left`}</span>
+        <span class="muted" style="font-size:12.5px">${goalMet(v, g.amount) ? '<span class="pos">Done for this month</span>' : `${eur0.format(left)} to go · ${x.daysLeft} day${x.daysLeft === 1 ? '' : 's'} left`}</span>
         ${(() => { const X = goalBudget(g, thisMonth()); return X ? `<span class="muted" style="font-size:12.5px">In the budget: ${eur0.format(X.assigned)} of ${eur0.format(g.amount)} assigned in ${esc(X.name)}${X.short >= 0.5 ? ` · <a href="#budget">assign ${eur0.format(X.short)} →</a>` : ' · <span class="pos">covered</span>'}</span>` : ''; })()}
-        <span class="gdots" title="Last 6 months">${x.hist.map((h, j) => `<i class="${j === x.hist.length - 1 ? (h.v >= g.amount ? 'hit now' : 'now') : h.v >= g.amount ? 'hit' : 'miss'}" title="${monthLabel(h.m)}: ${eur0.format(h.v)}"></i>`).join('')} <span>${x.hits} of the last ${x.of} months</span></span></div>`;
+        <span class="gdots" title="Last 6 months">${x.hist.map((h, j) => `<i class="${j === x.hist.length - 1 ? (goalMet(h.v, g.amount) ? 'hit now' : 'now') : goalMet(h.v, g.amount) ? 'hit' : 'miss'}" title="${monthLabel(h.m)}: ${eur0.format(h.v)}"></i>`).join('')} <span>${x.hits} of the last ${x.of} months</span></span></div>`;
     }
     const x = goalEmergency(g);
     return `<div class="goal"><div class="gh"><strong>Emergency fund${who}</strong><button class="linkbtn" type="button" data-goaledit="${i}">Edit</button></div>
