@@ -1563,3 +1563,15 @@ test('investing goal: €2,499.75 sent (rupee transfers in euros) meets a €2,5
   assert.match(await app.text('#goalsP .gdots'), /1 of the last \d months/);
   await clean(app);
 });
+
+test('taxes: a payslip picked while the view redraws (a phone back from the file picker) still opens the check dialog', async () => {
+  const app = await openApp({ mobile: true }), { page } = app;
+  await page.waitForTimeout(300); await app.go('wealth'); await page.waitForTimeout(200); await page.click('[data-wv="tax"]'); await page.waitForTimeout(300);
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('text=Upload payslips (PDF)')]);
+  await app.seed({ workdays: { anubhav_x: { date: d(0), user: 'anubhav', where: 'office' } } }); await page.waitForTimeout(400);   // data comes in: Wealth redraws
+  await fc.setFiles({ name: 'Payslip.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') }); await page.waitForTimeout(800);
+  assert.equal(await page.isVisible('#psDlg[open]'), true, 'the dialog opens');
+  assert.match(await app.text('#psBody'), /Payslip\.pdf/);
+  await page.click('#psCancel');
+  await clean(app);
+});

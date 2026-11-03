@@ -1432,6 +1432,9 @@ label.f input,label.f select{min-width:0;max-width:100%;border:1px solid var(--l
 </dialog>
 <input id="itFile" type="file" accept=".json,application/json" hidden>
 <input id="rsFile" type="file" accept=".json,application/json" hidden>
+<!-- Payslips: outside the Taxes panel, which is redrawn when data comes in (as when a phone comes back from the file
+     picker); a picker inside it would hand the chosen file to an element no longer on the page. -->
+<input id="psFile" type="file" accept="application/pdf,.pdf" multiple hidden>
 <dialog id="rsDlg">
   <form id="rsForm" novalidate style="display:grid;gap:14px;padding:20px">
     <h3>Restore from backup</h3>
@@ -6331,14 +6334,15 @@ document.addEventListener('click', async e => {
     finally { t.disabled = false; }
   }
 });
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-psupload]')) $('#psFile').click(); });
+$('#psFile').addEventListener('change', e => { const f = [...e.target.files]; e.target.value = ''; psUpload(f).catch(x => toast(x.message)); });
 document.addEventListener('change', e => {
-  if (e.target.id === 'psFile'){ const f = e.target.files; psUpload(f).catch(x => toast(x.message)); e.target.value = ''; }
   if (e.target.id === 'psProject'){ state.psProject = e.target.checked; render(); }
 });
 function returnPanel(y){
   const project = state.psProject !== false, r = taxReturn(y, project), f2 = v => eur0.format(Math.abs(v));
   const head = `<header><h2>Tax return estimate · ${y}</h2><span class="hint"><label class="inl"><input type="checkbox" id="psProject" ${project ? 'checked' : ''}> Count the rest of the year like the latest payslip</label></span></header>`;
-  const upload = `<p class="psbtns"><label class="btn primary">Upload payslips (PDF)<input type="file" id="psFile" accept="application/pdf" multiple hidden></label><button type="button" class="btn" id="psAddHand">Type one in</button></p>`;
+  const upload = `<p class="psbtns"><button type="button" class="btn primary" data-psupload>Upload payslips (PDF)</button><button type="button" class="btn" id="psAddHand">Type one in</button></p>`;
   if (!r) return `<section class="panel">${head}<p class="muted" style="margin:0 0 10px;font-size:13px">Upload this year’s payslips and the app adds up the wage tax already paid, works out the tax actually due with your work costs and insurance, and shows what you’d get back.</p>${upload}</section>`;
   const { p, v, c, full } = r, rows = [
     ['Taxable pay', v.taxGross], ['− Work costs', -Math.max(1230, c.wk), c.wk > 1230 ? 'yours, see below' : 'the 1,230 € flat amount'],
