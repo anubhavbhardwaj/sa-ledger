@@ -1575,3 +1575,44 @@ test('taxes: a payslip picked while the view redraws (a phone back from the file
   await page.click('#psCancel');
   await clean(app);
 });
+
+test('office trip paid back by work: owed, claimed, a smaller refund, your own cost; spending, income and the budget follow', async () => {
+  const app = await openApp(), { page } = app, m = month(0), td = d(0), now = new Date().toISOString();
+  const ex = (id, amount, category) => ({ amount, date: td, store: id, category, account: 'Deutsche Bank', spender: 'Anubhav', tripId: 'pl', createdAt: now });
+  await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    trips: { pl: { name: 'Office trip to Poland', type: 'office', traveller: 'Anubhav', start: td, end: td, reimb: true, createdAt: now } },
+    expenses: { f: ex('LOT', 210, 'Transportation'), h: ex('Hotel', 180, 'Accommodation'), e: ex('Dinner', 130, 'Eating Out'),
+      g: { amount: 50, date: td, store: 'Rewe', category: 'Groceries', account: 'Deutsche Bank', spender: 'Anubhav', createdAt: now } },
+    settings: { envelopes: { start: m + '-01', accounts: ['Deutsche Bank'], opening: 2000, openingBy: { 'Deutsche Bank': 2000 }, trips: true, updatedAt: now, groups: [], assigned: {} } } });
+  await page.waitForTimeout(400);
+  // Nothing claimed yet: all of the trip is owed, none of it is spending.
+  assert.match(await app.text('#kpis'), /Spent\s*€50\.00/);
+  assert.match(await app.text('#todoCard'), /€520 owed by work.*Work owes you €520\.00 · Office trip to Poland/);
+  await app.go('budget'); await page.waitForTimeout(300);
+  assert.match(await envText(app), /Office trip to Poland · \w+ '\d\d\s*waiting for €520 from work/);
+  assert.equal(await page.$eval('[data-envkey="t_pl"] .pill', e => e.classList.contains('wait')), true, 'not red: waiting');
+  // Claimed 450: the 70 above it (meals over the per diem) is yours now.
+  await app.go('trips'); await page.waitForTimeout(200); await page.click('[data-trip="pl"]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#reimbP'), /Spent on the trip\s*€520\.00.*Still owed\s*€520\.00.*Your cost\s*€0\.00/);
+  await page.fill('#rbClaim', '450'); await page.click('[data-reimbclaim]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#reimbP'), /Work owes you €450\.00.*Your cost\s*€70\.00/);
+  // The refund: 440 came, added from the trip.
+  await page.click('[data-reimbadd]'); await page.waitForSelector('#dlg[open]');
+  assert.equal(await page.inputValue('#f-amount'), '450.00'); assert.equal(await page.inputValue('#f-category'), 'Refund');
+  await page.fill('#f-amount', '440'); await page.fill('#f-account', 'Deutsche Bank'); await page.click('#saveBtn'); await page.waitForTimeout(400);
+  const trip = (await dbDocs(app, 'trips'))[0], inc = await dbDocs(app, 'income');
+  assert.deepEqual(trip.reimbIds, [inc[0].id], 'linked to the trip');
+  assert.match(await app.text('#reimbP'), /Paid back\s*€440\.00\s*Still owed\s*€10\.00 That’s all they’ll pay/);
+  await page.click('[data-reimball]'); await page.waitForTimeout(300);
+  assert.match(await app.text('#reimbP'), /Still owed\s*€0\.00\s*Your cost\s*€80\.00/);
+  // Overview: the refund isn't income, and only your 80 of the trip is spending.
+  await app.go('overview'); await page.waitForTimeout(300);
+  assert.match(await app.text('#kpis'), /Spent\s*€130\.00/); assert.match(await app.text('#kpis'), /Income\s*€0\.00/);
+  assert.doesNotMatch(await page.$eval('#todoCard', e => e.hidden ? '' : e.textContent), /owed by work|owes you/, 'nothing owed any more');
+  // Budget: the refund went back to the trip; the 80 beyond it is overspent; Ready to Assign didn't get the 440.
+  await app.go('budget'); await page.waitForTimeout(300);
+  const t = await envText(app);
+  assert.match(t, /Ready to Assign\s*€2,000\.00\s*€0 came in/, 'the 440 went back to the trip, not into Ready to Assign');
+  assert.match(t, /Office trip to Poland · \w+ '\d\d\s*–\s*−€80\s*−€80/, 'the 80 work doesn’t pay is overspent');
+  await clean(app);
+});

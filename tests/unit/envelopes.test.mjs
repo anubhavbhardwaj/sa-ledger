@@ -198,3 +198,32 @@ test('envelopes: an adjustment from reconciling goes into Ready to Assign in its
   assert.equal(nov.ready, budgetMonth(cfg(), '2026-11', { ...data, acc, now: '2026-11' }).ready + 846);
 });
 
+
+test('reimbursed office trips: owed, received and your own cost; the budget waits for the money and puts the refund back in the trip', async () => {
+  const { reimbData } = await import('../../public/envelopes.js');
+  const trips = [{ id: 'pl', type: 'office', reimb: true, name: 'Poland' }, { id: 'h', type: 'holiday', reimb: true }];
+  const items = [{ date: '2026-10-02', amount: 210, tripId: 'pl', category: 'Flights', account: 'Deutsche Bank' }, { date: '2026-10-03', amount: 180, tripId: 'pl', category: 'Hotel', account: 'Deutsche Bank' },
+    { date: '2026-10-04', amount: 130, tripId: 'pl', category: 'Eating out', account: 'Deutsche Bank' }];
+  // Nothing claimed yet: all of it is owed.
+  let R = reimbData(trips, items, []);
+  assert.deepEqual(Object.keys(R.trips), ['pl'], 'only office trips');
+  assert.equal(R.trips.pl.spent, 520); assert.equal(R.trips.pl.owed, 520); assert.equal(R.trips.pl.own, 0);
+  // Claimed 450 (flight, hotel, per diem): 70 is yours right away.
+  R = reimbData([{ ...trips[0], reimbClaim: 450 }], items, []);
+  assert.equal(R.trips.pl.owed, 450); assert.equal(R.trips.pl.own, 70); assert.equal(Math.round(R.trips.pl.f * 1000) / 1000, Math.round(450 / 520 * 1000) / 1000);
+  // 440 came in November: 10 still owed against the claim; "that's all" (claim = 440) leaves 80 yours.
+  const inc = [{ id: 'r1', date: '2026-11-10', amount: 440, account: 'Deutsche Bank' }];
+  R = reimbData([{ ...trips[0], reimbClaim: 450, reimbIds: ['r1'] }], items, inc);
+  assert.equal(R.trips.pl.got, 440); assert.equal(R.trips.pl.owed, 10); assert.deepEqual(R.refunds.r1, { trip: 'pl', k: 1 });
+  R = reimbData([{ ...trips[0], reimbIds: ['r1'] }], items, inc);
+  assert.equal(R.trips.pl.owed, 0, 'a refund without a claim is all of it'); assert.equal(R.trips.pl.own, 80);
+  // The budget: October waits for the 440 (only 80 is overspent), November's refund goes back to the trip.
+  const cfg = { start: '2026-10-01', accounts: ['Deutsche Bank'], opening: 1000, trips: true, groups: [], assigned: {} };
+  const acc = () => ({ type: 'bank' });
+  const oct = budgetMonth(cfg, '2026-10', { items, income: inc, acc, now: '2026-11', reimb: R }), nov = budgetMonth(cfg, '2026-11', { items, income: inc, acc, now: '2026-11', reimb: R });
+  assert.equal(oct.rows.find(r => r.key === 't_pl').available, -520); assert.equal(oct.waiting.t_pl, 440);
+  const t = nov.rows.find(r => r.key === 't_pl');
+  assert.equal(t.available, 0, '−440 waited for, +440 back; the 80 beyond it came out of November’s Ready to Assign');
+  assert.equal(nov.ready, 1000 - 80, 'the refund isn’t income for Ready to Assign');
+  assert.equal(nov.overspentLast, 80);
+});

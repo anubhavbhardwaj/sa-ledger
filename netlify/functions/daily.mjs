@@ -5,7 +5,7 @@
 import { firestore } from '../lib/members.mjs';
 import { sendTo, PEOPLE } from '../lib/push.mjs';
 import { beat } from '../lib/health.mjs';
-import { budgetMonth, makeBudget } from '../../public/envelopes.js';
+import { budgetMonth, makeBudget, reimbData } from '../../public/envelopes.js';
 
 const TZ = 'Europe/Berlin';
 const USERNAME = { Anubhav: 'anubhav', Sulekha: 'sulekha' };
@@ -35,12 +35,15 @@ export function dueLines(toBook, trips, today) {
 export function moneyLines({ cfg, items = [], income = [], transfers = [], accounts = [], trips = {} } = {}, today, since) {
   if (!cfg || !(cfg.accounts || []).length || !cfg.start || today < cfg.start) return [];
   const accBy = new Map(accounts.map(a => [String(a.name || '').toLowerCase(), a])), acc = n => accBy.get(String(n || '').toLowerCase()) || null;
-  const m = today.slice(0, 7), data = (old) => ({ items: old ? items.filter(x => !(String(x.createdAt || '') >= since)) : items, income: old ? income.filter(x => !(String(x.createdAt || '') >= since)) : income,
-    transfers: old ? transfers.filter(x => !(String(x.createdAt || '') >= since)) : transfers, acc, now: m });
+  const tripList = Object.entries(trips).map(([id, t]) => ({ id, ...t }));
+  const m = today.slice(0, 7), data = (old) => { const it = old ? items.filter(x => !(String(x.createdAt || '') >= since)) : items, inc = old ? income.filter(x => !(String(x.createdAt || '') >= since)) : income;
+    return { items: it, income: inc, transfers: old ? transfers.filter(x => !(String(x.createdAt || '') >= since)) : transfers, acc, now: m, reimb: reimbData(tripList, it, inc) }; };
   const now = budgetMonth(cfg, m, data(false)), before = budgetMonth(cfg, m, data(true)); if (now.before) return [];
   const { describe, isB } = makeBudget(cfg, acc), name = k => { const d = describe(k); return d?.tripId ? (trips[d.tripId]?.name || 'a trip') : d?.name || k; };
-  const was = new Map((before.rows || []).map(r => [r.key, r.available])), eur = v => '€' + Math.round(Math.abs(v)).toLocaleString('en-IE');
-  const out = (now.rows || []).filter(r => r.available < -0.5 && !r.card && !(was.get(r.key) < -0.5)).map(r => `${name(r.key)} is ${eur(r.available)} overspent`);
+  const eur = v => '€' + Math.round(Math.abs(v)).toLocaleString('en-IE');
+  // Overspent beyond what work still pays back for a trip, and not already yesterday.
+  const over = (B, r) => r.available + ((B.waiting || {})[r.key] || 0) < -0.5, wasOver = new Set((before.rows || []).filter(r => over(before, r)).map(r => r.key));
+  const out = (now.rows || []).filter(r => !r.card && over(now, r) && !wasOver.has(r.key)).map(r => `${name(r.key)} is ${eur(r.available + ((now.waiting || {})[r.key] || 0))} overspent`);
   const cameIn = income.filter(i => String(i.createdAt || '') >= since && i.date >= cfg.start && isB(i.account)).reduce((t, i) => t + (+i.amount || 0), 0);
   if (cameIn >= 100 && now.ready > 0.5) out.push(`${eur(cameIn)} came in: ${eur(now.ready)} to assign`);
   return out;

@@ -84,15 +84,45 @@ export function makeBudget(cfg, acc = () => null){
     : k === NONE_KEY ? { group: 'Not assigned', name: 'Spending in no envelope', none: true }
     : k.startsWith('t_') ? { group: 'Travel', tripId: k.slice(2) }
     : info.get(k) || null;
-  return { isB, isCard, isBill, billCard, keyFor, outKey, describe, info, cards };
+  return { isB, isCard, isBill, billCard, keyFor, outKey, describe, info, cards, tripKeyOf };
+}
+
+// Office trips your employer pays back (trip.reimb): what you spent on the trip, what came back (the income entries
+// linked in trip.reimbIds), what's still owed (what you claimed, trip.reimbClaim, less what came; before you claim
+// anything, all of it; once a refund is linked without a claim, what came is all), and your own cost: the rest.
+// cover = what is (or will be) paid back, never more than you spent. refunds: income id → { trip, k }, k being the
+// share of that entry that is money back (a refund bigger than the trip's spending is income for the rest).
+export function reimbData(trips = [], items = [], income = []){
+  const out = { trips: {}, refunds: {} }, on = trips.filter(t => t && t.reimb && t.type === 'office');
+  if (!on.length) return out;
+  const byTrip = {}; items.forEach(e => { if (e.tripId) byTrip[e.tripId] = (byTrip[e.tripId] || 0) + (+e.amount || 0); });
+  const incBy = new Map(income.map(i => [i.id, i]));
+  for (const t of on){
+    const spent = r2(byTrip[t.id] || 0), refunds = (t.reimbIds || []).map(id => incBy.get(id)).filter(Boolean);
+    const got = r2(refunds.reduce((a, i) => a + (+i.amount || 0), 0)), claim = typeof t.reimbClaim === 'number' && t.reimbClaim >= 0 ? t.reimbClaim : null;
+    const expect = claim !== null ? claim : got > 0 ? got : spent, owed = r2(Math.max(0, expect - got)), cover = r2(Math.min(spent, got + owed));
+    out.trips[t.id] = { spent, got, claim, owed, cover, own: r2(spent - cover), f: spent > 0 ? cover / spent : 0,
+      refunds: refunds.map(i => ({ id: i.id, date: i.date, amount: +i.amount || 0 })).sort((a, b) => String(a.date).localeCompare(String(b.date))) };
+    const k = got > 0 ? Math.min(1, spent / got) : 0;
+    refunds.forEach(i => { out.refunds[i.id] = { trip: t.id, k }; });
+  }
+  return out;
 }
 
 // The month's numbers. data = { items, income, transfers, acc, now } (acc(name) → the account, to know which are cards;
 // now: this month as YYYY-MM).
-export function budgetMonth(cfg, month, { items = [], income = [], transfers = [], acc = () => null, now = new Date().toISOString().slice(0, 7) } = {}){
+// reimb (from reimbData): with one envelope per trip, a refund from work goes back to the trip's envelope instead of
+// Ready to Assign, and while money is still to come back the envelope waits for it instead of counting as overspent.
+export function budgetMonth(cfg, month, { items = [], income = [], transfers = [], acc = () => null, now = new Date().toISOString().slice(0, 7), reimb = null } = {}){
   const start = cfg.start, sm = start.slice(0, 7);
   if (month < sm) return { before: true, ready: 0, rows: [] };
-  const { isB, isCard, isBill, billCard, keyFor, outKey, describe, cards } = makeBudget(cfg, acc), after = d => d >= start;
+  const { isB, isCard, isBill, billCard, keyFor, outKey, describe, cards, tripKeyOf } = makeBudget(cfg, acc), after = d => d >= start;
+  const RB = cfg.trips !== false && reimb && Object.keys(reimb.trips || {}).length ? reimb : null;
+  // Still to come back at the end of month m, per envelope: what will be paid back less the refunds that came by then.
+  const toCome = m => { const w = {}; if (!RB) return w;
+    for (const [id, x] of Object.entries(RB.trips)){ const came = x.refunds.filter(f => String(f.date).slice(0, 7) <= m).reduce((a, f) => a + f.amount, 0), v = r2(x.cover - came);
+      if (v > 0.004){ const k = tripKeyOf(id); w[k] = r2((w[k] || 0) + v); } }
+    return w; };
   const act = {}, inflow = {}, outside = {}, ex = new Set((cfg.excluded || []).map(a => String(a).toLowerCase()));
   const add = (m, k, v) => { (act[m] ||= {}); act[m][k] = (act[m][k] || 0) + v; };
   items.forEach(e => {
@@ -108,7 +138,9 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
     o.total += v; o.byAcc[acc] = (o.byAcc[acc] || 0) + v; o.byKey[k] = (o.byKey[k] || 0) + v;
   });
   income.forEach(i => { if (!after(i.date) || !isB(i.account)) return; const m = i.date.slice(0, 7), v = +i.amount || 0;
-    inflow[m] = (inflow[m] || 0) + v; if (isCard(i.account)) add(m, ccKey(i.account), -v); });
+    const rf = RB && RB.refunds[i.id];
+    if (rf) add(m, tripKeyOf(rf.trip), v); else inflow[m] = (inflow[m] || 0) + v;
+    if (isCard(i.account)) add(m, ccKey(i.account), -v); });
   // Adjustments from reconciling: money your accounts turned out to have (or not) that no entry explains.
   const adj = {};
   (cfg.adjust || []).forEach(a => { if (!a || !/^\d{4}-\d{2}-\d{2}$/.test(a.date || '') || !after(a.date)) return; const m = a.date.slice(0, 7), v = +a.amount || 0;
@@ -130,11 +162,13 @@ export function budgetMonth(cfg, month, { items = [], income = [], transfers = [
     const asg = Object.fromEntries(Object.entries((cfg.assigned || {})[m] || {}).filter(([k]) => known(k))), a = act[m] || {};
     const keys = new Set([...Object.keys(avail), ...Object.keys(asg), ...Object.keys(a)]);
     let overspent = 0;
-    for (const k of Object.keys(avail)) if (avail[k] < 0){ overspent += avail[k]; avail[k] = 0; }
+    // What work still owes for a trip isn't overspending: the envelope keeps waiting for it (only spending beyond it is).
+    const wait = toCome(shift(m, -1));
+    for (const k of Object.keys(avail)){ const lim = -(wait[k] || 0); if (avail[k] < lim - 0.004){ overspent += avail[k] - lim; avail[k] = lim; } }
     const carry = { ...avail }, assignedSum = Object.values(asg).reduce((s, v) => s + (+v || 0), 0);
     for (const k of keys) avail[k] = r2((avail[k] || 0) + (+asg[k] || 0) + (a[k] || 0));
     ready = r2(ready + (inflow[m] || 0) - assignedSum + overspent);
-    if (m === month) out = { inflow: r2(inflow[m] || 0), adjusted: r2(adj[m] || 0), assigned: r2(assignedSum), overspentLast: r2(-overspent),
+    if (m === month) out = { waiting: toCome(m), inflow: r2(inflow[m] || 0), adjusted: r2(adj[m] || 0), assigned: r2(assignedSum), overspentLast: r2(-overspent),
       outside: { total: r2((outside[m] || {}).total || 0), byAcc: Object.entries((outside[m] || {}).byAcc || {}).map(([acc, amount]) => ({ acc, amount: r2(amount) })).sort((a, b) => b.amount - a.amount), byKey: (outside[m] || {}).byKey || {} },
       rows: [...keys].map(k => ({ key: k, ...describe(k), carry: r2(carry[k] || 0), assigned: r2(+asg[k] || 0), activity: r2(a[k] || 0), available: avail[k], ...(k in cardDebt ? { debtAtStart: cardDebt[k] } : {}) })) };
   }

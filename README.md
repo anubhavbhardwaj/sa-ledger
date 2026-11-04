@@ -21,6 +21,11 @@ don't, it lists the likely causes (a starting amount the entries no longer back,
 balance logged the same day) and can record an adjustment to Ready to Assign. Entries dated on a day an account's
 balance was logged carry `inBal` (already in that balance, or after it) once someone says which.
 
+Office trips paid back by the employer (`reimb` on the trip, with `reimbClaim` and the linked refunds in `reimbIds`):
+`reimbData` in `public/envelopes.js` works out what's owed and your own cost. Spending and income totals count
+only your own cost and leave the refund out; in the budget the refund goes back to the trip's envelope, which waits
+for the money instead of counting as overspent.
+
 ## Phone capture (Android)
 
 `netlify/functions/capture.mjs` is served at `/api/capture`. MacroDroid on the phone POSTs each
