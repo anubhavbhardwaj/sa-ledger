@@ -8099,7 +8099,7 @@ function renderBadge(){
   $('#pmHealth').textContent = issues ? `${issues} need${issues === 1 ? 's' : ''} attention` : Object.keys(state.health).length ? 'all good' : '';
   $('#pmHealth').style.color = issues ? 'var(--warn)' : '';
 }
-setInterval(() => { if (state.user) renderBadge(); }, 5 * 60e3);
+setInterval(() => { if (!state.user) return; renderBadge(); if (state.page === 'overview' && !document.hidden) renderNextUp(); }, 5 * 60e3);   // a flight that has landed leaves Coming up
 
 // --- viewing ---
 const fmtDT = s => s ? shortDate(s.slice(0, 10)) + (s.length > 10 ? ' ' + s.slice(11, 16) : '') : '';
@@ -8761,14 +8761,28 @@ function bkPanel(t){
   return `<section class="panel"><header><h2>Itinerary</h2><span class="right"><button class="btn small" type="button" data-addbk="${esc(t.id)}">+ Booking</button></span></header>
     ${bl.length ? `<div class="itin">${bkItinerary(bl)}</div>` : `<p class="empty" style="margin:0">Add tickets and hotel confirmations: choose a PDF or screenshot${state.bkSettings?.email ? ', or forward the email' : ''}. Flights, trains and stays line up here by day, with their QR codes ready to show.</p>`}</section>`;
 }
-// Overview: what's on in the next two days.
+// A booking already behind you today, so Coming up leaves it out. A flight: an hour after it lands, by the live status
+// (which follows delays) or else the landing time saved, or 3 hours after it leaves when there's neither; a cancelled
+// one stays, there's something to do. Trains, buses, ferries, events and tables: once they end, or 3 hours after they
+// start when no end is saved. Stays and rentals go by day (check-out still shows on its day).
+function bkOver(b, now = Date.now()){
+  if (!b.start || b.type === 'hotel' || b.type === 'car') return false;
+  const at = v => v && v.length > 10 ? Date.parse(v) || 0 : 0, H = 36e5, s = at(b.start), e = at(b.end);
+  if (b.type === 'flight'){
+    const st = state.flightStatus[b.id] || {};
+    if (st.cancelled) return false;
+    const arr = (st.landed && Date.parse(st.landedAt || '')) || Date.parse(st.arrEst || '') || e;
+    return arr ? now > arr + H : s ? now > s + 3 * H : false;
+  }
+  return e ? now > e : s ? now > s + 3 * H : false;
+}
 // Overview: what's on in the next two days, with the boarding pass one tap away, or a nudge to check in.
 function renderNextUp(){
   const el = $('#nextUp'); if (!el) return;
   const td = today(), lim = addDays(td, 2), now = new Date();
   const soon = state.bookings.filter(b => {
     const s = (b.start || '').slice(0, 10), e = (b.end || b.start || '').slice(0, 10);
-    return s && ((s >= td && s <= lim) || (['hotel','car'].includes(b.type) && s < td && e >= td));
+    return s && ((s >= td && s <= lim) || (['hotel','car'].includes(b.type) && s < td && e >= td)) && !bkOver(b, +now);
   }).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 5);
   const done = lsGet('bkCheckedIn', []), me = ME();
   const flights = soon.filter(b => b.type === 'flight' && (b.start.length > 10 ? new Date(b.start) > now || (state.flightStatus[b.id] && !state.flightStatus[b.id].landed) : b.start.slice(0, 10) >= td));

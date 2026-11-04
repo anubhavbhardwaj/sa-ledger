@@ -1265,6 +1265,31 @@ test('Coming up: a flight with its pass shows once, with the route, arrival and 
   await clean(app);
 });
 
+test('Coming up leaves out what is already behind you today: a flight an hour after it lands, a train once it arrived', async () => {
+  // The phone's clock at 20:30 today.
+  const at2030 = `(() => { const D = Date, n = new D(); n.setHours(20, 30, 0, 0); const off = n - D.now();
+    class F extends D { constructor(...a){ a.length ? super(...a) : super(D.now() + off); } static now(){ return D.now() + off; } }
+    window.Date = F; })();`;
+  const app = await openApp({ mobile: true, init: at2030 }), { page } = app, now = new Date().toISOString(), td = d(0);
+  const fl = (number, start, end, extra = {}) => ({ tripId: 'tr', type: 'flight', number, title: `${number} Warsaw (WAW) → Munich (MUC)`, from: 'Warsaw (WAW)', to: 'Munich (MUC)', start, end, travellers: ['Anubhav Bhardwaj'], codes: [{ text: 'M1BHARDWAJ/ANUBHAV', format: 'aztec' }], createdAt: now, ...extra });
+  await app.seed({ trips: { tr: { name: 'Warsaw office', type: 'office', traveller: 'Anubhav', start: d(-2), end: td, closed: true, createdAt: now } },
+    bookings: {
+      gone: fl('LO353', td + 'T17:05', td + 'T18:40'),                                  // landed 18:40, no live status
+      late: fl('LO355', td + 'T16:00', td + 'T17:35'),                                  // landed 20:00 by the live status
+      next: fl('LO357', td + 'T22:10', td + 'T23:45'),
+      tr1: { tripId: 'tr', type: 'train', title: 'S8 to Ingolstadt', start: td + 'T18:00', end: td + 'T19:30', createdAt: now },
+      ev1: { tripId: 'tr', type: 'event', title: 'Team dinner', start: td + 'T19:00', createdAt: now } },
+    flightStatus: { late: { landed: true, departed: true, landedAt: td + 'T20:00:00', checkedAt: now } } });
+  await page.waitForTimeout(400);
+  const t = await app.text('#nextUp');
+  assert.doesNotMatch(t, /LO353/, 'landed almost two hours ago');
+  assert.doesNotMatch(t, /S8 to Ingolstadt/, 'the train arrived at 19:30');
+  assert.match(t, /LO355/, 'landed half an hour ago, after a delay');
+  assert.match(t, /LO357 today/, 'still to fly');
+  assert.match(t, /Team dinner/, 'started 90 minutes ago, no end saved');
+  await clean(app);
+});
+
 test('invested: the money sent counts (Overview agrees with Goals and Transfers); the account says when its monthly value misses a transfer', async () => {
   const app = await openApp(), { page } = app, m = month(0), now = new Date().toISOString();
   await app.seed({ accounts: { db: { name: 'Deutsche Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, t: { name: 'T212', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
