@@ -6248,6 +6248,18 @@ function payYear(y, project = true){
   const slips = state.payslips.filter(s => s.month?.startsWith(y + '')).sort((a, b) => a.month.localeCompare(b.month) || String(a.at).localeCompare(String(b.at))).map(withIns);
   if (!slips.length) return null;
   const tot = Object.fromEntries(PS_F.map(k => [k, 0])), byEmp = {}, groups = [], warn = [], notes = [];
+  // Church tax is all or nothing: a member has it on every payslip with wage tax, everyone else on none. On only a few
+  // of them it's a misread (and costly: 8% church tax on the year's income tax, about 2,000 €), so it's left out and named.
+  const taxed = slips.filter(s => +s.lst > 0), withK = taxed.filter(s => +s.kist > 0), ytdK = slips.filter(s => +s.ytd?.kist > 0);
+  const slipAt = s => `${monthLabel(s.month)} (${esc(s.employer || '?')})`;
+  if (!(withK.length * 2 > taxed.length)){
+    const odd = [...withK.map(s => `${slipAt(s)}: ${eur.format(s.kist)}`), ...ytdK.map(s => `${slipAt(s)}, year to date: ${eur.format(s.ytd.kist)}`)];
+    if (odd.length) warn.push(`Church tax on ${odd.join('; ')}, but not on your other payslips, so it’s probably misread and isn’t counted. If you’re not a church member, set it to 0 there with Edit.`);
+    slips.forEach(s => { if (+s.kist > 0){ s.kistRead = s.kist; s.kist = 0; } if (+s.ytd?.kist > 0){ s.kistRead ||= s.ytd.kist; s.ytd = { ...s.ytd, kist: 0 }; } });
+  } else {
+    const miss = taxed.filter(s => !(+s.kist > 0));
+    if (miss.length) warn.push(`No church tax on ${miss.map(slipAt).join(', ')}, though your other payslips have it. Add it with Edit if it’s on the slip.`);
+  }
   for (const s of slips) (byEmp[empKey(s.employer)] ||= []).push(s);
   for (const list of Object.values(byEmp)){
     const last = list[list.length - 1], ytd = { ...(last.ytd || {}) }, sum = Object.fromEntries(PS_F.map(k => [k, list.reduce((a, s) => a + (+s[k] || 0), 0)]));
@@ -6403,7 +6415,7 @@ function returnPanel(y){
       ${p.groups.map(g => `<tr><td>${esc(g.name)}<div class="muted" style="font-size:12px">${g.months.length} slip${g.months.length === 1 ? '' : 's'} · ${g.src}</div></td><td class="num">${eur0.format(g.v.taxGross)}</td><td class="num">${eur0.format(g.v.lst + g.v.soli)}</td><td class="num">${eur0.format(g.v.rv)}</td><td class="num">${eur0.format(g.v.kv)}</td><td class="num">${eur0.format(g.v.pv)}</td></tr>`).join('')}
       ${project && p.rest ? `<tr><td>Projected ${p.rest} month${p.rest === 1 ? '' : 's'}<div class="muted" style="font-size:12px">${p.base.n > 1 ? `a normal month of the last ${p.base.n}` : `like ${monthLabel(p.base.month)}`}, without one-off pay · ${esc(p.base.employer || '')}</div></td><td class="num">${eur0.format(p.rest * (+p.base.taxGross || 0))}</td><td class="num">${eur0.format(p.rest * ((+p.base.lst || 0) + (+p.base.soli || 0)))}</td><td class="num">${eur0.format(p.rest * (+p.base.rv || 0))}</td><td class="num">${eur0.format(p.rest * (+p.base.kv || 0))}</td><td class="num">${eur0.format(p.rest * (+p.base.pv || 0))}</td></tr>` : ''}
       </tbody></table></div><p class="hint">Average wage tax rate so far: ${(p.tot.lst / Math.max(1, p.tot.taxGross) * 100).toFixed(1)}% of tax gross; at your income about 20 to 25% is normal.</p></details>
-    <details class="psmore"><summary>Payslips (${p.slips.length})</summary><div class="mwrap"><table class="mini"><thead><tr><th>Month</th><th>Employer</th><th class="num">Tax gross</th><th class="num">Wage tax</th><th class="num">Pension, health, care</th><th></th></tr></thead><tbody>${p.slips.map(s => `<tr><td>${monthLabel(s.month)}</td><td>${esc(s.employer || '')}${s.ytd ? ' <span class="chip">YTD</span>' : ''}${+s.oneOff > 0 ? ' <span class="chip">one-off</span>' : ''}</td><td class="num">${eur0.format(s.taxGross || 0)}</td><td class="num">${eur0.format(s.lst || 0)}</td><td class="num">${eur0.format((+s.rv || 0) + (+s.kv || 0) + (+s.pv || 0))}</td><td style="white-space:nowrap"><button type="button" class="linkbtn" data-psedit="${s.id}">Edit</button> <button type="button" class="linkbtn" data-psdel="${s.id}" aria-label="Remove">✕</button></td></tr>`).join('')}</tbody></table></div></details>
+    <details class="psmore"><summary>Payslips (${p.slips.length})</summary><div class="mwrap"><table class="mini"><thead><tr><th>Month</th><th>Employer</th><th class="num">Tax gross</th><th class="num">Wage tax</th><th class="num">Pension, health, care</th><th></th></tr></thead><tbody>${p.slips.map(s => `<tr><td>${monthLabel(s.month)}</td><td>${esc(s.employer || '')}${s.ytd ? ' <span class="chip">YTD</span>' : ''}${+s.oneOff > 0 ? ' <span class="chip">one-off</span>' : ''}${s.kistRead ? ` <span class="chip neg" title="Church tax ${eur.format(s.kistRead)} on this slip only: not counted">church tax?</span>` : ''}</td><td class="num">${eur0.format(s.taxGross || 0)}</td><td class="num">${eur0.format(s.lst || 0)}</td><td class="num">${eur0.format((+s.rv || 0) + (+s.kv || 0) + (+s.pv || 0))}</td><td style="white-space:nowrap"><button type="button" class="linkbtn" data-psedit="${s.id}">Edit</button> <button type="button" class="linkbtn" data-psdel="${s.id}" aria-label="Remove">✕</button></td></tr>`).join('')}</tbody></table></div></details>
     ${upload}
     <p class="hint">Single filer, ${y} tariff. Health insurance counts less 4% (sick pay); unemployment insurance isn’t deductible at your income. Bonuses or a 13th salary later in the year change the result. A rough estimate, not tax advice.</p></section>`;
 }

@@ -292,6 +292,22 @@ test('taxes on a phone: the view fits, a second payslip for the month of a job c
   await clean(app);
 });
 
+test('taxes: church tax on only one payslip is a misread: left out and named; on all of them it counts', async () => {
+  const app = await openApp(), { page } = app;
+  const slip = (m, kist) => ({ month: `2025-${m}`, employer: 'MediaMarktSaturn', user: 'anubhav', taxGross: 7000, lst: 1500, soli: 0, kist, rv: 651, av: 91, kv: 509, pv: 140 });
+  await app.seed({ payslips: { a: slip('01', 0), b: slip('02', 120), c: slip('03', 0) } });
+  await app.go('wealth'); await page.click('[data-wv="tax"]'); await page.click('[data-taxyear="2025"]'); await page.waitForTimeout(150);
+  let t = await app.text('#wv-tax');
+  assert.match(t, /Church tax on Feb 2025 \(MediaMarktSaturn\): €120\.00, but not on your other payslips, so it’s probably misread and isn’t counted/);
+  assert.match(t, /Income tax \+ Soli\s*€/); assert.doesNotMatch(t, /\+ church tax|insurance, church tax/, 'no church tax in the return');
+  assert.match(t, /Already withheld\s*€18,000/, 'twelve months of 1,500 € wage tax: the misread 120 € isn’t counted as withheld either');
+  assert.match(t, /church tax\?/, 'the slip is marked in the list');
+  await app.seed({ payslips: { a: slip('01', 120), c: slip('03', 120) } });
+  await page.waitForTimeout(200); t = await app.text('#wv-tax');
+  assert.match(t, /Income tax \+ Soli \+ church tax/, 'a member’s church tax counts'); assert.doesNotMatch(t, /probably misread/);
+  await clean(app);
+});
+
 test('taxes: figure check flags missing insurance and doubled months; ways to save feed the estimate', async () => {
   const app = await openApp(), { page } = app;
   const base = { user: 'anubhav', taxGross: 7669, lst: 1650, soli: 0, kist: 0, rv: 713, av: 100, kv: 509, pv: 140 };
