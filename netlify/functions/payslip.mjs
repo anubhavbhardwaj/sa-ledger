@@ -3,6 +3,7 @@
 // POST /api/payslip { text } → { slip }. The app shows the result for checking before anything is saved.
 import { member, json, verifyToken, firestore } from '../lib/members.mjs';
 import { beat } from '../lib/health.mjs';
+import { fixSlip } from '../../public/payslip-check.js';
 
 const MODEL = 'openai/gpt-oss-120b';
 export const FIELDS = ['taxGross', 'oneOff', 'lst', 'soli', 'kist', 'rv', 'av', 'kv', 'pv', 'net'];
@@ -18,13 +19,18 @@ Meaning (all for THIS month, in euros, positive numbers, employee share only):
 - lst: Lohnsteuer / wage tax withheld. soli: Solidaritätszuschlag. kist: Kirchensteuer / church tax (0 if none).
 - rv: Rentenversicherung / pension insurance contribution, employee share (AN-Anteil, RV-AN). The contribution in euros, not the insurance gross it is based on.
 - av: Arbeitslosenversicherung / unemployment insurance, employee share.
-- kv: Krankenversicherung / health insurance contribution, employee share including the additional contribution (Zusatzbeitrag). If you pay private insurance and get an employer subsidy, the premium minus the subsidy.
+- kv: Krankenversicherung / health insurance contribution, employee share including the additional contribution (Zusatzbeitrag). If you pay private insurance, or are voluntarily insured (freiwillig versichert) and the employer pays the whole contribution and an allowance (KV-Gesamtbeitrag and KV-AG-Zuschuss, "Pay-Off Contrib. Volun. H" and "ER Allowance HI"), the whole contribution minus the allowance. pv the same way (PV-Gesamtbeitrag less PV-AG-Zuschuss, "Ded. Contrib. Vol. CI" less "ER nursing subsidy").
 - pv: Pflegeversicherung / long-term care insurance, employee share.
-- net: Nettoverdienst / net pay (before other deductions like job bike or advances).
+- net: what was paid out to the bank account (Auszahlung, Überweisung, Auszahlungsbetrag, Bank transfer), not the statutory net (Netto, Statutory net) above it.
 - ytd: the same figures accumulated for the year so far (Jahreswerte, kumuliert, YTD) when the slip shows them; omit ytd or fields it doesn't show.
 Labels you may see, German and English: Lohnsteuer/LSt/Wage tax/Income tax; Solidaritätszuschlag/SolZ/Soli; Kirchensteuer/KiSt/Church tax;
 RV/Rentenversicherung/PI/Pension insurance; AV/ALV/Arbeitslosenversicherung/UI/Unemployment insurance; KV/Krankenversicherung/HI/Health insurance
 (the contribution line, often "KV-Beitrag AN", "HI EE", "Health insurance employee"); PV/Pflegeversicherung/LTCI/Nursing care/Long-term care insurance.
+Tables often leave a column empty (no church tax, or no health and care contributions for a voluntary member), so a row has fewer numbers than
+its headers. Match each number to its column by position and never move a number into the empty column: under "KV RV AV PV" the row
+"SV-Beitrag 744,00 104,00" with KV empty is rv 744.00 and av 104.00; under "Steuerbrutto Lohnsteuer Kirchensteuer Solidaritätsz." the row
+"4000,00 950,00 15,00" is taxGross, lst and soli (no church tax). The same in the year-to-date block (Jahreswerte), where a voluntary
+member's health and care are usually not shown: use null for them.
 Lines like "KV-Brutto", "HI gross", "PI gross", "SV-Brutto" are bases, not contributions: never use them as kv, pv, rv or taxGross.
 In a year-to-date block, take ytd.taxGross from the tax gross line (Steuer-Brutto / Tax gross / LSt-Brutto), not from a pension or health insurance gross.
 Never use employer shares (AG-Anteil, ER). Use null for a monthly figure the slip doesn't show. Never invent numbers.`;
@@ -75,7 +81,9 @@ export async function handle(req, { env = process.env, verify = verifyToken, fet
     console.error('payslip: Groq', jsonMode ? 'JSON mode' : 'plain', last);
   }
   if (!out) return json(502, { error: 'The AI couldn’t read this payslip (' + last + '). Try again, or type the figures in.' });
-  return json(200, { slip: clean(out) });
+  // Checked against the rules the figures follow, and repaired from the slip's text where the reading slipped.
+  const { slip, fixes } = fixSlip(clean(out), text);
+  return json(200, { slip, fixes });
 }
 
 export default async (req) => {

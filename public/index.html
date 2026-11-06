@@ -1652,6 +1652,7 @@ import { detectRecurring, backtest as recurBacktest } from "./recur.js";
 import { checkPhoto, passportAlerts, human as humanDate } from "./verify.js";
 import { formPayload, peopleText, bookmarklet, FILLER_VERSION } from "./fill.js";
 import { reimbData, budgetMonth, groupRows, assignTargets, setAssigned, moveAssigned, makeBudget, unassignedSources, allSources, spendingStats, srcLabel, norm as srcNorm, newId, tripKey, ccKey, CC_RE, SAVE_KEY, NONE_KEY, SAVE_A, SAVE_S, saveKeyOf, isSaveKey, committedBy, splitOf, PEOPLE, transferSources, TO } from "./envelopes.js";
+import { checkSlip } from "./payslip-check.js";
 import { evaluate as evalCategories, CategoryModel, suggestCategory, tuneThreshold, normStore } from "./smart.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -6250,6 +6251,8 @@ function payYear(y, project = true){
   const tot = Object.fromEntries(PS_F.map(k => [k, 0])), byEmp = {}, groups = [], warn = [], notes = [];
   // Church tax is all or nothing: a member has it on every payslip with wage tax, everyone else on none. On only a few
   // of them it's a misread (and costly: 8% church tax on the year's income tax, about 2,000 €), so it's left out and named.
+  // Saved figures that don't fit the rules (a shifted column, Soli read as something else): named so they get fixed.
+  for (const s of state.payslips.filter(s => s.month?.startsWith(y + ''))) for (const x of checkSlip(s, { church: false })) warn.push(`${monthLabel(s.month)} (${esc(s.employer || '?')}): ${esc(x)} Fix it with Edit.`);
   const taxed = slips.filter(s => +s.lst > 0), withK = taxed.filter(s => +s.kist > 0), ytdK = slips.filter(s => +s.ytd?.kist > 0);
   const slipAt = s => `${monthLabel(s.month)} (${esc(s.employer || '?')})`;
   if (!(withK.length * 2 > taxed.length)){
@@ -6337,8 +6340,9 @@ async function psUpload(files){
   for (const f of list){
     try {
       const text = await pdfRows(f);
-      const { slip } = await (await api('/api/payslip', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) })).json();
-      state.psDraft.push({ ...slip, file: f.name });
+      const r = await api('/api/payslip', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) }), j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.slip) throw new Error(j.error || 'The payslip couldn’t be read. Type the figures in instead.');
+      state.psDraft.push({ ...j.slip, fixes: j.fixes || [], file: f.name });
     } catch (x){ state.psDraft.push({ file: f.name, error: x.message || String(x) }); }
     psDialog(state.psDraft.length < list.length ? `Reading ${state.psDraft.length + 1} of ${list.length}…` : '');
   }
@@ -6349,14 +6353,23 @@ function psDialog(busy){
   $('#psBody').innerHTML = (busy ? `<p class="muted">${esc(busy)}</p>` : '') + drafts.map((s, i) => s.error ? `<div class="pscard"><strong>${esc(s.file)}</strong><p class="err" style="margin:6px 0 0">${esc(s.error)}</p></div>` : `<div class="pscard">
       <div class="psh"><strong>${esc(s.file || 'Typed in')}</strong><button type="button" class="linkbtn" data-psdrop="${i}">Leave out</button></div>
       <div class="fire-grid"><label>Month<input type="month" data-ps="${i}" data-psk="month" value="${s.month || ''}"></label><label>Employer<input data-ps="${i}" data-psk="employer" value="${esc(s.employer || '')}"></label>${['taxGross', 'oneOff', ...PS_F.slice(1), 'net'].map(k => inp(i, k, s[k])).join('')}</div>
-      <details ${s.ytd ? 'open' : ''}><summary>Year to date${s.ytd ? ' (found on the slip)' : ' (not on the slip)'}</summary><div class="fire-grid">${PS_F.map(k => inp(i, k, s.ytd?.[k], true)).join('')}</div></details></div>`).join('');
+      <details ${s.ytd ? 'open' : ''}><summary>Year to date${s.ytd ? ' (found on the slip)' : ' (not on the slip)'}</summary><div class="fire-grid">${PS_F.map(k => inp(i, k, s.ytd?.[k], true)).join('')}</div></details>
+      <div data-psiss="${i}">${psIssues(s)}</div></div>`).join('');
   $('#psSave').disabled = !!busy || !drafts.some(s => !s.error);
   if (!d.open) d.showModal();
+}
+// What the reader corrected, and figures that don't fit the rules (pension 9.3% and unemployment 1.3% of the same pay,
+// Soli at most 5.5% and church tax 8 or 9% of the wage tax), checked again as you type.
+function psIssues(s){
+  const bad = checkSlip(s);
+  return (s.fixes?.length ? `<div class="psnote"><p><strong>Corrected while reading:</strong> ${s.fixes.map(esc).join('; ')}.</p></div>` : '')
+    + (bad.length ? `<div class="pschk"><strong>Check before saving:</strong>${bad.map(x => `<p>${esc(x)}</p>`).join('')}</div>` : '');
 }
 document.addEventListener('input', e => {
   const i = e.target.closest('[data-ps]'); if (!i) return;
   const s = state.psDraft[+i.dataset.ps], k = i.dataset.psk, v = i.type === 'number' ? (i.value === '' ? null : +i.value) : i.value.trim();
   if (k.startsWith('ytd.')){ s.ytd ||= {}; if (v === null) delete s.ytd[k.slice(4)]; else s.ytd[k.slice(4)] = v; } else s[k] = v;
+  const box = document.querySelector(`[data-psiss="${i.dataset.ps}"]`); if (box) box.innerHTML = psIssues(s);
 });
 document.addEventListener('click', async e => {
   const t = e.target;

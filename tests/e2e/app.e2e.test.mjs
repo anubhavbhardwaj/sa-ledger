@@ -292,6 +292,23 @@ test('taxes on a phone: the view fits, a second payslip for the month of a job c
   await clean(app);
 });
 
+test('taxes: figures that don’t fit (shifted columns) are flagged in the check dialog as you type, and on saved slips', async () => {
+  const app = await openApp(), { page } = app;
+  // Saved with the year to date shifted one column: unemployment in pension, pension in health.
+  await app.seed({ payslips: { 'anubhav_2025-10_new': { month: '2025-10', employer: 'New Job', user: 'anubhav', taxGross: 8000, lst: 1900, soli: 37.1, kist: 0, rv: 744, av: 104, kv: 450, pv: 120,
+    ytd: { taxGross: 12000, lst: 2850, soli: 55.65, rv: 156, kv: 1116 } } } });
+  await app.go('wealth'); await page.click('[data-wv="tax"]'); await page.click('[data-taxyear="2025"]'); await page.waitForTimeout(150);
+  assert.match(await app.text('#wv-tax'), /Oct 2025 \(New Job\): Year to date: health \(1116\.00\) looks like the pension figure and pension \(156\.00\) like unemployment/);
+  await page.click('#psAddHand'); await page.waitForSelector('#psDlg[open]');
+  const set = async (k, v) => page.fill(`#psDlg [data-ps="0"][data-psk="${k}"]`, v);
+  for (const [k, v] of Object.entries({ taxGross: '8000', lst: '1900', kv: '744', rv: '104' })) await set(k, v);
+  assert.match(await app.text('#psBody'), /Check before saving:\s*Health \(744\.00\) looks like the pension figure/);
+  await set('kv', '450'); await set('rv', '744'); await set('av', '104');
+  assert.doesNotMatch(await app.text('#psBody'), /Check before saving/, 'gone once the figures fit');
+  await page.click('#psCancel');
+  await clean(app);
+});
+
 test('taxes: church tax on only one payslip is a misread: left out and named; on all of them it counts', async () => {
   const app = await openApp(), { page } = app;
   const slip = (m, kist) => ({ month: `2025-${m}`, employer: 'MediaMarktSaturn', user: 'anubhav', taxGross: 7000, lst: 1500, soli: 0, kist, rv: 651, av: 91, kv: 509, pv: 140 });
