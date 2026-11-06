@@ -258,6 +258,40 @@ test('taxes: a payslip typed in gives the return estimate (tax due vs wage tax w
   await clean(app);
 });
 
+test('taxes on a phone: the view fits, a second payslip for the month of a job change saves, and the estimate copes with the half months', async () => {
+  const app = await openApp({ mobile: true }), { page } = app, y = new Date().getFullYear(), sep = `${y}-09`, oct = `${y}-10`;
+  // Leaving the old job mid-September: half a month, with the year so far on it. The new job starts the same month.
+  await app.seed({ payslips: {
+    [`anubhav_${sep}_old`]: { month: sep, employer: 'Old Job GmbH', user: 'anubhav', taxGross: 3000, lst: 650, soli: 0, kist: 0, rv: 279, av: 39, kv: 250, pv: 70,
+      ytd: { taxGross: 60000, lst: 14000, soli: 100, kist: 0, rv: 5500, av: 780, kv: 4250, pv: 1180 } },
+    [`anubhav_${oct}_new`]: { month: oct, employer: 'New Job GmbH', user: 'anubhav', taxGross: 8000, lst: 1900, soli: 30, kist: 0, rv: 744, av: 104, kv: 500, pv: 140 } } });
+  await app.go('wealth'); await page.click('[data-wv="tax"]'); await page.waitForTimeout(250);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), await page.evaluate(() => innerWidth), 'the tables scroll in their box, the page fits the phone');
+  await page.click('#psAddHand'); await page.waitForSelector('#psDlg[open]');
+  const save = await page.$eval('#psSave', e => e.getBoundingClientRect().right);
+  assert.ok(save <= await page.evaluate(() => innerWidth), 'Save is on the screen');
+  const set = async (k, v) => page.fill(`#psDlg [data-ps="0"][data-psk="${k}"]`, v);
+  await set('month', sep);
+  for (const [k, v] of Object.entries({ taxGross: '4000', lst: '950', soli: '15', rv: '372', av: '52', kv: '250', pv: '70' })) await set(k, v);
+  await page.click('#psSave'); await page.waitForTimeout(300);
+  const ids = (await dbDocs(app, 'payslips')).map(s => s.id).sort();
+  assert.deepEqual(ids, [`anubhav_${sep}_new-job-gmbh`, `anubhav_${sep}_old`, `anubhav_${oct}_new`], 'both September slips are kept');
+  // The same month and employer again would replace it: asked first, and nothing changes on Cancel.
+  await page.click('#psAddHand'); await page.waitForSelector('#psDlg[open]');
+  await set('month', sep); await set('taxGross', '1'); await set('lst', '0');
+  let asked = ''; page.once('dialog', dl => { asked = dl.message(); dl.dismiss(); });
+  await page.click('#psSave'); await page.waitForTimeout(250);
+  assert.match(asked, /already a Sep \d{4} payslip from New Job GmbH\. Replace it\?/);
+  assert.equal((await dbDocs(app, 'payslips')).find(s => s.id === `anubhav_${sep}_new-job-gmbh`).taxGross, 4000, 'not replaced');
+  await page.click('#psCancel');
+  await page.click('summary:has-text("Where the figures come from")').catch(() => {});
+  const t = await app.text('#wv-tax');
+  assert.match(t, /Old Job GmbH\s*1 slip · year-to-date on Sep/, 'the half month’s year-to-date figures are used');
+  assert.match(t, /Projected 2 months\s*like Oct \d{4}, without one-off pay · New Job GmbH\s*€16,000/, 'the rest of the year like a full month, not the half one');
+  assert.doesNotMatch(t, /Payslips start in Sep/);
+  await clean(app);
+});
+
 test('taxes: figure check flags missing insurance and doubled months; ways to save feed the estimate', async () => {
   const app = await openApp(), { page } = app;
   const base = { user: 'anubhav', taxGross: 7669, lst: 1650, soli: 0, kist: 0, rv: 713, av: 100, kv: 509, pv: 140 };

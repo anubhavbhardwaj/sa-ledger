@@ -802,7 +802,7 @@ a.kpilink:hover{background:var(--sunk)}
 .banner .left{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 
 .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;min-width:0;display:grid;gap:12px;align-content:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-content:start}   /* a wide table scrolls in its box instead of widening the page */
 .panel h2{font:700 15px/1.2 var(--f-display);margin:0}
 .panel .hint{font-size:12px;color:var(--muted);margin:0}
 .panel header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
@@ -6252,12 +6252,16 @@ function payYear(y, project = true){
   for (const list of Object.values(byEmp)){
     const last = list[list.length - 1], ytd = { ...(last.ytd || {}) }, sum = Object.fromEntries(PS_F.map(k => [k, list.reduce((a, s) => a + (+s[k] || 0), 0)]));
     // Year-to-date figures win when they look right: at least what the uploaded months add up to (they may cover
-    // months not uploaded), and not more than 12 times a normal month.
-    const ytdOk = ytd.taxGross > 0 && ytd.taxGross >= sum.taxGross * 0.97 && ytd.taxGross <= Math.max(...list.map(s => +s.taxGross || 0)) * 13;
+    // months not uploaded), and not more than 13 times the biggest month, unless their wage tax fits too (a last
+    // month that's only half a month, like leaving a job mid-month, is no measure of a normal month).
+    const ytdLow = ytd.taxGross > 0 && ytd.taxGross < sum.taxGross * 0.97;
+    const ytdOk = ytd.taxGross > 0 && !ytdLow && (ytd.taxGross <= Math.max(...list.map(s => +s.taxGross || 0)) * 13
+      || (ytd.lst > 0 && ytd.lst >= sum.lst * 0.97 && ytd.lst / ytd.taxGross <= 0.45));
     const g = { name: last.employer || '?', months: list.map(s => s.month), src: ytdOk ? `year-to-date on ${monthLabel(last.month)}` : `${list.length} month${list.length === 1 ? '' : 's'} added up`, v: {} };
     for (const k of PS_F) g.v[k] = ytdOk && ytd[k] !== undefined ? ytd[k] : sum[k];
     for (const k of PS_F) tot[k] += g.v[k];
-    if (ytd.taxGross > 0 && !ytdOk) notes.push(`${esc(g.name)}: the year-to-date figure read from ${monthLabel(last.month)} (${eur0.format(ytd.taxGross)}) is lower than the months added up (${eur0.format(sum.taxGross)}), so it’s probably a different gross (like the pension-insurance gross, which leaves out one-off pay). The months are used instead; nothing to do if all months are uploaded.`);
+    if (ytdLow) notes.push(`${esc(g.name)}: the year-to-date figure read from ${monthLabel(last.month)} (${eur0.format(ytd.taxGross)}) is lower than the months added up (${eur0.format(sum.taxGross)}), so it’s probably a different gross (like the pension-insurance gross, which leaves out one-off pay). The months are used instead; nothing to do if all months are uploaded.`);
+    else if (ytd.taxGross > 0 && !ytdOk) notes.push(`${esc(g.name)}: the year-to-date figures on ${monthLabel(last.month)} (tax gross ${eur0.format(ytd.taxGross)}) don’t fit the months (no year-to-date wage tax, or too much of it), so the months are used instead. Check them with Edit.`);
     const dup = list.map(s => s.month).filter((m, i, a) => a.indexOf(m) !== i);
     if (dup.length) warn.push(`${esc(g.name)}: ${[...new Set(dup)].map(monthLabel).join(', ')} uploaded twice.`);
     const ratios = list.filter(s => +s.taxGross > 0 && !(+s.oneOff > 0)).map(s => s.lst / s.taxGross), low = Math.min(...ratios);
@@ -6276,7 +6280,9 @@ function payYear(y, project = true){
   // The rest of the year: the latest employer's normal month (median of up to its last 3 slips, one-off pay taken out,
   // months that look like they hold a bonus left out when there are others).
   const last = slips[slips.length - 1], cur = byEmp[empKey(last.employer)];
-  const pool = (cur.filter(s => !s.suspect).length ? cur.filter(s => !s.suspect) : cur).slice(-3).map(regular);
+  // A part month (the first or last month of a job, unpaid leave) isn't a normal month either: left out when there are others.
+  const pool0 = (cur.filter(s => !s.suspect).length ? cur.filter(s => !s.suspect) : cur).slice(-3).map(regular);
+  const top = Math.max(...pool0.map(s => +s.taxGross || 0)), pool = pool0.filter(s => (+s.taxGross || 0) >= 0.7 * top);
   const base = { ...last, ...Object.fromEntries(PS_F.map(k => [k, median(pool.map(s => +s[k] || 0))])), month: pool[pool.length - 1].month, n: pool.length };
   const lastM = +last.month.slice(5, 7), rest = project ? 12 - lastM : 0;
   const proj = Object.fromEntries(PS_F.map(k => [k, tot[k] + rest * (+base[k] || 0)]));
@@ -6351,15 +6357,19 @@ document.addEventListener('click', async e => {
     const ok = state.psDraft.filter(s => !s.error);
     const bad = ok.find(s => !/^\d{4}-\d{2}$/.test(s.month || '') || !(s.taxGross > 0) || s.lst === null || s.lst === undefined);
     if (bad) return toast('Each payslip needs its month, tax gross and wage tax.');
+    // One payslip per month and employer: a new one with the same month and employer replaces the saved one, so ask.
+    const empOf = s => (s.employer || 'Employer').slice(0, 60), psId = s => `anubhav_${s.month}_${empOf(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x'}`;
+    const clash = ok.filter(s => psId(s) !== s.id && state.payslips.some(p => p.id === psId(s)));
+    if (clash.length && !confirm(`There’s already a ${clash.map(s => monthLabel(s.month) + ' payslip from ' + empOf(s)).join(' and a ')}. Replace it?\n\nFor a second payslip in the same month (changing jobs), cancel and change the employer.`)) return;
     t.disabled = true;
     try {
       const b = writeBatch(fs);
       for (const s of ok){
-        const emp = (s.employer || 'Employer').slice(0, 60), o = { month: s.month, employer: emp, user: 'anubhav', at: new Date().toISOString(), by: usernameOf(state.user) };
+        const emp = empOf(s), o = { month: s.month, employer: emp, user: 'anubhav', at: new Date().toISOString(), by: usernameOf(state.user) };
         for (const k of [...PS_F, 'oneOff', 'net']) if (typeof s[k] === 'number' && isFinite(s[k])) o[k] = Math.round(s[k] * 100) / 100;
         const y = {}; for (const k of PS_F) if (typeof s.ytd?.[k] === 'number' && isFinite(s.ytd[k])) y[k] = s.ytd[k];
         if (Object.keys(y).length) o.ytd = y;
-        const id = `anubhav_${s.month}_${emp.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x'}`;
+        const id = psId(s);
         b.set(doc(fs, 'payslips', id), o);
         if (s.id && s.id !== id) b.delete(doc(fs, 'payslips', s.id));
       }
