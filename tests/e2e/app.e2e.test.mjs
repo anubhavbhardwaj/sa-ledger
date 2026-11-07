@@ -924,6 +924,63 @@ test('layout: numbers first and To do on one line; Budget tab; charts on Transac
   await clean(app);
 });
 
+test('investments: money put in counts as on the Overview, money sent after a value was saved counts on top, a new account’s transfers are new money', async () => {
+  const app = await openApp(), { page } = app, q = month(-2), p = month(-1), now = new Date().toISOString();
+  const inv = (name, owner = 'Anubhav') => ({ name, type: 'investment', invType: 'equity', currency: 'EUR', owner });
+  const snap = (acc, m, investment, value, createdAt, extra = {}) => ({ accountId: acc, month: m, investment, value, createdAt, ...extra });
+  const tr = (to, date, amount) => ({ amount, date, from: 'Bank', to, createdAt: now });
+  await app.seed({
+    accounts: { bank: { name: 'Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' }, b1: inv('Broker'), b2: inv('Broker 2'), nf: inv('New fund', 'Sulekha') },
+    checkins: { c1: { accountId: 'bank', date: q + '-01', balance: 20000, createdAt: now } },
+    invSnapshots: {
+      // Its value was saved on the 3rd; 400 more went in on the 20th and "put in" says 500: the 400 isn't in the value.
+      b1q: snap('b1', q, 10000, 10000, q + '-15T10:00:00Z', { opening: true }), b1p: snap('b1', p, 500, 10600, p + '-03T10:00:00Z'),
+      // Saved on the 3rd too, but "put in" already has the later 400 (it was edited after): the value has it as well.
+      b2q: snap('b2', q, 5000, 5000, q + '-15T10:00:00Z', { opening: true }), b2p: snap('b2', p, 700, 5700, p + '-03T10:00:00Z'),
+      // A new account: its first value is the 300 sent that day; 200 more came later that month.
+      nfp: snap('nf', p, 300, 300, p + '-10T10:00:00Z', { opening: true }) },
+    transfers: { t1: tr('Broker', p + '-02', 500), t2: tr('Broker', p + '-20', 400), t3: tr('Broker 2', p + '-02', 300), t4: tr('Broker 2', p + '-20', 400),
+      t5: tr('New fund', p + '-10', 300), t6: tr('New fund', p + '-25', 200) },
+    settings: { goals: { items: [{ type: 'invest', owner: 'Both', amount: 2000 }], updatedAt: now } } });
+  await page.waitForTimeout(250);
+  const lbl = m => new Date(m + '-15').toLocaleString('en-IE', { month: 'short' }) + ' ' + m.slice(0, 4);
+  assert.ok((await page.$$eval('.gdots i', els => els.map(e => e.title))).includes(`${lbl(p)}: €2,100`), 'the goal counts 900 + 700 + 500');
+  await app.go('wealth'); await page.waitForTimeout(250);
+  await page.click('#invMSeg [data-im="invested"]'); await page.click('#invRSeg [data-ir="all"]'); await page.waitForTimeout(100);
+  const bars = await page.$$eval('#invMonthly [data-tip]', els => els.map(e => e.getAttribute('data-tip')));
+  assert.ok(bars.includes(`${lbl(p)} · put in €2,100`), 'the chart counts the same, with no opening balance for the new account: ' + bars.join(' | '));
+  const list = await app.text('#invList');
+  assert.match(list, /Broker Stocks[^€]*\+€400 moved in since\s*€11,000/, 'the value saved before the 400 went in, plus the 400');
+  assert.match(list, /Broker 2[^·]*· updated [^·]*€5,700/, 'no double count where the month was updated after the transfer');
+  assert.match(list, /New fund[\s\S]*\+€200 moved in since\s*€500/);
+  // Same month, same figure on both charts.
+  const nw = await page.$$eval('#nwAll [data-tip]', els => els.map(e => e.getAttribute('data-tip')));
+  const growth = await page.$$eval('#invGrowth [data-tip]', els => els.map(e => e.getAttribute('data-tip')));
+  const val = (arr, re) => (arr.find(t => t.startsWith(lbl(p))) || '').match(re)?.[1];
+  assert.equal(val(growth, /value (€[\d,]+)/), val(nw, /investments (€[\d,]+)/));
+  assert.match(growth[0], /value (€[\d,]+) · put in so far \1/, 'no gain or loss on the first day');
+  await page.click('#invList [data-acc="b1"]'); await page.waitForTimeout(100);
+  assert.match(await app.text('#accDetail'), /\+€400 moved in after the .+ value was saved/);
+  await clean(app);
+});
+
+test('investments: saving a month records when its value was taken; money sent before that is in it', async () => {
+  const app = await openApp(), { page } = app, p = month(-1), now = new Date().toISOString();
+  await app.seed({ accounts: { b1: { name: 'Broker', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' }, bank: { name: 'Bank', type: 'bank', currency: 'EUR', owner: 'Anubhav' } },
+    invSnapshots: { b1p: { accountId: 'b1', month: p, investment: 0, value: 1000, createdAt: p + '-02T10:00:00Z', opening: true } },
+    transfers: { t1: { amount: 400, date: p + '-20', from: 'Bank', to: 'Broker', createdAt: now } } });
+  await app.go('wealth'); await page.click('#invList [data-acc="b1"]'); await page.waitForTimeout(100);
+  assert.match(await app.text('#accDetail'), /\+€400 moved in after/);
+  // Update the month now, with a value that includes the 400.
+  await page.click(`#accDetail [data-editsnap]`); await page.waitForSelector('#snapDlg[open]');
+  await page.fill('#s-val', '1450'); await page.click('#snapSave'); await page.waitForTimeout(250);
+  const d = (await dbDocs(app, 'invSnapshots')).find(s => s.month === p);
+  assert.ok(d.at && d.at.slice(0, 10) > p + '-20', 'when it was saved');
+  assert.doesNotMatch(await app.text('#accDetail'), /moved in after/, 'the 400 is in the new value now');
+  assert.match(await app.text('#accDetail .kpis'), /Value€1,450/);
+  await clean(app);
+});
+
 test('investments: each account has its own XIRR (from 3 months of values); the portfolio’s is unchanged', async () => {
   const app = await openApp(), { page } = app;
   const snap = (acc, m, investment, value, opening) => ({ accountId: acc, month: m, investment, value, ...(opening ? { opening: true } : {}) });

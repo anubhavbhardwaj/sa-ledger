@@ -5429,25 +5429,75 @@ async function fillMonthRates(){
 }
 
 const snapsOf = a => state.snaps.filter(s => s.accountId === a.id).sort((x,y) => x.month.localeCompare(y.month));
+// Money moved into (+) or out of (−) an investment account up to today: in its currency and in euros as sent.
+function accMoves(a){
+  const n = a.name.toLowerCase(), td = today();
+  return state.transfers.filter(t => t.date <= td && (String(t.to).toLowerCase() === n) !== (String(t.from).toLowerCase() === n))
+    .map(t => { const k = String(t.to).toLowerCase() === n ? 1 : -1; return { d: t.date, m: t.date.slice(0, 7), own: k * inAccCur(a, t), eur: k * (+t.amount || 0) }; });
+}
+const sumMv = (mv, f) => Math.round(mv.reduce((v, t) => f(t) ? v + t.own : v, 0) * 100) / 100;
+const sumMvEur = (mv, f) => Math.round(mv.reduce((v, t) => f(t) ? v + t.eur : v, 0) * 100) / 100;
+// Money put in a month: its "put in", or what was transferred if that's more, the way the Overview and Goals count it.
+const putPick = (pEur, tEur) => pEur ? Math.max(pEur, tEur) : tEur;
 // One row per recorded month, with the value resolved. Modelled accounts grow the previous value by the
-// monthly return and add the month's investment, unless a real value was typed for that month.
+// monthly return and add the month's money, unless a real value was typed for that month.
+// vd: the day the value is from. It's when it was saved, at the latest the month's last day. Entries saved before
+// this was recorded keep their first save date even when edited later, so for them it only counts while their
+// "put in" also leaves out money moved in later that month (it wasn't updated after that money went in).
 function invRows(a){
-  const r = rMonthly(a), auto = a.valueMode === 'auto';
+  const r = rMonthly(a), auto = a.valueMode === 'auto', cur = a.currency || 'EUR', mv = accMoves(a);
   let prev = null; const out = [];
   for (const s of snapsOf(a)){
-    const inv = +s.investment || 0, typed = s.value !== undefined && s.value !== null;
-    const expected = prev === null ? null : (prev + inv) * (1 + r);
-    const value = typed ? +s.value : prev === null ? inv : auto ? prev * (1 + r) + inv : prev + inv;
-    out.push({ s, month: s.month, inv, value, expected, diff: expected ? value / expected - 1 : null,
-      modelled: auto && !typed && prev !== null, missing: !auto && !typed, base: prev === null, opening: prev === null && !!s.opening });
+    const first = prev === null, inv = +s.investment || 0, typed = s.value !== undefined && s.value !== null;
+    const tOwn = sumMv(mv, t => t.m === s.month), tEur = sumMvEur(mv, t => t.m === s.month);
+    const pEur = inv * monthRate(cur, s.month), byPut = !!pEur && pEur >= tEur;
+    const put = first ? inv : byPut ? inv : tOwn, putEur = first ? pEur : putPick(pEur, tEur);
+    const expected = first ? null : (prev + put) * (1 + r);
+    const value = typed ? +s.value : first ? inv : auto ? prev * (1 + r) + put : prev + put;
+    const end = lastDayOf(s.month), saved = String(s.at || s.createdAt || '').slice(0, 10);
+    const vd = !typed || !/^\d{4}-\d{2}-\d{2}$/.test(saved) || saved >= end ? end : s.at ? saved : inv + 0.5 < tOwn ? saved : end;
+    out.push({ s, month: s.month, inv, put, putEur, tOwn, tEur, value, vd, expected, diff: expected ? value / expected - 1 : null,
+      modelled: auto && !typed && prev !== null, missing: !auto && !typed, base: first, opening: first && !!s.opening });
     prev = value;
   }
   return out;
 }
-function predict(a, rows, n){
+// One account month by month. Its value at a month's end is the latest value up to then plus money moved in or out
+// after that value's day: it left the bank, so it can't vanish from net worth, and isn't a loss either. Money in: the
+// first month brings its value (plus what came after it); later months what was put in or transferred. In euros,
+// a first value is priced at its month-end rate, money put in at its month's rate, transfers at what was sent.
+function invModel(a){
+  const rows = invRows(a), cur = a.currency || 'EUR', x = { a, cur, rows };
+  if (!rows.length) return x;
+  const mv = accMoves(a), td = today(), r0 = rows[0], last = rows[rows.length-1];
+  const rowAt = m => { let r = null; for (const w of rows){ if (w.month <= m) r = w; else break; } return r; };
+  x.valueAt = m => { const r = rowAt(m); if (!r) return null; const e = lastDayOf(m) < td ? lastDayOf(m) : td; return r.value + sumMv(mv, t => t.d > r.vd && t.d <= e); };
+  x.endX = [last.month, ...mv.filter(t => t.d > last.vd).map(t => t.m)].sort().pop();
+  x.months = monthsBetween(r0.month, x.endX);
+  const late0 = t => t.m === r0.month && t.d > r0.vd;
+  x.flow = x.months.map(m => {
+    if (m === r0.month) return { m, own: r0.value + sumMv(mv, late0), eurOpen: r0.value * openRate(cur, m), eur: sumMvEur(mv, late0),
+      fresh: r0.opening ? sumMvEur(mv, t => t.m === m) : putPick(r0.inv * monthRate(cur, m), sumMvEur(mv, t => t.m === m)), open: true };
+    const r = rows.find(w => w.month === m);
+    if (r) return { m, own: r.put, eurOpen: 0, eur: r.putEur, fresh: r.putEur };
+    const tE = sumMvEur(mv, t => t.m === m); return { m, own: sumMv(mv, t => t.m === m), eurOpen: 0, eur: tE, fresh: tE };
+  });
+  x.flowAt = Object.fromEntries(x.flow.map(f => [f.m, f]));
+  // What the first month already held before any of its transfers: an opening balance, not new money.
+  x.openBal = Math.max(0, r0.value - sumMv(mv, t => t.m === r0.month && t.d <= r0.vd));
+  x.last = last; x.m0 = r0.month; x.startVal = r0.value;
+  x.value = x.valueAt(thisMonth()); x.pending = Math.round((x.value - last.value) * 100) / 100;
+  x.invested = x.flow.reduce((v, f) => v + f.own, 0);
+  return x;
+}
+// Euros to the home currency (rupees when planning in India), at a month's rate or, for a first value, its month-end rate.
+const eurH = (v, m, open) => HOME() === 'EUR' ? v : v / ((open ? openRate('INR', m) : monthRate('INR', m)) || NaN);
+const flowH = f => eurH(f.eurOpen, f.m, true) + eurH(f.eur, f.m);
+// From the account's value and money in now (as its page shows them), on at its expected return and target.
+function predict(a, rows, n, inv0, v0){
   if (!rows.length) return [];
   const r = rMonthly(a), t = accTarget(a).v;
-  let v = rows[rows.length-1].value, inv = rows.reduce((s,x) => s + x.inv, 0), m = rows[rows.length-1].month;
+  let v = v0 ?? rows[rows.length-1].value, inv = inv0 ?? rows.reduce((s,x) => s + x.inv, 0), m = rows[rows.length-1].month;
   const out = [];
   for (let k = 0; k < n; k++){ m = addMonth(m, 1); v = (v + t) * (1 + r); inv += t; out.push({ month:m, inv:t, value:v, invested:inv }); }
   return out;
@@ -5475,57 +5525,40 @@ let pfCache = null;
 function portfolio(){
   if (pfCache) return pfCache;
   const PAL = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
-  const accs = state.accounts.filter(a => a.type === 'investment').map(a => ({ a, cur: a.currency || 'EUR', rows: invRows(a) }));
+  const accs = state.accounts.filter(a => a.type === 'investment').map(invModel);
   const withData = accs.filter(x => x.rows.length);
   const res = { accs, withData, tl: [], value: 0, cost: 0, market: 0, fx: 0, net: 0, xirr: null, l12: null };
   if (!withData.length) return pfCache = res;
-  const first = withData.map(x => x.rows[0].month).sort()[0], last = withData.map(x => x.rows[x.rows.length-1].month).sort().pop();
-  // Money moved in after an account's last monthly value shows in the month it moved, at face value,
-  // so the charts run up to the current month instead of stopping at the last update.
-  withData.forEach(x => { x.pendM = pendingByMonth(x.a, x.rows[x.rows.length-1].month); });
-  const endM = [last, ...withData.flatMap(x => Object.keys(x.pendM))].sort().pop();
-  const months = monthsBetween(first, endM);
+  const first = withData.map(x => x.m0).sort()[0], last = withData.map(x => x.last.month).sort().pop();
+  const endM = withData.map(x => x.endX).sort().pop(), months = monthsBetween(first, endM);
   // Tracking starts at each account's first monthly VALUE. Whatever it had gained before that (value minus what
   // was paid in earlier) happened over unknown years, so it is kept out of the gain and the yearly return.
   for (const x of withData){
-    const byM = Object.fromEntries(x.rows.map(r => [r.month, r])), lastM = x.rows[x.rows.length-1].month;
     const r0 = x.rows[0];
-    x.m0 = r0.month; x.startVal = r0.value; x.earlier = r0.value - r0.inv; x.earlierEur = x.earlier * oRH(x.cur, r0.month);
-    let v = null, cumP = 0; x.vals = []; x.invs = [];
-    x.fresh = []; x.rec = [];
-    for (const m of months){
-      const r = byM[m]; if (r) v = r.value;
-      const extra = m > lastM ? (x.pendM[m] || 0) : 0; cumP += extra;
-      x.vals.push(v === null ? null : v + cumP); x.invs.push((r ? (r === r0 ? r0.value : r.inv) : 0) + extra); x.fresh.push((r && !r.opening ? r.inv : 0) + extra); x.rec.push(!!r);
-    }
-    x.last = x.rows[x.rows.length-1];
-    x.invested = r0.value + x.rows.slice(1).reduce((s,r) => s + r.inv, 0);
-    // Transfers after the last monthly value aren't in it yet: count them at face value (no gain, no currency
-    // effect) until that month's value is added. Otherwise the money leaves the bank and vanishes from net worth.
-    x.pending = pendingIn(x.a, x.last.month);
-    x.value = x.last.value + x.pending;
-    x.invested += x.pending;
+    x.earlier = r0.value - r0.inv; x.earlierEur = x.earlier * oRH(x.cur, r0.month);
     x.valueEur = x.value * lRH(x.cur);
-    x.cost = r0.value * oRH(x.cur, r0.month) + x.rows.slice(1).reduce((s,r) => s + r.inv * mRH(x.cur, r.month), 0) + x.pending * lRH(x.cur);
-    x.openIdx = months.indexOf(r0.month);
+    x.cost = x.flow.reduce((v, f) => v + flowH(f), 0);
     x.market = (x.value - x.invested) * lRH(x.cur);
     x.modelled = x.a.valueMode === 'auto';
   }
   withData.sort((p,q) => q.valueEur - p.valueEur).forEach((x, i) => x.color = `var(${PAL[Math.min(i, PAL.length - 1)]})`);
   accs.forEach(x => { if (!x.color) x.color = 'var(--s8)'; });
+  // Each month: values at its month-end rate (today's for the running month), as on the net worth chart; money put
+  // in at its own month's rate. The market return leaves currency moves out: the change in value minus the money
+  // put in, all at the month's rate.
   let cum = 0;
   res.tl = months.map((m, i) => {
     let tv = 0, inv = 0, fresh = 0, profit = 0, base = 0, has = false;
     const parts = [];
     for (const x of withData){
-      const v = x.vals[i]; if (v === null){ parts.push(0); continue; }
-      const rt = mRH(x.cur, m);
-      tv += v * rt; inv += x.invs[i] * (i === x.openIdx ? oRH(x.cur, m) : rt); fresh += x.fresh[i] * rt; parts.push(v * rt);
-      // Market return: change in value minus money put in, both at this month's rate (currency moves left out).
-      if (i > 0 && x.vals[i-1] !== null){ profit += (v - x.vals[i-1] - x.invs[i]) * rt; base += x.vals[i-1] * rt; if (x.rec[i]) has = true; }
+      const v = x.valueAt(m); if (v === null){ parts.push(0); continue; }
+      const f = x.flowAt[m], rt = mRH(x.cur, m);
+      tv += v * oRH(x.cur, m); parts.push(v * oRH(x.cur, m));
+      if (f){ inv += flowH(f); fresh += eurH(f.fresh, m); }
+      if (m > x.m0){ const pv = x.valueAt(addMonth(m, -1)); profit += (v - pv - (f ? f.own : 0)) * rt; base += pv * rt; if (x.rows.some(r => r.month === m)) has = true; }
     }
     cum += inv;
-    // inv: all money in (for XIRR and the put-in line); fresh: leaves out opening balances (for monthly figures).
+    // inv: all money in (for the put-in line); fresh: leaves out opening balances (for monthly figures).
     return { m, tv, inv, fresh, cum, profit, pct: base > 0 ? profit / base : null, has, parts };
   });
   res.value = withData.reduce((s,x) => s + x.valueEur, 0);
@@ -5533,28 +5566,24 @@ function portfolio(){
   res.market = withData.reduce((s,x) => s + x.market, 0);
   res.net = res.value - res.cost; res.fx = res.net - res.market;
   // Cash flows per account: the starting value at the end of its first month, money added later in the month it
-  // went in, and today's value at the end. In euros (each amount at its own month's rate), and again with every
-  // amount at today's rate, which leaves out what the currencies did.
+  // went in, and the value at the end. In euros (each amount as it was counted above), and again with every amount
+  // at today's rate, which leaves out what the currencies did.
   const end = Math.min(mTime(addMonth(endM, 1)), Date.now());
-  // rate(m): what one unit of the account's currency is worth for month m; open for its first value, now for today.
-  const accFlows = (x, rate, open, now, end) => [
-    { t: Math.min(mTime(addMonth(x.m0, 1)), end), v: -x.startVal * open },
-    ...x.rows.slice(1).filter(row => row.inv).map(row => ({ t: mTime(row.month), v: -row.inv * rate(row.month) })),
-    ...Object.entries(x.pendM).map(([m, p]) => ({ t: mTime(m), v: -p * now }))];
-  const flowsAt = local => [...withData.flatMap(x => local ? accFlows(x, () => lRH(x.cur), lRH(x.cur), lRH(x.cur), end)
-    : accFlows(x, m => mRH(x.cur, m), oRH(x.cur, x.m0), lRH(x.cur), end)), { t: end, v: res.value }];
-  res.xirr = xirr(flowsAt(false));
-  res.xirrLocal = xirr(flowsAt(true));
+  const accFlows = (x, home, end) => [
+    { t: Math.min(mTime(addMonth(x.m0, 1)), end), v: -(home ? x.startVal * oRH(x.cur, x.m0) : x.startVal) },
+    ...x.flow.map(f => ({ t: mTime(f.m), v: -(home ? flowH(f) - (f.open ? x.startVal * oRH(x.cur, x.m0) : 0) : f.own - (f.open ? x.startVal : 0)) })).filter(c => Math.abs(c.v) > 1e-9)];
+  res.xirr = xirr([...withData.flatMap(x => accFlows(x, true, end)), { t: end, v: res.value }]);
+  res.xirrLocal = xirr([...withData.flatMap(x => accFlows(x, false, end).map(c => ({ ...c, v: c.v * lRH(x.cur) }))), { t: end, v: res.value }]);
   // Each account's own: up to its own last value (or money moved in since), in its own currency and, for another
   // currency, in the home currency with what the exchange rate did. From 3 months of values: over a few weeks a
   // yearly rate means little.
   for (const x of withData){
-    const endX = [x.last.month, ...Object.keys(x.pendM)].sort().pop(), tEnd = Math.min(mTime(addMonth(endX, 1)), Date.now());
+    const tEnd = Math.min(mTime(addMonth(x.endX, 1)), Date.now());
     const days = (tEnd - Math.min(mTime(addMonth(x.m0, 1)), tEnd)) / 864e5;
     x.xirrMonths = Math.round(days / 30.44); x.xirr = x.xirrHome = null;
     if (days < 89) continue;
-    x.xirr = xirr([...accFlows(x, () => 1, 1, 1, tEnd), { t: tEnd, v: x.value }]);
-    x.xirrHome = x.cur === HOME() ? x.xirr : xirr([...accFlows(x, m => mRH(x.cur, m), oRH(x.cur, x.m0), lRH(x.cur), tEnd), { t: tEnd, v: x.valueEur }]);
+    x.xirr = xirr([...accFlows(x, false, tEnd), { t: tEnd, v: x.value }]);
+    x.xirrHome = x.cur === HOME() ? x.xirr : xirr([...accFlows(x, true, tEnd), { t: tEnd, v: x.valueEur }]);
   }
   res.earlier = withData.reduce((s,x) => s + (Math.abs(x.earlier) >= 1 ? x.earlierEur : 0), 0);
   res.since = first;
@@ -5571,55 +5600,21 @@ function portfolio(){
 // otherwise the transfers into it that month (an account without monthly values, not updated yet, or whose
 // first entry is its opening balance still counts). null when nothing at all was recorded.
 function investedBy(period){
-  const accs = state.accounts.filter(a => a.type === 'investment');
   const inP = m => period === 'all' || m === period;
   const by = {}; let any = false;
-  for (const a of accs){
-    const n = a.name.toLowerCase(), cur = a.currency || 'EUR', own = a.owner || 'Shared';
-    const snaps = Object.fromEntries(snapsOf(a).filter(x => inP(x.month)).map(x => [x.month, x]));
-    const months = new Set(Object.keys(snaps));
-    const tr = {};
-    for (const t of state.transfers){
-      const m = t.date.slice(0, 7); if (!inP(m)) continue;
-      const v = String(t.to).toLowerCase() === n ? +t.amount || 0 : String(t.from).toLowerCase() === n ? -(+t.amount || 0) : 0;
-      if (v){ tr[m] = (tr[m] || 0) + v; months.add(m); }
-    }
-    for (const m of months){
-      const x = snaps[m];
-      // An opening entry is the starting balance, not new money, but transfers in that same month are. The money sent
-      // (transfers) counts, so Overview, Goals and Transfers agree; a month's "put in" only adds money that came in
-      // another way (more than the transfers), or stands in when nothing was logged as a transfer.
-      const put = x && !x.opening ? (+x.investment || 0) * monthRate(cur, m) : 0, t = tr[m] || 0;
-      const v = put ? Math.max(put, t) : t;
-      any = true; by[own] = (by[own] || 0) + v;
-    }
+  for (const a of state.accounts.filter(a => a.type === 'investment')){
+    // The money sent counts, so Overview, Goals and Transfers agree; a month's "put in" adds money that came in another
+    // way (more than the transfers), or stands in when nothing was logged as a transfer. An opening balance (what the
+    // first month already held) isn't new money, but what was transferred that month is. Same figures as Investments.
+    const own = a.owner || 'Shared', x = portfolio().accs.find(x => x.a === a) || invModel(a), months = {};
+    for (const t of accMoves(a)) if (inP(t.m)) months[t.m] = (months[t.m] || 0) + t.eur;
+    for (const f of x.flow || []) if (inP(f.m)) months[f.m] = f.fresh;
+    for (const v of Object.values(months)){ any = true; by[own] = (by[own] || 0) + v; }
   }
   if (!any) return null;
   return { total: Object.values(by).reduce((s, v) => s + v, 0), by };
 }
 const investedIn = period => investedBy(period)?.total ?? null;
-// Net transfers into an investment account in one month, in its currency.
-function trInMonth(a, m){
-  const n = a.name.toLowerCase(); let v = 0;
-  for (const t of state.transfers){ if (t.date.slice(0, 7) !== m) continue; if (String(t.to).toLowerCase() === n) v += inAccCur(a, t); else if (String(t.from).toLowerCase() === n) v -= inAccCur(a, t); }
-  return Math.round(v * 100) / 100;
-}
-function pendingByMonth(a, afterMonth){
-  const n = a.name.toLowerCase(), td = today(), out = {};
-  for (const t of state.transfers){
-    const m = t.date.slice(0,7); if (m <= afterMonth || t.date > td) continue;
-    const v = String(t.to).toLowerCase() === n ? inAccCur(a, t) : String(t.from).toLowerCase() === n ? -inAccCur(a, t) : 0;
-    if (v) out[m] = Math.round(((out[m] || 0) + v) * 100) / 100;
-  }
-  return out;
-}
-// Net transfers into an account dated after a given month (up to today), in the account's currency.
-function pendingIn(a, afterMonth){
-  const n = a.name.toLowerCase(), td = today();
-  const v = state.transfers.filter(t => t.date.slice(0,7) > afterMonth && t.date <= td)
-    .reduce((s,t) => s + (String(t.to).toLowerCase() === n ? inAccCur(a, t) : String(t.from).toLowerCase() === n ? -inAccCur(a, t) : 0), 0);
-  return Math.round(v * 100) / 100;
-}
 // Net transfers into an account during a month, in the account's currency.
 function ledgerInv(a, m){
   const n = a.name.toLowerCase();
@@ -5644,12 +5639,12 @@ function netWorthSeries(){
     const cur = m === cm, d = cur ? today() : lastDayOf(m);
     let inv = 0, added = 0;
     for (const x of pf.withData){
-      const r = x.rows.filter(r => r.month <= m).pop(); if (!r) continue;
-      const rate = cur ? lRH(x.cur) : mRH(x.cur, addMonth(m, 1));
-      inv += (r.value + (cur ? x.pending : 0)) * rate;
+      const v = x.valueAt(m); if (v === null) continue;
+      const rate = oRH(x.cur, m);   // its month-end rate (today's for the running month), as on the growth chart
+      inv += v * rate;
       // An account first tracked this month brings in its starting value: that isn't growth. Money sent to it from
       // your other accounts that month is (it only moved), so that part stays in.
-      if (x.rows[0].month === m && m !== months[0]) added += Math.max(0, x.rows[0].value - trInMonth(x.a, m)) * rate;
+      if (x.m0 === m && m !== months[0]) added += x.openBal * rate;
     }
     let cash = 0;
     for (const a of cashAccs){ const e = estimate(a, d); if (e) cash += eurToHome(toEur(a, e.balance)); }
@@ -5730,7 +5725,7 @@ function renderInvestments(pf){
       <div class="kpi"><span class="lbl">Gain since ${MON[+pf.since.slice(5,7)-1]} '${pf.since.slice(2,4)}</span><span class="val ${pf.net < 0 ? 'neg' : ''}">${signed(pf.net)}</span><span class="split"><span>Market <b class="${pf.market >= 0 ? 'pos' : 'neg'}">${signed(pf.market, hmK)}</b></span><span>Currency <b class="${pf.fx >= 0 ? 'pos' : 'neg'}">${signed(pf.fx, hmK)}</b></span></span></div>
       <div class="kpi"><span class="lbl">Return a year (XIRR)</span><span class="val">${pf.xirr === null ? '—' : (pf.xirr * 100).toFixed(1) + '%'}</span><span class="sub">${HOME() === 'INR' ? 'in rupees' : 'in euros'} · ${pf.xirrLocal === null ? '' : `<b>${(pf.xirrLocal * 100).toFixed(1)}%</b> without currency moves`}</span></div>
       <div class="kpi"><span class="lbl">Last 12 months</span><span class="val ${l.profit < 0 ? 'neg' : ''}">${signed(l.profit)}</span><span class="sub">market return · ${l.n ? l.pos + ' of ' + l.n + ' months up' : 'not enough months'} · ${hmK.format(l.invested)} put in</span></div>`;
-    $('#invGrowthHint').textContent = 'Each month at that month’s exchange rate';
+    $('#invGrowthHint').textContent = 'Values at each month’s closing exchange rate, money put in at the rate when it went in';
     renderGrowth(pf);
     $$('#invMSeg [data-im]').forEach(b => b.setAttribute('aria-checked', b.dataset.im === state.im));
     $('#invMTitle').textContent = state.im === 'profit' ? 'Monthly return' : 'Monthly investment';
@@ -5806,12 +5801,12 @@ function renderMonthly(pf){
 }
 
 function renderInvDetail(a){
-  const rows = invRows(a), cur = a.currency || 'EUR';
-  const last = rows[rows.length-1], pend = last ? pendingIn(a, last.month) : 0;
-  const invested = rows.length ? rows[0].value + rows.slice(1).reduce((s,r) => s + r.inv, 0) + pend : 0;
+  const X = portfolio().accs.find(x => x.a.id === a.id) || invModel(a), rows = X.rows, cur = a.currency || 'EUR';
+  const last = rows[rows.length-1], pend = last ? X.pending : 0;
+  const invested = rows.length ? X.invested : 0;
   const before = rows.length ? rows[0].value - rows[0].inv : 0;
-  const value = last ? last.value + pend : null, g = last && invested > 0 ? (value - invested) / invested : null;
-  const pred = state.showPred ? predict(a, rows, 60) : [];
+  const value = last ? X.value : null, g = last && invested > 0 ? (value - invested) / invested : null;
+  const pred = state.showPred ? predict(a, rows, 60, invested, value) : [];
   const fx = cur !== HOME() && value !== null ? lRH(cur) : 0;
   $('#accDetail').innerHTML = `
     <div><button class="btn ghost" type="button" data-backaccs>← Wealth</button></div>
@@ -5832,10 +5827,9 @@ function renderInvDetail(a){
           ? (x.xirrMonths < 3 ? 'from 3 months of values' : 'not enough to work it out')
           : `in ${cur} over ${x.xirrMonths} months${a.valueMode === 'auto' ? ', modelled' : ''}${x.cur !== HOME() && x.xirrHome != null ? ` · <b>${f(x.xirrHome)}</b> in ${HOME() === 'INR' ? 'rupees' : 'euros'}, with what the ${cur} did` : ''}`}</span></div>`; })()}
     </section>
-    ${(() => { const r = rows.slice().reverse().find(r => !r.opening && trInMonth(a, r.month) - (r.inv || 0) > 1); if (!r) return '';
-      const t = trInMonth(a, r.month);
-      return `<div class="banner" data-putgap><span class="left"><span>${fmtW(a, t)} went in by transfer in ${monthLabel(r.month)}, but its monthly value says ${fmtW(a, r.inv || 0)} put in. Overview and Goals count the transfers; update the month so its gain is right too.</span></span><button class="btn small" type="button" data-editsnap="${esc(r.s.id)}">Update ${monthLabel(r.month)}</button></div>`; })()}
-    ${pend ? `<div class="banner"><span class="left"><span>${pend > 0 ? '+' : '−'}${fmtW(a, Math.abs(pend))} moved ${pend > 0 ? 'in' : 'out'} after ${monthLabel(last.month)}. It counts at face value for now; add the month’s value once it ends to include how it grew.</span></span><button class="btn small" type="button" data-addsnap="${esc(a.id)}">+ Add month</button></div>` : ''}
+    ${(() => { const r = rows.slice().reverse().find(r => !r.base && r.tOwn - (r.inv || 0) > 1); if (!r) return '';
+      return `<div class="banner" data-putgap><span class="left"><span>${fmtW(a, r.tOwn)} went in by transfer in ${monthLabel(r.month)}, but its monthly value says ${fmtW(a, r.inv || 0)} put in. The transfers are counted, as on the Overview and in Goals; update the month so the record matches.</span></span><button class="btn small" type="button" data-editsnap="${esc(r.s.id)}">Update ${monthLabel(r.month)}</button></div>`; })()}
+    ${pend ? `<div class="banner"><span class="left"><span>${pend > 0 ? '+' : '−'}${fmtW(a, Math.abs(pend))} moved ${pend > 0 ? 'in' : 'out'} after ${last.vd < lastDayOf(last.month) ? `the ${monthLabel(last.month)} value was saved (${shortDate(last.vd, true)})` : monthLabel(last.month)}. It counts at face value until you add a newer value that includes it.</span></span><button class="btn small" type="button" data-${last.vd < lastDayOf(last.month) ? 'editsnap="' + esc(last.s.id) + '"' : 'addsnap="' + esc(a.id) + '"'}>${last.vd < lastDayOf(last.month) ? 'Update ' + monthLabel(last.month) : '+ Add month'}</button></div>` : ''}
     <section class="panel"><header><h2>Value and money put in</h2><button class="btn ghost" type="button" data-pred aria-pressed="${state.showPred}">${state.showPred ? 'Hide' : 'Show'} 5-year projection</button></header>
       <div id="accChart"></div>
       <div class="legend"><span><i style="background:var(--bar)"></i>Value</span><span><i style="background:none;border-top:2px dashed var(--ink);height:0;border-radius:0;vertical-align:3px"></i>Put in</span>${state.showPred ? `<span><i style="background:var(--bar-dim)"></i>Projection at ${a.returnPct || 0}% with ${fmtW(a, a.target || 0)} a month</span>` : ''}</div>
@@ -5843,20 +5837,19 @@ function renderInvDetail(a){
     <section class="panel"><header><h2>Monthly values</h2><span class="hint">Expected = last value plus this month’s money, grown by one month of the expected return</span></header>
       <div class="tscroll"><table class="snaps"><thead><tr><th>Month</th><th class="num">Put in</th><th class="num">Value</th><th class="num">Expected</th><th class="num">Diff</th></tr></thead>
       <tbody>${pred.slice(0, 12).reverse().map(p => `<tr class="pred"><td>${monthLabel(p.month)}</td><td class="num">${fmtW(a, p.inv)}</td><td class="num">${fmtW(a, p.value)}</td><td class="num"></td><td class="num">—</td></tr>`).join('')}
-      ${rows.slice().reverse().map(r => `<tr class="row" data-editsnap="${esc(r.s.id)}" tabindex="0"><td>${monthLabel(r.month)}${r.opening ? '<span class="tag">opening balance</span>' : ''}${r.modelled ? '<span class="modelled">modelled</span>' : ''}${r.missing ? '<span class="modelled">no value</span>' : ''}</td><td class="num">${fmtW(a, r.inv)}</td><td class="num">${fmtW(a, r.value)}</td>
+      ${rows.slice().reverse().map(r => `<tr class="row" data-editsnap="${esc(r.s.id)}" tabindex="0"><td>${monthLabel(r.month)}${r.opening ? '<span class="tag">opening balance</span>' : ''}${r.modelled ? '<span class="modelled">modelled</span>' : ''}${r.missing ? '<span class="modelled">no value</span>' : ''}</td><td class="num">${fmtW(a, r.base ? r.inv : r.put)}${!r.base && Math.abs(r.put - r.inv) >= 0.5 ? `<span class="tag" title="Its monthly value says ${fmtW(a, r.inv)}; the transfers that month are counted">transfers</span>` : ''}</td><td class="num">${fmtW(a, r.value)}</td>
         <td class="num">${r.expected === null ? '—' : fmtW(a, r.expected)}</td><td class="num ${r.diff === null || r.modelled ? '' : r.diff >= 0 ? 'pos' : 'neg'}">${r.diff === null || r.base ? '—' : pct(r.diff, 2)}</td></tr>`).join('')}</tbody></table></div>
     </section>` : `<div class="panel"><p class="empty" style="margin:0">No monthly values yet. Use “+ Add month” to enter${a.valueMode === 'auto' ? ' the first value; later months are modelled from the return rate' : ' what you put in and what it was worth'}.</p></div>`}`;
   if (rows.length){
-    let cv = last.value, ci = 0;
-    const extra = Object.entries(pendingByMonth(a, last.month)).sort().map(([m, v]) => { cv += v; ci += v; return { month: m, value: cv, inv: v, moved: true }; });
-    renderAccChart(a, rows.concat(extra), pred);
+    // Month by month, the same figures as above: its value (plus money moved in since) and the money in since tracking.
+    let ci = 0;
+    renderAccChart(a, X.months.map(m => ({ month: m, value: X.valueAt(m), cum: (ci += X.flowAt[m]?.own || 0), moved: m > last.month || (m === last.month && X.valueAt(m) !== last.value) })), pred);
   }
 }
 
 function renderAccChart(a, rows, pred){
   pred = pred.filter(p => p.month > rows[rows.length-1].month);
-  let cum = 0;
-  const pts = rows.map(r => ({ m: r.month, v: r.value, c: (cum += r.inv), moved: r.moved })).concat(pred.map(p => ({ m: p.month, v: p.value, c: p.invested, p: true })));
+  const pts = rows.map(r => ({ m: r.month, v: r.value, c: r.cum, moved: r.moved })).concat(pred.map(p => ({ m: p.month, v: p.value, c: p.invested, p: true })));
   const n = pts.length, narrow = innerWidth <= 640;
   const W = wideW(), H = narrow ? 220 : 260, L = narrow ? 92 : 70, R = 10, T = 12, B = 26;
   const max = niceMax(Math.max(...pts.map(p => Math.max(p.v, p.c))));
@@ -6684,7 +6677,8 @@ function snapHint(){
   const m = S('month').value, prev = m ? prevValue(a, m) : null, inv = parseFloat(S('inv').value) || 0;
   const auto = a.valueMode === 'auto' && prev !== null, sym = curSym(a.currency || 'EUR');
   $('#lb-sinv').textContent = `Put in this month (${sym})`;
-  $('#lb-sval').textContent = auto ? `Value from a statement (${sym}, optional)` : `Value at month end (${sym})`;
+  // A value is taken as of when it's saved (at the latest the month's end): money sent after that counts on top.
+  $('#lb-sval').textContent = auto ? `Value from a statement (${sym}, optional)` : m && m < thisMonth() ? `Value at month end (${sym})` : `Value today (${sym})`;
   S('val').placeholder = auto ? 'modelled: ' + fmtAcc(a, prev * (1 + rMonthly(a)) + inv) : '';
   $('#snapOpenRow').hidden = prev !== null;
   const led = m ? ledgerInv(a, m) : 0;
@@ -6723,7 +6717,7 @@ $('#snapForm').addEventListener('submit', async e => {
   const id = snapId(a.id, m), clash = state.snaps.find(x => x.id === id);
   if (clash && clash.id !== state.editingSnap){ err.textContent = monthLabel(m) + ' already has values. Edit that row instead.'; err.hidden = false; return; }
   const old = state.editingSnap && state.snaps.find(x => x.id === state.editingSnap), me = usernameOf(state.user);
-  const d = { accountId: a.id, month: m, investment: Math.round(inv * 100) / 100, createdAt: old?.createdAt || new Date().toISOString(), createdBy: old?.createdBy || me, updatedBy: me };
+  const d = { accountId: a.id, month: m, investment: Math.round(inv * 100) / 100, at: new Date().toISOString(), createdAt: old?.createdAt || new Date().toISOString(), createdBy: old?.createdBy || me, updatedBy: me };
   if (vraw !== '') d.value = Math.round(val * 100) / 100;
   if (prev === null && S('open').checked) d.opening = true;
   $('#snapSave').disabled = true;
@@ -6779,7 +6773,7 @@ $('#umForm').addEventListener('submit', async e => {
     if (!isFinite(inv) || (vv !== '' && (!isFinite(val) || val < 0))){ err.textContent = a.name + ': that isn’t a number.'; err.hidden = false; return; }
     if (vv === '' && (a.valueMode !== 'auto' || prev === null)){ err.textContent = a.name + ': add the value too, or clear the row.'; err.hidden = false; return; }
     const ex = state.snaps.find(x => x.id === snapId(a.id, m));
-    const d = { accountId: a.id, month: m, investment: Math.round(inv * 100) / 100, createdAt: ex?.createdAt || now, createdBy: ex?.createdBy || me, updatedBy: me };
+    const d = { accountId: a.id, month: m, investment: Math.round(inv * 100) / 100, at: now, createdAt: ex?.createdAt || now, createdBy: ex?.createdBy || me, updatedBy: me };
     if (vv !== '') d.value = Math.round(val * 100) / 100;
     if (prev === null && (ex ? ex.opening : !invRows(a).length)) d.opening = true;  // an account's first month is its opening balance
     out.push([snapId(a.id, m), d]);
