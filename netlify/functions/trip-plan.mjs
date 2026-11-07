@@ -44,6 +44,8 @@ export function normalize(j){
   return out.sort((x, y) => x.price - y.price).filter(o => { const k = o.numbers.join('|') + o.dep; if (seen.has(k)) return false; seen.add(k); return o.dep && o.arr; }).slice(0, MAX_OPTIONS);
 }
 
+// SerpApi's ways of saying Google found nothing: an answer, not a failure ("Empty results for departure_id: …" for places).
+const NONE = /hasn't returned any results|no results|empty results/i;
 async function searchOnce(leg, { key, adults, fetch: f }){
   const q = new URLSearchParams({ engine: 'google_flights', type: '2', departure_id: leg.from, arrival_id: leg.to, outbound_date: leg.date,
     currency: 'EUR', hl: 'en', gl: 'de', adults: String(adults), api_key: key });
@@ -51,8 +53,7 @@ async function searchOnce(leg, { key, adults, fetch: f }){
   let j = {}; try { j = await r.json(); } catch {}
   if (!r.ok || j.error){
     const e = String(j.error || 'SerpApi ' + r.status);
-    // "no results" is an answer, not a failure
-    if (/hasn't returned any results|no results/i.test(e)) return { json: {}, found: 0 };
+    if (NONE.test(e)) return { json: {}, found: 0 };
     return { error: r.status === 401 || /invalid api key/i.test(e) ? 'SERPAPI_KEY is not valid' : r.status === 429 || /run out of searches/i.test(e) ? 'Monthly SerpApi searches used up' : e.slice(0, 160) };
   }
   return { json: j, found: (j.best_flights || []).length + (j.other_flights || []).length };
@@ -100,7 +101,7 @@ async function exploreOnce(x, { key, adults, fetch: f }){
   let j = {}; try { j = await r.json(); } catch {}
   if (!r.ok || j.error){
     const e = String(j.error || 'SerpApi ' + r.status);
-    if (/hasn't returned any results|no results/i.test(e)) return { places: [] };
+    if (NONE.test(e)) return { places: [] };
     return { error: r.status === 401 || /invalid api key/i.test(e) ? 'SERPAPI_KEY is not valid' : r.status === 429 || /run out of searches/i.test(e) ? 'Monthly SerpApi searches used up' : e.slice(0, 160) };
   }
   return { places: normalizePlaces(j) };
@@ -113,6 +114,7 @@ export async function explore(x, ctx){
   const first = await exploreOnce(x, ctx);
   if (first.error || first.places.length >= THIN || !x.from.includes(',')) return first;
   const rs = await Promise.all(x.from.split(',').slice(0, 3).map(c => exploreOnce({ ...x, from: c }, ctx)));
+  if (!first.places.length && rs.every(r => r.error)) return { error: rs[0].error };
   const best = new Map();
   for (const p of [first, ...rs].flatMap(r => r.places || [])){
     const k = (p.name + '|' + (p.country || '')).toLowerCase();
