@@ -5453,9 +5453,11 @@ function predict(a, rows, n){
   return out;
 }
 
+const xpct = v => (v < 0 ? '−' : '') + Math.abs(v * 100).toFixed(1) + '%';   // a yearly return, with a real minus
 function xirr(flows){
   if (flows.length < 2 || !flows.some(f => f.v > 0) || !flows.some(f => f.v < 0)) return null;
   const t0 = Math.min(...flows.map(f => f.t)); let r = 0.1;
+  if (Math.max(...flows.map(f => f.t)) - t0 < 864e5) return null;   // all on one day: no time, no yearly rate
   for (let i = 0; i < 100; i++){
     let f = 0, df = 0;
     for (const c of flows){ const y = (c.t - t0) / 864e5 / 365, d = Math.pow(1 + r, y); f += c.v / d; df -= y * c.v / (d * (1 + r)); }
@@ -5534,19 +5536,26 @@ function portfolio(){
   // went in, and today's value at the end. In euros (each amount at its own month's rate), and again with every
   // amount at today's rate, which leaves out what the currencies did.
   const end = Math.min(mTime(addMonth(endM, 1)), Date.now());
-  const flowsAt = local => {
-    const f = [];
-    for (const x of withData){
-      const r = m => local ? lRH(x.cur) : mRH(x.cur, m);
-      f.push({ t: Math.min(mTime(addMonth(x.m0, 1)), end), v: -x.startVal * (local ? lRH(x.cur) : oRH(x.cur, x.m0)) });
-      x.rows.slice(1).forEach(row => { if (row.inv) f.push({ t: mTime(row.month), v: -row.inv * r(row.month) }); });
-      Object.entries(x.pendM).forEach(([m, p]) => f.push({ t: mTime(m), v: -p * lRH(x.cur) }));
-    }
-    f.push({ t: end, v: res.value });
-    return f;
-  };
+  // rate(m): what one unit of the account's currency is worth for month m; open for its first value, now for today.
+  const accFlows = (x, rate, open, now, end) => [
+    { t: Math.min(mTime(addMonth(x.m0, 1)), end), v: -x.startVal * open },
+    ...x.rows.slice(1).filter(row => row.inv).map(row => ({ t: mTime(row.month), v: -row.inv * rate(row.month) })),
+    ...Object.entries(x.pendM).map(([m, p]) => ({ t: mTime(m), v: -p * now }))];
+  const flowsAt = local => [...withData.flatMap(x => local ? accFlows(x, () => lRH(x.cur), lRH(x.cur), lRH(x.cur), end)
+    : accFlows(x, m => mRH(x.cur, m), oRH(x.cur, x.m0), lRH(x.cur), end)), { t: end, v: res.value }];
   res.xirr = xirr(flowsAt(false));
   res.xirrLocal = xirr(flowsAt(true));
+  // Each account's own: up to its own last value (or money moved in since), in its own currency and, for another
+  // currency, in the home currency with what the exchange rate did. From 3 months of values: over a few weeks a
+  // yearly rate means little.
+  for (const x of withData){
+    const endX = [x.last.month, ...Object.keys(x.pendM)].sort().pop(), tEnd = Math.min(mTime(addMonth(endX, 1)), Date.now());
+    const days = (tEnd - Math.min(mTime(addMonth(x.m0, 1)), tEnd)) / 864e5;
+    x.xirrMonths = Math.round(days / 30.44); x.xirr = x.xirrHome = null;
+    if (days < 89) continue;
+    x.xirr = xirr([...accFlows(x, () => 1, 1, 1, tEnd), { t: tEnd, v: x.value }]);
+    x.xirrHome = x.cur === HOME() ? x.xirr : xirr([...accFlows(x, m => mRH(x.cur, m), oRH(x.cur, x.m0), lRH(x.cur), tEnd), { t: tEnd, v: x.valueEur }]);
+  }
   res.earlier = withData.reduce((s,x) => s + (Math.abs(x.earlier) >= 1 ? x.earlierEur : 0), 0);
   res.since = first;
   // A month counts once some account with history has a value for it; a month holding only a new account's
@@ -5735,7 +5744,7 @@ function renderInvestments(pf){
     return `<button type="button" class="r" data-acc="${esc(a.id)}"><span class="dot" style="background:${x.color}"></span>
       <span><span class="nm">${esc(a.name)}</span>${x.modelled ? '<span class="modelled" title="Value grows by the expected return; not from a statement">modelled</span>' : ''}${a.inFire === false ? '<span class="tag" title="Not counted in FIRE">not in FIRE</span>' : ''}<br>
         <span class="meta">${INV_TYPE[a.invType] || 'Investment'}${a.currency && a.currency !== 'EUR' ? ' · ' + a.currency : ''} · ${n ? 'updated ' + monthLabel(x.last.month) : 'no values yet'}${n && x.pending ? ` · <span class="pos">${x.pending > 0 ? '+' : '−'}${fmtW(a, Math.abs(x.pending))} moved ${x.pending > 0 ? 'in' : 'out'} since</span>` : ''}</span></span>
-      <span class="v">${n ? fmtW(a, x.value) : '—'}<small>${n ? (x.cur !== HOME() ? '≈ ' + hm0.format(x.valueEur) + ' · ' : '') + (g === null ? '' : `<span class="${g >= 0 ? 'pos' : 'neg'}">${pct(g)}</span>`) : 'Add month'}</small></span></button>`;
+      <span class="v">${n ? fmtW(a, x.value) : '—'}<small>${n ? (x.cur !== HOME() ? '≈ ' + hm0.format(x.valueEur) + ' · ' : '') + (g === null ? '' : `<span class="${g >= 0 ? 'pos' : 'neg'}">${pct(g)}</span>`) + (x.xirr == null ? '' : ` · <span title="Return a year (XIRR) in ${x.cur}, over ${x.xirrMonths} months">${xpct(x.xirr)} a year</span>`) : 'Add month'}</small></span></button>`;
   }).join('') + (pf.withData.length > 1 ? `<div class="r tot"><span></span><span>Total</span><span class="v">${hm0.format(pf.value)}<small>${pct(pf.cost > 0 ? pf.net / pf.cost : 0)} in euros</small></span></div>` : '')
     : `<p class="empty" style="margin:0">${state.accountsReady ? 'No investment accounts yet.' : 'Loading…'}</p>`;
   $('#updMonth').hidden = !rows.length;
@@ -5818,6 +5827,10 @@ function renderInvDetail(a){
       <div class="kpi"><span class="lbl">Value</span><span class="val">${fmtW(a, value)}</span><span class="sub">${pend ? `${monthLabel(last.month)} value ${fmtW(a, last.value)} ${pend > 0 ? '+' : '−'} ${fmtW(a, Math.abs(pend))} moved since` : monthLabel(last.month)}${fx ? ' · ≈ ' + hm0.format(value * fx) + ' today' : ''}</span></div>
       <div class="kpi"><span class="lbl">In since tracking</span><span class="val">${fmtW(a, invested)}</span><span class="sub">its ${monthLabel(rows[0].month)} value plus money added since${Math.abs(before) >= 1 && rows[0].inv > 0 ? ` · before that: paid ${fmtW(a, rows[0].inv)}, worth ${fmtW(a, rows[0].value)} (${pct(before / rows[0].inv)})` : ''}</span></div>
       <div class="kpi"><span class="lbl">Gain since tracking</span><span class="val ${value - invested < 0 ? 'neg' : ''}">${value - invested >= 0 ? '+' : '−'}${fmtW(a, Math.abs(value - invested))}</span><span class="sub">${g === null ? '' : pct(g) + ' in ' + cur}</span></div>
+      ${(() => { const x = portfolio().accs.find(x => x.a.id === a.id) || {}, f = xpct;
+        return `<div class="kpi"><span class="lbl">Return a year (XIRR)</span><span class="val ${x.xirr < 0 ? 'neg' : ''}">${x.xirr == null ? '—' : f(x.xirr)}</span><span class="sub">${x.xirr == null
+          ? (x.xirrMonths < 3 ? 'from 3 months of values' : 'not enough to work it out')
+          : `in ${cur} over ${x.xirrMonths} months${a.valueMode === 'auto' ? ', modelled' : ''}${x.cur !== HOME() && x.xirrHome != null ? ` · <b>${f(x.xirrHome)}</b> in ${HOME() === 'INR' ? 'rupees' : 'euros'}, with what the ${cur} did` : ''}`}</span></div>`; })()}
     </section>
     ${(() => { const r = rows.slice().reverse().find(r => !r.opening && trInMonth(a, r.month) - (r.inv || 0) > 1); if (!r) return '';
       const t = trInMonth(a, r.month);

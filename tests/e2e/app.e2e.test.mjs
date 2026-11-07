@@ -924,6 +924,25 @@ test('layout: numbers first and To do on one line; Budget tab; charts on Transac
   await clean(app);
 });
 
+test('investments: each account has its own XIRR (from 3 months of values); the portfolio’s is unchanged', async () => {
+  const app = await openApp(), { page } = app;
+  const snap = (acc, m, investment, value, opening) => ({ accountId: acc, month: m, investment, value, ...(opening ? { opening: true } : {}) });
+  // 1,000 in, worth 1,100 a year later and nothing added: 10% a year. A second account with one month only.
+  await app.seed({
+    accounts: { a1: { name: 'Broker', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' }, a2: { name: 'New fund', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
+    invSnapshots: { a1_1: snap('a1', '2025-01', 1000, 1000, true), a1_2: snap('a1', '2025-07', 0, 1050), a1_3: snap('a1', '2026-01', 0, 1100), a2_1: snap('a2', '2026-01', 500, 500, true) } });
+  await app.go('wealth'); await page.waitForTimeout(250);
+  const list = await app.text('#invList');
+  assert.match(list, /Broker[\s\S]*\+10\.0% · 10\.0% a year/);
+  assert.doesNotMatch(list, /New fund[\s\S]*a year/, 'one month is too short for a yearly rate');
+  assert.match(await app.text('#invKpis'), /Return a year \(XIRR\)\s*\d/, 'the portfolio still has its own');
+  await page.click('#invList [data-acc="a1"]'); await page.waitForTimeout(150);
+  assert.match(await app.text('#accDetail .kpis'), /Return a year \(XIRR\)\s*10\.0%\s*in EUR over 12 months/);
+  await page.click('[data-backaccs]'); await page.click('#invList [data-acc="a2"]'); await page.waitForTimeout(150);
+  assert.match(await app.text('#accDetail .kpis'), /Return a year \(XIRR\)\s*—\s*from 3 months of values/);
+  await clean(app);
+});
+
 test('wealth: net worth chart on Investments only; Cash & cards one row per account', async () => {
   const app = await openApp(), { page } = app, now = new Date().toISOString();
   await app.seed({ accounts: { ...ACC4, etf: { name: 'ETF', type: 'investment', invType: 'equity', currency: 'EUR', owner: 'Anubhav' } },
